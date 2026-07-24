@@ -1,0 +1,24 @@
+# MandiIQ Dashboard — Streamlit Cloud Configuration
+# This file is consumed by Streamlit Community Cloud (share.streamlit.io)
+# and local development. For Cloud, the API URL is set via Secrets:
+#   MANDIQ_API_URL = https://mandiiq-api.onrender.com
+
+[server]
+maxUploadSize = 10
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#d7ff00"
+backgroundColor = "#0a0a0a"
+secondaryBackgroundColor = "#1a1a2e"
+textColor = "#e8e8e8"
+font = "sans serif"
+
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"
+
