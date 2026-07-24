@@ -171,17 +171,6 @@ async def lifespan(app: FastAPI):
         state.commodities = []
     conn.close()
 
-    # Auto-start Ashoka historical import if data is missing
-    _hist_dir = Path(__file__).resolve().parent.parent / "data" / "historical"
-    _csv_path = _hist_dir / "agmarknet_ashoka.csv"
-    if not _csv_path.exists() and os.environ.get("MANDIIQ_AUTO_IMPORT", "1") == "1":
-        logger.info("Ashoka historical CSV not found -- starting background import thread (kept alive by UptimeRobot pings)...")
-        try:
-            from mandi_rdd.ingestion.ashoka_background_import import trigger
-            t = threading.Thread(target=trigger, kwargs={"all_commodities": True}, daemon=True)
-            t.start()
-        except Exception as e:
-            logger.warning(f"Could not start Ashoka import: {e}")
     yield
 
 
