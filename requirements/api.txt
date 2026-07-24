@@ -1,10 +1,13 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
-pydantic>=2.0.0
-pandas>=1.5.0
+# MandiIQ API - lightweight requirements (no prophet/xgboost/shap)
+# Heavy ML libs are only needed by the analysis engine, not the API serving layer
+pandas>=2.0.0
 numpy>=1.24.0
-scikit-learn>=1.2.0
-xgboost>=2.0.0
-shap>=0.41.0
-joblib>=1.2.0
 duckdb>=0.8.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+scipy>=1.11.0
+scikit-learn>=1.2.0
+joblib>=1.2.0
