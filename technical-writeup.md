@@ -38,20 +38,15 @@ Where:
 - $\gamma_1$ and $\gamma_2$ represent the slopes of the running variable on either side of the boundary.
 - $\varepsilon_{it}$ is the error term.
 
-```
-       Log Price (Y)
-            │
-            │                  / (Control Group: Normal Rainfall)
-            │                 /
-            │                /
-      Jump  │              .─── c (-20% Cutoff)
-     (β) ──▶│             │
-            │             │
-            │            /
-            │           /  (Treated Group: Rain Deficient)
-            │          /
-            └───────────────────────────────────
-                        Rainfall Departure (X)
+
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'backgroundColor': '#1a1a2e', 'primaryColor': '#d7ff00', 'lineColor': '#d7ff00', 'textColor': '#ffffff'}}}%%
+xychart-beta
+    title "RDD Discontinuity at -20% Rainfall Departure"
+    x-axis "Rainfall Departure (%)" ["-50%", "-40%", "-30%", "-20% (c)", "-10%", "0%", "+10%", "+20%"]
+    y-axis "Log Modal Price" 6.5 --> 9.0
+    line [6.8, 7.1, 7.4, 7.6, 8.1, 8.2, 8.3, 8.4]
 ```
 
 ### Bandwidth and Kernel Selection
@@ -81,24 +76,36 @@ To augment the causal analysis, MandiIQ includes a forecasting engine to predict
 ## 4. System Architecture & High-Scale Blueprint
 
 The MandiIQ prototype is built using a decoupled architecture:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1a1a2e', 'primaryTextColor': '#fff', 'lineColor': '#d7ff00', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460', 'clusterBkg': '#0d0d1a', 'clusterBorder': '#533483'}}}%%
+graph LR
+    subgraph Sources[Data Sources]
+        A[Agmarknet API / IMD Weather Grids]
+    end
+    subgraph Storage[Storage]
+        B[DuckDB Analytic Warehouse]
+    end
+    subgraph Analysis[Analysis]
+        C[Causal RDD Engine / MLflow Models]
+    end
+    subgraph API[API]
+        D[FastAPI Web App - /forecast /predict]
+    end
+    subgraph Frontend[Frontend]
+        E[Streamlit Dashboard - Theme Injected]
+    end
+    A --> B
+    B --> C
+    C --> D
+    D <--> E
+    linkStyle default stroke-width:2px,fill:none,stroke:#d7ff00
+```
 - **Database:** DuckDB acts as an embedded analytical warehouse containing 26,994 transaction records joined with spatial IMD indices.
 - **Serving Layer:** FastAPI exposes endpoints for model predictions, RDD calculations, and raw ledger data.
 - **Frontend:** Streamlit renders Plotly charts and metrics.
 
-```
-                                    [ SYSTEM PIPELINE FLOW ]
 
-   ┌───────────────────┐      ┌──────────────────┐      ┌────────────────────┐
-   │ Agmarknet API /   │ ───▶ │  DuckDB Analytic │ ───▶ │ Causal RDD Engine  │
-   │ IMD Weather Grids │      │  Warehouse File  │      │ & MLflow Models    │
-   └───────────────────┘      └──────────────────┘      └─────────┬──────────┘
-                                                                  │
-                                                                  ▼
-   ┌───────────────────┐      ┌──────────────────┐      ┌────────────────────┐
-   │  Streamlit App    │ ◀─── │  FastAPI Web App │ ◀─── │ Prediction API     │
-   │  (Theme Injected) │      │  (/forecast)     │      │ (Fallback pickles) │
-   └───────────────────┘      └──────────────────┘      └────────────────────┘
-```
 
 ### Scaling to 10 Million Orders / Transactions Per Day
 To upgrade the system from an analytical prototype to an enterprise platform processing 10 million agricultural transactions daily, the following architecture is deployed:

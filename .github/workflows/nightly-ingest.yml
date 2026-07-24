@@ -12,9 +12,10 @@ name: Nightly Ingestion
 #   DATA_GOV_IN_API_KEY  - a free key from https://api.data.gov.in/
 
 on:
+  push:
+    branches: [master]
   schedule:
-    # Daily 18:30 UTC (~midnight IST, after mandi data for the day is published)
-    - cron: "30 18 * * *"
+    - cron: "30 * * * *"  # every hour at :30
   workflow_dispatch: {}   # allow manual "Run workflow" from the Actions tab
 
 permissions:

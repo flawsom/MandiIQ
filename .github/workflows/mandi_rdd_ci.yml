@@ -10,7 +10,7 @@ on:
       - 'mandi_rdd/**'
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours - runs ingestion (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '15 * * * *'  # Every hour at :15 - runs ingestion
 
 jobs:
   test:

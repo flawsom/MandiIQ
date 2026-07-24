@@ -29,6 +29,10 @@ Designed with a premium dark creative-studio aesthetic inspired by **Alche Studi
 
 ```
 .
+├── diagrams/
+│   ├── architecture.mmd      # System architecture mermaid diagram
+│   └── pipeline-flow.mmd     # Data pipeline flow mermaid diagram
+├── mermaid.json              # Mermaid diagram config (dark theme)
 ├── docs/
 │   ├── index.html            # Redesigned Alche-style GH-Pages Landing & Docs
 │   ├── writeup.md            # In-depth scientific/technical writeup
@@ -104,43 +108,6 @@ Our empirical results show that onions show active hoarding signals (a statistic
 
 ---
 
-## Design Reference
-
-The MandiIQ visual language is a deep adaptation of [Alche Studio](https://alche.studio), a Tokyo-based creative house. Key elements adopted:
-
-| Alche DNA | MandiIQ Implementation |
-|-----------|------------------------|
-| Pure black `#000` infinite canvas | `--color-bg: #000000` page background |
-| Lighter surface mode (`#111`) | `.theme-surface` CSS class swaps `--color-bg-base: #111111`; toggleable via `localStorage` + `st.query_params` + cross-tab sync |
-| Single chartreuse accent `#d7ff00` | `--color-primary: #d7ff00` for metrics, CTAs, active states |
-| Monochromatic grey scale | `--color-text-high/med/low: #bababa/#7e7e7e/#555555` |
-| Frame-drawing SVG corner brackets | `.crosshair-card`, `.crosshair-panel` with animated corner reveals on hover (now works: `overflow:hidden` removed from all glass cards) |
-| `cubic-bezier(0.25, 0.46, 0.45, 0.94)` easing | `--ease-soft` token used across all motion |
-| `cubic-bezier(0.16, 1, 0.3, 1)` overshoot | `--ease-bounce` for scroll-reveal animations |
-| SlotButton slide-up hover | `.slot-btn` with scale + opacity transition + center-grown underline |
-| Dot grid pixel canvas | 38px-spaced subtle dot pattern overlay at 0.04 opacity |
-| Drifting atmosphere blobs | 5-layer multi-color drifter system (25-45s cycles) |
-| Typography stack (Space Grotesk, IBM Plex Sans/Mono) | Same stack + Barlow for numeric displays + Inter fallback |
-| SVG icon system (Lucide-based) | `dashboard/icons.py` exports 5 constants (SUN, MOON, LEAF, CHAT, COG) — single source of truth, no emoji in UI |
-
-### Static Pages Alche Parity
-
-All three static landing/documentation pages are at full Alche parity with the dashboard:
-
-| Feature | `docs/index.html` | `landing/index.html` | `landing/mandi-iq/index.html` |
-|---------|:---:|:---:|:---:|
-| Dot grid + 5-layer atmosphere | ✅ | ✅ | ✅ |
-| SlotButtons with slide-up | ✅ | ✅ | ✅ |
-| Text scrambler | ✅ | ✅ | ✅ |
-| Hero frame-drawing SVG | ✅ | ✅ | ✅ |
-| Glass cards with crosshair corners | ✅ (hover lift + shadow) | ✅ (hover lift + shadow) | N/A (uses robo-card pattern) |
-| Scroll reveal animation | ✅ | ✅ | ✅ |
-| Favicon (inline SVG lime leaf) | ✅ | ✅ | ✅ |
-| Responsive layout | ✅ | ✅ | ✅ |
-
-See [`docs/writeup.md` §6](docs/writeup.md) for the full design system documentation including the color palette table and motion system spec.
-
----
 
 ## Production Resilience & Scale
 

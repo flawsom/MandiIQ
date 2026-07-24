@@ -8,16 +8,13 @@ Features:
 - Progress reporting
 """
 
-import os
-import json
 import datetime
-import urllib.parse
-import time
-import urllib.request
-import urllib.error
-import ssl
 import logging
+import os
+import urllib.parse
 from typing import Optional
+
+from mandi_rdd.ingestion.http_client import SSL_CTX, get_api_key, http_get_json, safe_float
 
 # Default public API key (rate-limited but works)
 
@@ -27,7 +24,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
 
 # SSL context for Windows
-SSL_CTX = ssl.create_default_context()
+# SSL_CTX imported from http_client
 
 # Supplementary "variety-wise" price archive (data.gov.in resource 35985678-...).
 # 80M+ historical rows; used as a best-effort SUPPLEMENTARY feed for recent

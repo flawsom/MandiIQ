@@ -13,22 +13,23 @@ for the RDD: monthly rainfall departure from normal (%).
 
 import os
 import re
-import json
 import csv
 import io
 import time
-import urllib.request
 import urllib.parse
-import urllib.error
-import ssl
 import logging
-from pathlib import Path
 from typing import Optional
-import zipfile
+
+from mandi_rdd.ingestion.http_client import (
+    safe_float,
+    get_api_key,
+    http_get,
+    http_get_json,
+    http_get_text,
+    SSL_CTX,
+)
 
 logger = logging.getLogger(__name__)
-
-SSL_CTX = ssl.create_default_context()
 
 
 # data.gov.in resource IDs to try (rainfall-related)
@@ -48,28 +49,6 @@ RAINFALL_CANDIDATE_IDS = [
 FALLBACK_CSV_URL = "https://raw.githubusercontent.com/datameet/rainfall/master/data/rainfall_monthly_subdivisions.csv"
 
 
-def _get_api_key() -> str:
-    """Get API key from env; fail loudly if missing/invalid (no fallback key)."""
-    key = os.environ.get("DATA_GOV_IN_API_KEY")
-    if not key:
-        raise RuntimeError(
-            "DATA_GOV_IN_API_KEY is not set. Refusing to fall back to a shared "
-            "default key (PRD Phase 1). Set the secret in CI or local .env."
-        )
-    if len(key) < 16:
-        raise RuntimeError(f"DATA_GOV_IN_API_KEY looks invalid (len={len(key)}).")
-    return key
-
-
-def _safe_float(val):
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-
 def search_rainfall_resource() -> Optional[str]:
     """
     Search data.gov.in catalog for the rainfall departure resource.
@@ -78,7 +57,7 @@ def search_rainfall_resource() -> Optional[str]:
     logger.info("Searching for rainfall departure resource on data.gov.in...")
 
     # Try the catalog search API
-    api_key = _get_api_key()
+    api_key = get_api_key("DATA_GOV_IN_API_KEY")
     search_urls = [
         f"https://api.data.gov.in/catalog?api-key={api_key}&format=json&limit=10&search=rainfall+departure+normal+monthly+sub-division",
         f"https://api.data.gov.in/catalog?api-key={api_key}&format=json&limit=10&search=sub-division+rainfall+departure",
@@ -87,9 +66,7 @@ def search_rainfall_resource() -> Optional[str]:
 
     for url in search_urls:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=15, context=SSL_CTX) as f:
-                data = json.loads(f.read())
+            data = http_get_json(url, timeout=15, max_retries=1)
             if "records" in data and len(data["records"]) > 0:
                 for r in data["records"]:
                     rid = r.get("resource_id", r.get("id", ""))
@@ -108,13 +85,11 @@ def try_rainfall_resource(resource_id: str) -> Optional[list[dict]]:
     Try to pull data from a rainfall resource ID.
     Returns records if successful, None otherwise.
     """
-    api_key = _get_api_key()
+    api_key = get_api_key("DATA_GOV_IN_API_KEY")
     url = f"https://api.data.gov.in/resource/{resource_id}?api-key={api_key}&format=json&limit=10"
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15, context=SSL_CTX) as f:
-            data = json.loads(f.read())
+        data = http_get_json(url, timeout=15, max_retries=1)
         records = data.get("records", [])
         if records:
             logger.info(f"  Resource {resource_id} returned {len(records)} records")
@@ -136,12 +111,7 @@ def fetch_rainfall_from_github() -> list[dict]:
     logger.info("Fetching rainfall data from Datameet GitHub...")
 
     try:
-        req = urllib.request.Request(
-            FALLBACK_CSV_URL,
-            headers={"User-Agent": "Mozilla/5.0"},
-        )
-        with urllib.request.urlopen(req, timeout=30, context=SSL_CTX) as f:
-            content = f.read().decode("utf-8")
+        content = http_get_text(FALLBACK_CSV_URL, timeout=30, max_retries=2)
 
         reader = csv.DictReader(io.StringIO(content))
         records = []
@@ -154,11 +124,11 @@ def fetch_rainfall_from_github() -> list[dict]:
                 month = int(row.get("month") or row.get("Month") or 0)
 
                 # Rainfall amount and normal
-                rainfall = _safe_float(row.get("rainfall") or row.get("Rainfall") or row.get("RAINFALL"))
-                normal = _safe_float(row.get("normal") or row.get("Normal") or row.get("NORMAL"))
+                rainfall = safe_float(row.get("rainfall") or row.get("Rainfall") or row.get("RAINFALL"))
+                normal = safe_float(row.get("normal") or row.get("Normal") or row.get("NORMAL"))
 
                 # Departure percentage
-                departure = _safe_float(
+                departure = safe_float(
                     row.get("departure_pct")
                     or row.get("departure")
                     or row.get("Departure")
@@ -459,7 +429,7 @@ def fetch_district_daily_rainfall(resource_id: str, districts: list[str],
     We pull per-district daily rows (filtered), bounded so CI stays fast.
     Returns a flat list of raw records.
     """
-    api_key = _get_api_key()
+    api_key = get_api_key("DATA_GOV_IN_API_KEY")
     all_recs: list[dict] = []
     for dist in districts:
         offset = 0
@@ -472,9 +442,7 @@ def fetch_district_daily_rainfall(resource_id: str, districts: list[str],
                 f"&filters[District]={urllib.parse.quote(str(dist))}"
             )
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=25, context=SSL_CTX) as f:
-                    data = json.loads(f.read())
+                data = http_get_json(url, timeout=25, max_retries=1)
             except Exception as e:
                 logger.warning(f"  Rainfall fetch failed for {dist}: {e}")
                 break
@@ -503,7 +471,7 @@ def aggregate_daily_to_monthly(records: list[dict]) -> list[dict]:
     data-driven "normal" without needing an external normals table.
     District -> sub_division uses the bundled mandi mapping (reversed).
     """
-    from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map
+    from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map  # noqa: F811
     dmap = load_district_subdivision_map()
     # Reverse: District (lower) -> sub_division
     dist_to_subdiv = {}
@@ -516,7 +484,7 @@ def aggregate_daily_to_monthly(records: list[dict]) -> list[dict]:
         dist = (r.get("District") or "").strip()
         yr = r.get("Year")
         mo = r.get("Month")
-        val = _safe_float(r.get("Avg_rainfall"))
+        val = safe_float(r.get("Avg_rainfall"))
         if not dist or val is None or yr is None or mo is None:
             continue
         try:
@@ -573,7 +541,7 @@ def fetch_and_store_all_rainfall() -> list[dict]:
     if explicit_ids:
         try:
             from mandi_rdd.storage.duckdb_store import get_connection
-            from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map
+            from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map  # noqa: F811
             dmap = load_district_subdivision_map()
             try:
                 conn = get_connection()
@@ -684,11 +652,11 @@ def fetch_all_india_monsoon(resource_id: str, api_key: str | None = None) -> lis
             try:
                 out.append({
                     "year": int(r.get("year", 0)),
-                    "jun": _safe_float(r.get("jun")),
-                    "jul": _safe_float(r.get("jul")),
-                    "aug": _safe_float(r.get("aug")),
-                    "sep": _safe_float(r.get("sep")),
-                    "jun_sep": _safe_float(r.get("jun_sep")),
+                    "jun": safe_float(r.get("jun")),
+                    "jul": safe_float(r.get("jul")),
+                    "aug": safe_float(r.get("aug")),
+                    "sep": safe_float(r.get("sep")),
+                    "jun_sep": safe_float(r.get("jun_sep")),
                 })
             except (ValueError, TypeError):
                 continue

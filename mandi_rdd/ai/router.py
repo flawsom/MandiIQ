@@ -42,6 +42,33 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _cool_down: dict[str, float] = {}  # model_id -> timestamp until which it's cooling down
 _lock = threading.Lock()
 
+# ── Global timeout & fallback counter ──
+GLOBAL_TIMEOUT_SECONDS = 60     # hard ceiling for the entire call_llm() chain
+_fallback_count: int = 0
+_fallback_lock = threading.Lock()
+
+
+def get_llm_fallback_count() -> int:
+    """Return how many times call_llm() exhausted all models."""
+    with _fallback_lock:
+        return _fallback_count
+
+
+def reset_llm_fallback_count():
+    """Reset the fallback counter to 0."""
+    global _fallback_count
+    with _fallback_lock:
+        _fallback_count = 0
+
+
+def timeout_config() -> dict:
+    """Return current timeout configuration for observability."""
+    return {
+        "global_timeout_seconds": GLOBAL_TIMEOUT_SECONDS,
+        "cool_down_models": list(_cool_down.keys()),
+        "fallback_count": get_llm_fallback_count(),
+    }
+
 
 def _detect_provider() -> tuple[Optional[str], Optional[str]]:
     """
@@ -157,6 +184,8 @@ def get_provider() -> Optional[str]:
     return provider
 
 
+
+
 def call_llm(
     system_prompt: str,
     user_message: str,
@@ -175,6 +204,8 @@ def call_llm(
           - "error": str | None
           - "endpoints_cited": list[str] (which internal endpoints were invoked)
     """
+    _call_llm_deadline = time.time() + GLOBAL_TIMEOUT_SECONDS
+
     provider, api_key = _detect_provider()
     if not provider or not api_key:
         return {"content": "", "model": "", "error":
@@ -205,6 +236,11 @@ def call_llm(
         if _is_cooling_down(model_id):
             logger.debug(f"Skipping {model_id} — cooling down")
             continue
+
+        # Global deadline check
+        if time.time() > _call_llm_deadline:
+            logger.warning("Global timeout reached — stopping model chain")
+            break
 
         logger.info(f"Trying model: {model_id} ({model_name}) via {provider}")
 
@@ -277,6 +313,9 @@ def call_llm(
                 logger.warning(last_error)
 
     logger.error(f"All models exhausted. Last error: {last_error}")
+    global _fallback_count
+    with _fallback_lock:
+        _fallback_count += 1
     return {
         "content": "",
         "model": "",

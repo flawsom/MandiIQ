@@ -999,18 +999,17 @@
             background: var(--color-primary);
         }
 
-        /* Flowchart ASCII mockup */
-        .flowchart-mockup {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            line-height: 1.5;
-            color: var(--color-text-med);
-            white-space: pre;
-            overflow-x: auto;
+        /* Mermaid diagram wrapper */
+        .mermaid-wrapper {
             background: rgba(0, 0, 0, 0.4);
-            padding: 1.2rem;
+            padding: 1.5rem 1rem;
             border-radius: 4px;
             border: 1px solid var(--hairline);
+            overflow-x: auto;
+            margin: 1.2rem 0;
+        }
+        .mermaid-wrapper .mermaid {
+            max-width: 100%;
         }
 
         .alert-box {
@@ -1125,6 +1124,29 @@
             }
         }
     </style>
+    <!-- Mermaid.js for diagrams -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#1a1a2e',
+                primaryTextColor: '#ffffff',
+                lineColor: '#d7ff00',
+                secondaryColor: '#16213e',
+                tertiaryColor: '#0f3460',
+                mainBkg: '#1a1a2e',
+                nodeBorder: '#d7ff00',
+                clusterBkg: '#0d0d1a',
+                clusterBorder: '#533483',
+                titleColor: '#d7ff00',
+                nodeTextColor: '#ffffff'
+            },
+            fontFamily: '"Space Grotesk", "Inter", sans-serif'
+        });
+    </script>
+    
 </head>
 <body>
 
@@ -1401,17 +1423,17 @@
                             MandiIQ decouples the heavy analytical warehouse from the customer-facing dashboard. The system runs an automated ELT pipeline using DuckDB, fits locally weighted regressions, tracks models in MLflow, and exposes predictions through FastAPI.
                         </p>
                         
-                        <div class="flowchart-mockup">
-┌──────────────┐      ┌───────────────┐      ┌──────────────┐
-│  Agmarknet   │ ───▶ │  Local DuckDB │ ───▶ │ MLflow Model │
-│  CSV Ingest  │      │  Warehouse    │      │ Registry     │
-└──────────────┘      └───────────────┘      └──────┬───────┘
-                                                    │
-                                                    ▼
-┌──────────────┐      ┌───────────────┐      ┌──────────────┐
-│  Streamlit   │ ◀─── │  FastAPI      │ ◀─── │ Causal RDD   │
-│  Dashboard   │      │  /forecast    │      │ Estimator    │
-└──────────────┘      └───────────────┘      └──────────────┘</div>
+                        <div class="mermaid-wrapper">
+<pre class="mermaid" style="text-align: center;">
+%%{init: {"theme": "dark", "themeVariables": { "primaryColor": "#1a1a2e", "primaryTextColor": "#fff", "lineColor": "#d7ff00", "secondaryColor": "#16213e", "tertiaryColor": "#0f3460"}}}%%
+graph TD
+    A["Agmarknet<br/>CSV Ingest"] --> B["Local DuckDB<br/>Warehouse"]
+    B --> C["MLflow Model<br/>Registry"]
+    C --> D["Causal RDD<br/>Estimator"]
+    D --> E["FastAPI<br/>Forecast"]
+    E <--> F["Streamlit<br/>Dashboard"]
+</pre>
+</div>
 
                         <h3>Scaling to 10 Million Orders per Day</h3>
                         <p>

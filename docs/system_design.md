@@ -2,32 +2,34 @@
 
 ## 1. Current Architecture
 
-```
-┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌────────────────┐
-│  Raw CSV      │───▶│ DuckDB Data    │───▶│ Feature Eng   │───▶│ Model Training  │
-│  (Superstore) │    │ Pipeline       │    │ (src/features)│    │ + MLflow Track  │
-└──────────────┘    └───────────────┘    └──────────────┘    └───────┬────────┘
-                                                                      │
-                                                                      ▼
-                                                             ┌──────────────────┐
-                                                             │ MLflow Registry  │
-                                                             │ (Models:/Prod)   │
-                                                             └───────┬──────────┘
-                                                                      │
-                          ┌───────────────────────────────────────────┴──────────────┐
-                          ▼                                                          ▼
-                 ┌───────────────────┐                                   ┌───────────────────┐
-                 │ FastAPI Service    │◀──── HTTP requests ──────────────│ Streamlit Dashboard│
-                 │ (Render, free)     │                                   │ (Streamlit Cloud)  │
-                 │ /predict, /forecast│                                   │ Calls API, not .pkl│
-                 └────────┬──────────┘                                   └───────────────────┘
-                           │
-                           ▼
-                 ┌───────────────────┐
-                 │ Monitoring Logger  │
-                 │ (flat file + drift │
-                 │  detection)        │
-                 └───────────────────┘
+```mermaid
+%%{init: {"theme": "dark", "themeVariables": { "primaryColor": "#1a1a2e", "primaryTextColor": "#fff", "lineColor": "#d7ff00", "secondaryColor": "#16213e", "tertiaryColor": "#0f3460", "clusterBkg": "#0d0d1a", "clusterBorder": "#533483"}}}%%
+graph TD
+    subgraph Data[Data Sources]
+        A1[Raw CSV / Agmarknet API]
+        A2[IMD Weather Grids]
+    end
+    subgraph Pipe[Pipeline]
+        B1[DuckDB Data Pipeline]
+        B2[Feature Engineering]
+    end
+    subgraph Train[Training]
+        C1[Model Training + MLflow Tracking]
+        C2[MLflow Registry]
+    end
+    subgraph Serve[Serving]
+        D1[FastAPI Service]
+        D2[Streamlit Dashboard]
+        D3[Monitoring Logger]
+    end
+    A1 --> B1
+    A2 --> B1
+    B1 --> B2
+    B2 --> C1
+    C1 --> C2
+    C2 --> D1
+    D1 --> D2
+    D1 --> D3
 ```
 
 ### Current tech stack

@@ -5,8 +5,10 @@
 name: daily-ingest
 
 on:
+  push:
+    branches: [master]
   schedule:
-    - cron: "0 3 * * *"   # daily at 03:00 UTC
+    - cron: "0 * * * *"   # every hour at :00
   workflow_dispatch:       # allow manual trigger
 
 jobs:

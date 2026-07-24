@@ -28,7 +28,7 @@ from contextlib import asynccontextmanager
 
 import pandas as pd
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -40,6 +40,11 @@ from mandi_rdd.storage.duckdb_store import (
     get_monthly_avg_prices,
 )
 from mandi_rdd.analysis.rdd_engine import run_rdd, rdd_plot_data
+from mandi_rdd.ai.router import (
+    clear_cool_down,
+    get_llm_fallback_count,
+    reset_llm_fallback_count,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,6 +54,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
+    llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
     n_states: int
@@ -134,6 +140,17 @@ class AskResponse(BaseModel):
 
 # ── App state ──
 
+class HealthStats:
+    """Simple state for /metrics endpoint tracking."""
+    def __init__(self):
+        self.start_time = time.time()
+        self.health_count = 0
+        self.cold_start = 1  # resets on each server start
+
+
+health_stats = HealthStats()
+
+
 class AppState:
     def __init__(self):
         self.commodities = []
@@ -207,6 +224,7 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health():
+    health_stats.health_count += 1
     """Liveness check with full data counts for the documentation page."""
     conn = get_connection()
     init_schema(conn)
@@ -253,6 +271,7 @@ async def health():
 
     return HealthResponse(
         status="healthy",
+        llm_fallback_count=get_llm_fallback_count(),
         n_prices=n_prices,
         n_commodities=n_commodities,
         n_states=n_states,
@@ -600,6 +619,24 @@ async def refresh(commodity: Optional[str] = None):
         )
 
 
+# ── Admin reset endpoint ──
+
+@app.post("/admin/reset-metrics", tags=["Admin"])
+async def admin_reset_metrics():
+    """Reset LLM fallback counter and clear all model cool-down states.
+
+    Useful for recovering from a stuck state after a free-tier rate limit
+    penalty has expired. Does not affect any other system state.
+    """
+    reset_llm_fallback_count()
+    clear_cool_down()
+    return {
+        "status": "ok",
+        "llm_fallback_count": get_llm_fallback_count(),
+        "message": "LLM metrics reset: counter zeroed, all models taken out of cool-down.",
+    }
+
+
 @app.get("/historical-import-status", tags=["Data"])
 async def historical_import_status():
     """Get the current status of the background Ashoka CEDA historical import."""
@@ -642,6 +679,62 @@ async def trigger_backfill():
     except Exception as e:
         return {"error": str(e)}
 
+
+
+# ── Prometheus /metrics endpoint ──
+# Exposes lightweight service metrics in Prometheus text exposition format.
+# No prometheus_client dependency required.
+
+PROMETHEUS_METRICS_HEADER = {"Content-Type": "text/plain; version=0.0.4"}
+
+@app.get("/metrics", tags=["System"], include_in_schema=False)
+async def metrics():
+    """Prometheus-compatible metrics endpoint (no prometheus_client library).
+
+    Exposes service-level metrics in the Prometheus text exposition format
+    so the service can be scraped by Prometheus, Grafana Agent, or any
+    OpenMetrics-compatible collector.
+
+    Adding new metrics:
+        1. Define a gauge/counter line in the TEXT block below.
+        2. Populate its value from the relevant module function.
+        3. Ensure the metric name follows Prometheus naming conventions.
+    """
+    _uptime_sec = time.time() - health_stats.start_time
+    _llm_fb = get_llm_fallback_count()
+
+    lines = [
+        "# HELP mandiiq_uptime_seconds Time since the API server started.",
+        "# TYPE mandiiq_uptime_seconds gauge",
+        f"mandiiq_uptime_seconds {_uptime_sec}",
+        "",
+        "# HELP mandiiq_llm_fallback_total Number of times call_llm() exhausted all models.",
+        "# TYPE mandiiq_llm_fallback_total counter",
+        f"mandiiq_llm_fallback_total {_llm_fb}",
+        "",
+        "# HELP mandiiq_health_checks_total Total health check requests.",
+        "# TYPE mandiiq_health_checks_total counter",
+        f"mandiiq_health_checks_total {health_stats.health_count}",
+        "",
+        "# HELP mandiiq_cold_starts_total Number of cold starts (server restarts) detected.",
+        "# TYPE mandiiq_cold_starts_total counter",
+        f"mandiiq_cold_starts_total {health_stats.cold_start}",
+        "",
+        "# HELP mandiiq_prices_count Current number of price records in the database.",
+        "# TYPE mandiiq_prices_count gauge",
+    ]
+
+    # Try to read live prices count; emit -1 on failure (graceful degradation)
+    try:
+        conn = get_connection()
+        n = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
+        conn.close()
+        lines.append(f"mandiiq_prices_count {n}")
+    except Exception:
+        lines.append("mandiiq_prices_count -1")
+
+    body = "\n".join(lines) + "\n"
+    return Response(content=body, media_type=PROMETHEUS_METRICS_HEADER["Content-Type"])
 
 
 if __name__ == "__main__":

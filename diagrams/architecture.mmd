@@ -1,0 +1,88 @@
+---
+title: MandiIQ System Architecture
+---
+graph TB
+    subgraph Sources["📡 Data Sources"]
+        AGMARKNET["Agmarknet API<br/>Daily Mandi Prices"]
+        IMD["IMD Weather Grids<br/>Rainfall Departure (%)"]
+        SENTINEL["Sentinel Hub<br/>NDVI Satellite Data"]
+    end
+    subgraph Ingestion["📥 Ingestion Pipeline"]
+        FETCH_PRICES["fetch_prices.py<br/>Pagination + Retry"]
+        FETCH_RAINFALL["fetch_rainfall.py<br/>Sub-division Rainfall"]
+        FETCH_NDVI["fetch_ndvi.py<br/>Vegetation Index"]
+        SCHEDULER["scheduler.py<br/>Orchestration"]
+        HTTP_CLIENT["http_client.py<br/>Shared HTTP with Retry"]
+    end
+    subgraph Storage["🗄️ Storage Layer"]
+        DUCKDB["DuckDB Warehouse<br/>mandi_iq.duckdb"]
+        TABLES["Tables: prices, rainfall,<br/>ndvi, rdd_results,<br/>source_metadata"]
+        LAST_STATUS["last_ingest_status.json<br/>Freshness Tracking"]
+    end
+    subgraph Analysis["🧮 Analysis Engine"]
+        RDD_ENGINE["rdd_engine.py<br/>RDD Specification<br/>Local Linear Regression"]
+        FORECAST["forecast.py<br/>Prophet + XGBoost<br/>Volatility Envelopes"]
+        CLASSIFIER["classifier.py<br/>Spike Risk Scoring"]
+        PRESCRIPTIVE["prescriptive.py<br/>Procurement Recommendations"]
+    end
+    subgraph AI["🤖 AI Orchestrator"]
+        ROUTER["router.py<br/>Multi-Provider LLM<br/>Circuit Breaker"]
+        ORCHESTRATOR["orchestrator.py<br/>Tool Selection<br/>Grounded Answering"]
+        NARRATIVE["Nightly Narratives<br/>Commodity Reports"]
+    end
+    subgraph Serving["🌐 Serving Layer"]
+        FASTAPI["FastAPI Gateway<br/>(mandiiq-api.onrender.com)"]
+        ENDPOINTS["Endpoints:<br/>/health /prices /rdd-result<br/>/forecast /risk-score<br/>/ask /refresh /metrics"]
+        STREAMLIT["Streamlit Dashboard<br/>(mandiiq-dashboard.onrender.com)"]
+    end
+    subgraph Monitoring["📈 Observability"]
+        PROMETHEUS["/metrics Endpoint<br/>Prometheus Exposition"]
+        FRESHNESS["/freshness<br/>Source Staleness Tracking"]
+        HEALTH["/health<br/>Liveness + Data Counts"]
+        GRAFANA["Grafana / Prometheus<br/>(Optional Scraping)"]
+    end
+    AGMARKNET --> FETCH_PRICES
+    IMD --> FETCH_RAINFALL
+    SENTINEL --> FETCH_NDVI
+    FETCH_PRICES --> HTTP_CLIENT
+    FETCH_RAINFALL --> HTTP_CLIENT
+    FETCH_NDVI --> HTTP_CLIENT
+    SCHEDULER --> FETCH_PRICES
+    SCHEDULER --> FETCH_RAINFALL
+    SCHEDULER --> FETCH_NDVI
+    FETCH_PRICES --> DUCKDB
+    FETCH_RAINFALL --> DUCKDB
+    FETCH_NDVI --> DUCKDB
+    DUCKDB --> TABLES
+    SCHEDULER --> LAST_STATUS
+    DUCKDB --> RDD_ENGINE
+    DUCKDB --> FORECAST
+    DUCKDB --> CLASSIFIER
+    DUCKDB --> PRESCRIPTIVE
+    RDD_ENGINE --> FASTAPI
+    FORECAST --> FASTAPI
+    CLASSIFIER --> FASTAPI
+    PRESCRIPTIVE --> FASTAPI
+    FASTAPI --> ENDPOINTS
+    FASTAPI --> STREAMLIT
+    FASTAPI --> ROUTER
+    ROUTER --> ORCHESTRATOR
+    ORCHESTRATOR --> NARRATIVE
+    FASTAPI --> PROMETHEUS
+    FASTAPI --> FRESHNESS
+    FASTAPI --> HEALTH
+    PROMETHEUS --> GRAFANA
+    classDef source fill:#1a1a2e,stroke:#e94560,stroke-width:2px,color:#fff
+    classDef ingestion fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#fff
+    classDef storage fill:#0f3460,stroke:#533483,stroke-width:2px,color:#fff
+    classDef analysis fill:#533483,stroke:#e94560,stroke-width:2px,color:#fff
+    classDef ai fill:#2d1b69,stroke:#d7ff00,stroke-width:2px,color:#fff
+    classDef serving fill:#1a1a2e,stroke:#d7ff00,stroke-width:2px,color:#fff
+    classDef monitoring fill:#16213e,stroke:#e94560,stroke-width:2px,color:#fff
+    class AGMARKNET,IMD,SENTINEL source
+    class FETCH_PRICES,FETCH_RAINFALL,FETCH_NDVI,SCHEDULER,HTTP_CLIENT ingestion
+    class DUCKDB,TABLES,LAST_STATUS storage
+    class RDD_ENGINE,FORECAST,CLASSIFIER,PRESCRIPTIVE analysis
+    class ROUTER,ORCHESTRATOR,NARRATIVE ai
+    class FASTAPI,ENDPOINTS,STREAMLIT serving
+    class PROMETHEUS,FRESHNESS,HEALTH,GRAFANA monitoring

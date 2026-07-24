@@ -1,0 +1,38 @@
+---
+title: MandiIQ Data Pipeline Flow
+---
+flowchart LR
+    subgraph Ingest["🌾 Daily Ingestion"]
+        direction TB
+        A1["data.gov.in<br/>API"] --> A2["fetch_prices.py<br/>Pagination Engine"]
+        A3["IMD / GitHub<br/>Rainfall CSV"] --> A4["fetch_rainfall.py<br/>Sub-division Parser"]
+        A5["Sentinel Hub<br/>NDVI"] --> A6["fetch_ndvi.py<br/>Vegetation Index"]
+        A2 --> A7["http_client.py<br/>Retry + SSL + JSON"]
+        A4 --> A7
+        A6 --> A7
+    end
+    subgraph Store["💾 DuckDB Warehouse"]
+        direction TB
+        B1["prices<br/>371K+ Records"]
+        B2["rainfall<br/>Sub-division Monthly"]
+        B3["ndvi<br/>District Vegetation"]
+        B4["rdd_results<br/>Causal Estimates"]
+        B5["source_metadata<br/>Freshness Tracking"]
+    end
+    subgraph Analyze["🔬 Analysis & ML"]
+        direction TB
+        C1["rdd_engine.py<br/>Local Linear RDD<br/>McCrary Density Test"]
+        C2["forecast.py<br/>Prophet + XGBoost<br/>Volatility Envelopes"]
+        C3["classifier.py<br/>Spike Risk<br/>XGBoost Classifier"]
+        C4["prescriptive.py<br/>Procurement<br/>Recommendations"]
+    end
+    subgraph Serve["🚀 Serving"]
+        direction TB
+        D1["FastAPI Gateway<br/>mandiiq-api.onrender.com"]
+        D2["Streamlit Dashboard<br/>Interactive UI"]
+        D3["AI Orchestrator<br/>Gemini / OpenRouter<br/>Free-tier LLM Chain"]
+    end
+    Ingest --> Store
+    Store --> Analyze
+    Analyze --> Serve
+    linkStyle default stroke-width:2px,fill:none,stroke:#d7ff00

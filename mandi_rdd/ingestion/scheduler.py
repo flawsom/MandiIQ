@@ -13,6 +13,7 @@ Use cases:
 - Cron: 0 6 * * * cd /app && python -m mandi_rdd.ingestion.scheduler
 """
 
+import json
 import os
 import sys
 import time
@@ -308,6 +309,31 @@ def run_ingestion(
     logger.info(f"Pipeline complete in {summary['duration_seconds']}s")
     return summary
 
+
+
+def _write_ingest_status(summary: dict) -> None:
+    """Write last_ingest_status.json so /health sees latest status."""
+    status = summary.get("status", "unknown")
+    steps = summary.get("steps", {})
+    prices_step = steps.get("prices", {})
+    n_new = prices_step.get("new", 0) if isinstance(prices_step, dict) else 0
+    outcome = "success" if status == "ok" else "failure"
+    import datetime
+    record = {
+        "last_run_utc": datetime.datetime.utcnow().isoformat() + "Z",
+        "outcome": outcome,
+        "status": status,
+        "new_price_rows": n_new,
+        "duration_s": summary.get("duration_seconds"),
+        "error": None if status == "ok" else summary.get("error"),
+    }
+    try:
+        out = Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w") as f:
+            json.dump(record, f, indent=2)
+    except Exception:
+        pass
 
 def run_once():
     """One-shot ingestion + RDD run. Suitable for cron."""
