@@ -13,7 +13,7 @@ services:
     region: oregon          # closest free-tier region to India-friendly latency; change if preferred
     branch: master
     buildCommand: pip install -r mandi_rdd/requirements.txt
-    startCommand: uvicorn mandi_rdd.api.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn mandi_rdd.api.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
     # The API reads the committed DuckDB inside the repo. Default path already
     # resolves to mandi_rdd/data/mandi_iq.duckdb, but we set it explicitly.

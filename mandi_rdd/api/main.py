@@ -27,7 +27,6 @@ import time
 from typing import Optional
 from contextlib import asynccontextmanager
 
-import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +39,6 @@ from mandi_rdd.storage.duckdb_store import (
     get_latest_rdd,
     get_monthly_avg_prices,
 )
-from mandi_rdd.analysis.rdd_engine import run_rdd, rdd_plot_data
 from mandi_rdd.ai.router import (
     clear_cool_down,
     get_llm_fallback_count,
@@ -347,6 +345,7 @@ async def rdd_result(commodity: str):
     
     # Run fresh RDD
     try:
+        from mandi_rdd.analysis.rdd_engine import run_rdd
         result = run_rdd(conn, commodity=commodity)
         conn.close()
         
@@ -401,6 +400,7 @@ async def rdd_plot(commodity: str):
         x = merged["departure_pct"].values
         y = merged["avg_modal_price"].values
         
+        from mandi_rdd.analysis.rdd_engine import rdd_plot_data
         plot_data = rdd_plot_data(x, y, cutoff=-19.0)
         return plot_data
         
