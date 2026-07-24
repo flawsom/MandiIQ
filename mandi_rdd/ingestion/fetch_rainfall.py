@@ -11,6 +11,7 @@ The rainfall data is joined with mandi prices on
 for the RDD: monthly rainfall departure from normal (%).
 """
 
+import json
 import os
 import re
 import csv
