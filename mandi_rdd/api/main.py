@@ -620,13 +620,6 @@ async def admin_reset_metrics():
     Useful for recovering from a stuck state after a free-tier rate limit
     penalty has expired. Does not affect any other system state.
     """
-@app.post("/admin/reset-metrics", tags=["Admin"])
-async def admin_reset_metrics():
-    """Reset LLM fallback counter and clear all model cool-down states.
-
-    Useful for recovering from a stuck state after a free-tier rate limit
-    penalty has expired. Does not affect any other system state.
-    """
     reset_llm_fallback_count()
     clear_cool_down()
     return {
