@@ -110,12 +110,14 @@ def _default_models(provider: Optional[str]) -> list[dict]:
     """Fallback model list if models.yaml is missing or unreadable."""
     if provider == "nvidia":
         return [
-            {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B Instruct",
-             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
-            {"id": "mistralai/mistral-nemo-12b-instruct", "name": "Mistral Nemo 12B",
-             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
-            {"id": "google/gemma-2-27b-it", "name": "Gemma 2 27B IT",
-             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
+            {"id": "nvidia/nemotron-3-ultra-550b-a55b", "name": "Nemotron 3 Ultra 550B",
+             "max_retries": 1, "timeout_seconds": 60, "cool_down_minutes": 3},
+            {"id": "deepseek-ai/deepseek-v4-pro", "name": "DeepSeek V4 Pro",
+             "max_retries": 1, "timeout_seconds": 60, "cool_down_minutes": 3},
+            {"id": "moonshotai/kimi-k2.6", "name": "Kimi K2.6",
+             "max_retries": 1, "timeout_seconds": 60, "cool_down_minutes": 3},
+            {"id": "z-ai/glm-5.2", "name": "GLM-5.2",
+             "max_retries": 1, "timeout_seconds": 60, "cool_down_minutes": 3},
         ]
     if provider == "gemini":
         return [
