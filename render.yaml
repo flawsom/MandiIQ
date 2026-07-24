@@ -26,5 +26,7 @@ services:
         sync: false          # you paste this in the Render dashboard (or use OPENROUTER_API_KEY)
       - key: OPENROUTER_API_KEY
         sync: false          # optional alternative provider
+      - key: MANDIIQ_AUTO_IMPORT
+        value: "0"          # disable Ashoka background import (uses 500MB+ RAM)
       - key: PORT
         value: "8000"        # Render overrides this at runtime via $PORT
