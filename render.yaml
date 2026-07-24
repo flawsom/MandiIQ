@@ -26,5 +26,7 @@ services:
         sync: false          # you paste this in the Render dashboard (or use OPENROUTER_API_KEY)
       - key: OPENROUTER_API_KEY
         sync: false          # optional alternative provider
+      - key: DATA_GOV_IN_API_KEY
+        sync: false          # paste from data.gov.in — required to populate mandi prices
       - key: PORT
         value: "8000"        # Render overrides this at runtime via $PORT
