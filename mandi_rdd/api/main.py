@@ -27,7 +27,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -558,58 +558,68 @@ async def ask_question(request: AskRequest):
 
 
 @app.post("/refresh", response_model=RefreshResponse, tags=["System"])
-async def refresh(commodity: Optional[str] = None):
-    """Manually trigger a full pipeline re-run.
-    
-    After the pipeline finishes, also generates the nightly narrative
-    via the AI orchestrator (if OPENROUTER_API_KEY is set).
-    
+async def refresh(background_tasks: BackgroundTasks, commodity: Optional[str] = None):
+    """Kick off a full pipeline re-run in the background.
+
+    Because the pipeline (fetching prices, rainfall, RDD, forecast) can take
+    several minutes, the task runs as a background job and this endpoint
+    returns immediately. Track progress via GET /health (n_prices, last_run_utc)
+    or GET /metrics.
+
     Args:
         commodity: Optional commodity filter to limit the pipeline run.
     """
-    import time
-    start = time.time()
-    
     try:
         from mandi_rdd.ingestion.scheduler import run_ingestion
-        filters = {}
-        if commodity:
-            filters["commodity"] = commodity
-        summary = run_ingestion(filters=filters if commodity else None)
-        
-        # Generate nightly narrative if AI is configured (Gemini free or OpenRouter)
-        from mandi_rdd.ai.router import get_api_key as _get_llm_key
-        _llm_key = _get_llm_key()
-        narrative_status = "skipped"
-        if _llm_key:
-            try:
-                from mandi_rdd.ai.orchestrator import generate_nightly_narrative
-                target = commodity or "Onion"
-                narrative = generate_nightly_narrative(commodity=target)
-                narrative_status = "generated" if not narrative.get("error") else "failed"
-                logger.info(f"Nightly narrative for {target}: {narrative_status}")
-            except Exception as e:
-                narrative_status = f"error: {e}"
-                logger.warning(f"Nightly narrative generation failed: {e}")
-        
-        summary["nightly_narrative"] = narrative_status
-        duration = round(time.time() - start, 1)
-        
+
+        def _run_pipeline(commodity_filter: str | None = None):
+            import time as _t
+            _start = _t.time()
+            filters = {}
+            if commodity_filter:
+                filters["commodity"] = commodity_filter
+            logger.info(f"Background pipeline starting (commodity={commodity_filter or 'all'})...")
+            summary = run_ingestion(filters=filters if commodity_filter else None)
+
+            # Generate nightly narrative if AI is configured
+            from mandi_rdd.ai.router import get_api_key as _get_llm_key
+            _llm_key = _get_llm_key()
+            narrative_status = "skipped"
+            if _llm_key:
+                try:
+                    from mandi_rdd.ai.orchestrator import generate_nightly_narrative
+                    target = commodity_filter or "Onion"
+                    narrative = generate_nightly_narrative(commodity=target)
+                    narrative_status = "generated" if not narrative.get("error") else "failed"
+                    logger.info(f"Nightly narrative for {target}: {narrative_status}")
+                except Exception as e:
+                    narrative_status = f"error: {e}"
+                    logger.warning(f"Nightly narrative generation failed: {e}")
+            duration = round(_t.time() - _start, 1)
+            logger.info(f"Background pipeline finished in {duration}s: {summary}")
+
+        background_tasks.add_task(_run_pipeline, commodity)
         return RefreshResponse(
-            status="ok" if summary.get("status") == "ok" else "partial",
-            message=f"Pipeline complete: {summary.get('steps', {})}. Narrative: {narrative_status}",
-            duration_seconds=duration,
+            status="ok",
+            message=f"Pipeline started in background (commodity={commodity or 'all'}). Check /health or /metrics for progress.",
+            duration_seconds=None,
         )
     except Exception as e:
-        logger.error(f"Refresh failed: {e}")
+        logger.error(f"Failed to start background pipeline: {e}")
         return RefreshResponse(
             status="error",
-            message=f"Pipeline failed: {e}",
+            message=f"Failed to start pipeline: {e}",
+            duration_seconds=None,
         )
 
 
-# ── Admin reset endpoint ──
+@app.post("/admin/reset-metrics", tags=["Admin"])
+async def admin_reset_metrics():
+    """Reset LLM fallback counter and clear all model cool-down states.
 
+    Useful for recovering from a stuck state after a free-tier rate limit
+    penalty has expired. Does not affect any other system state.
+    """
 @app.post("/admin/reset-metrics", tags=["Admin"])
 async def admin_reset_metrics():
     """Reset LLM fallback counter and clear all model cool-down states.
