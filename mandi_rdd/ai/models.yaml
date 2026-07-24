@@ -1,12 +1,42 @@
 # MandiIQ — Multi-Provider Model Configuration
 #
 # Provider selection is automatic and free-first:
-#   1. If GEMINI_API_KEY is set → use Google Gemini directly (FREE tier, no middleman)
-#   2. If OPENROUTER_API_KEY is set → use OpenRouter (free-tier models)
-#   3. If neither is set → structured-data fallback (no narrative, no cost)
+#   1. If NVIDIA_API_KEY is set → use NVIDIA NIM API (free tier, direct)
+#   2. If GEMINI_API_KEY is set → use Google Gemini directly (FREE tier, no middleman)
+#   3. If OPENROUTER_API_KEY is set → use OpenRouter (free-tier models)
+#   4. If none set → structured-data fallback (no narrative, no cost)
 #
 # This file is provider-aware. Update the section for the provider you use
 # without touching code.
+
+nvidia:
+  # NVIDIA NIM API — https://build.nvidia.com (key format: nvapi-...)
+  # OpenAI-compatible endpoint at https://integrate.api.nvidia.com/v1
+  # Free tier includes a generous rate limit for open models.
+  models:
+    # Tier 1 — Powerful 70B model, strong instruction-following
+    - id: "meta/llama-3.1-70b-instruct"
+      name: "Llama 3.1 70B Instruct"
+      description: "Strong open-weight model for narratives and reasoning"
+      max_retries: 1
+      timeout_seconds: 45
+      cool_down_minutes: 3
+
+    # Tier 2 — Lightweight but capable 12B model
+    - id: "mistralai/mistral-nemo-12b-instruct"
+      name: "Mistral Nemo 12B"
+      description: "Efficient 12B model, good for structured outputs"
+      max_retries: 1
+      timeout_seconds: 45
+      cool_down_minutes: 3
+
+    # Tier 3 — Google Gemma 2 27B, solid multilingual fallback
+    - id: "google/gemma-2-27b-it"
+      name: "Gemma 2 27B IT"
+      description: "Strong multilingual model from Google"
+      max_retries: 1
+      timeout_seconds: 45
+      cool_down_minutes: 3
 
 gemini:
   # Google AI Studio free tier — https://aistudio.google.com

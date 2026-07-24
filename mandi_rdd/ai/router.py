@@ -35,6 +35,7 @@ except ImportError:
     logger.warning("openai SDK not installed. Install with: pip install openai")
 
 # ── Provider endpoints ──
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -89,22 +90,33 @@ def _detect_provider() -> tuple[Optional[str], Optional[str]]:
 
 
 def _base_url_for(provider: Optional[str]) -> str:
+    if provider == "nvidia":
+        return NVIDIA_BASE_URL
     if provider == "gemini":
         return GEMINI_BASE_URL
     return OPENROUTER_BASE_URL
 
 
 def _default_headers_for(provider: Optional[str]) -> dict:
-    if provider == "gemini":
-        return {}  # Gemini doesn't use OpenRouter-style attribution headers
+    if provider == "nvidia" or provider == "gemini":
+        return {}  # NVIDIA and Gemini don't need attribution headers
     return {
-        "HTTP-Referer": "https://github.com/flawsom/Margin-Intelligence-System",
+        "HTTP-Referer": "https://github.com/flawsom/MandiIQ",
         "X-Title": "MandiIQ",
     }
 
 
 def _default_models(provider: Optional[str]) -> list[dict]:
     """Fallback model list if models.yaml is missing or unreadable."""
+    if provider == "nvidia":
+        return [
+            {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B Instruct",
+             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
+            {"id": "mistralai/mistral-nemo-12b-instruct", "name": "Mistral Nemo 12B",
+             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
+            {"id": "google/gemma-2-27b-it", "name": "Gemma 2 27B IT",
+             "max_retries": 1, "timeout_seconds": 45, "cool_down_minutes": 3},
+        ]
     if provider == "gemini":
         return [
             {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (free)",
@@ -173,8 +185,8 @@ def get_api_key() -> Optional[str]:
     """Get the active provider's API key from environment (free-first)."""
     _provider, key = _detect_provider()
     if not key:
-        logger.warning("No LLM provider configured. Set GEMINI_API_KEY (free) "
-                       "or OPENROUTER_API_KEY")
+        logger.warning("No LLM provider configured. Set NVIDIA_API_KEY, "
+                       "GEMINI_API_KEY (free), or OPENROUTER_API_KEY")
     return key
 
 
@@ -209,8 +221,8 @@ def call_llm(
     provider, api_key = _detect_provider()
     if not provider or not api_key:
         return {"content": "", "model": "", "error":
-                "No LLM provider configured. Set GEMINI_API_KEY (free) "
-                "or OPENROUTER_API_KEY", "endpoints_cited": []}
+                "No LLM provider configured. Set NVIDIA_API_KEY, "
+                "GEMINI_API_KEY (free), or OPENROUTER_API_KEY", "endpoints_cited": []}
 
     if not OPENAI_AVAILABLE:
         return {"content": "", "model": "", "error": "openai SDK not installed",
