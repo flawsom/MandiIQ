@@ -1,0 +1,16 @@
+title: Ideas
+description: Share a feature idea or brainstorm — lower bar than a formal feature request
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What's the idea?
+      description: Tell us what you're thinking — it doesn't need to be fully formed.
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: What problem does it solve?
+      description: Who would this help and how?

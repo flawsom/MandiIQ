@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Help
+    url: https://github.com/flawsom/MIS/discussions/categories/q-a
+    about: Please ask usage questions in Discussions — the issue tracker is for bugs and feature requests only.
+  - name: MandiIQ Documentation
+    url: https://mandiiq.streamlit.app/about
+    about: Read the methodology and data source documentation on the live dashboard.

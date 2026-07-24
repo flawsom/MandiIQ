@@ -1,0 +1,4 @@
+# Drop Agmarknet / data.gov.in bulk historical CSVs here (any *.csv).
+# The nightly scheduler ingests every file in this folder, then deletes it,
+# so the dashboard can build a real multi-month time-series (the live API
+# only serves the current day's snapshot). See ingestion/ingest_historical_csv.py.

@@ -1,0 +1,81 @@
+# MandiIQ — Multi-Provider Model Configuration
+#
+# Provider selection is automatic and free-first:
+#   1. If GEMINI_API_KEY is set → use Google Gemini directly (FREE tier, no middleman)
+#   2. If OPENROUTER_API_KEY is set → use OpenRouter (free-tier models)
+#   3. If neither is set → structured-data fallback (no narrative, no cost)
+#
+# This file is provider-aware. Update the section for the provider you use
+# without touching code.
+
+gemini:
+  # Google AI Studio free tier — https://aistudio.google.com
+  # Models below are free-tier eligible. Verify current free models at:
+  # https://ai.google.dev/gemini-api/docs/models
+  models:
+    # Tier 1 — Fast, free, strong instruction-following
+    - id: "gemini-2.5-flash"
+      name: "Gemini 2.5 Flash (free)"
+      description: "Fastest free Gemini, strong instruction-following, ideal for narratives"
+      max_retries: 1
+      timeout_seconds: 30
+      cool_down_minutes: 3
+
+    # Tier 2 — Slightly older but rock-solid free tier
+    - id: "gemini-2.0-flash"
+      name: "Gemini 2.0 Flash (free)"
+      description: "Reliable free fallback with good reasoning"
+      max_retries: 1
+      timeout_seconds: 30
+      cool_down_minutes: 3
+
+    # Tier 3 — Lite model, most generous free quota
+    - id: "gemini-2.0-flash-lite"
+      name: "Gemini 2.0 Flash Lite (free)"
+      description: "Lightest free model, highest rate limits, last resort"
+      max_retries: 1
+      timeout_seconds: 30
+      cool_down_minutes: 3
+
+openrouter:
+  # OpenRouter free-tier models — https://openrouter.ai/models?q=:free
+  # Used only if GEMINI_API_KEY is not set but OPENROUTER_API_KEY is.
+  # Models with `:free` suffix are rate-limited but cost $0.
+  #
+  # Option A (bulletproof auto-router): the `openrouter/free` slug dynamically
+  # forwards requests to whatever high-capacity free model is currently active
+  # and healthy, so the config never goes stale when OpenRouter rotates its
+  # free-tier offerings. Backup models below are explicit modern heavyweights
+  # used only if the auto-router is unavailable.
+  models:
+    # Tier 0 — Dynamic auto-router (future-proof, no hardcoded model)
+    - id: "openrouter/free"
+      name: "OpenRouter Free Auto-Router"
+      description: "Dynamically routes to the active, healthy free model (e.g. llama-3.3-70b, gemma-4-31b). Never goes deprecated."
+      max_retries: 1
+      timeout_seconds: 30
+      cool_down_minutes: 5
+
+    # Tier 1 — Modern high-capacity free heavyweights (explicit backups)
+    - id: "meta-llama/llama-3.3-70b-instruct:free"
+      name: "Llama 3.3 70B Instruct"
+      description: "Excellent natural prose & narrative generation, high-quality storytelling"
+      max_retries: 1
+      timeout_seconds: 45
+      cool_down_minutes: 5
+
+    # Tier 2 — Multilingual narrative with reasoning
+    - id: "google/gemma-4-31b-it:free"
+      name: "Gemma 4 31B IT"
+      description: "Great multilingual narrative generation with built-in thinking/reasoning"
+      max_retries: 1
+      timeout_seconds: 45
+      cool_down_minutes: 5
+
+    # Tier 3 — Massive-parameter structured-output fallback
+    - id: "openai/gpt-oss-120b:free"
+      name: "GPT-OSS 120B"
+      description: "Massive free model, great for structured outputs and complex lore-tracking"
+      max_retries: 1
+      timeout_seconds: 60
+      cool_down_minutes: 5

@@ -1,0 +1,31 @@
+name: Keepalive Loop
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'Hours to keep alive (max 6)'
+        default: '6'
+        required: false
+
+jobs:
+  keepalive:
+    name: Ping every 5 minutes for ${{ github.event.inputs.hours || '6' }} hours
+    runs-on: ubuntu-latest
+    steps:
+      - name: Continuous keepalive loop
+        run: |
+          HOURS="${{ github.event.inputs.hours || '6' }}"
+          TOTAL_PINGS=$(( HOURS * 12 ))
+          echo "Starting keepalive for ${HOURS}h (${TOTAL_PINGS} pings every 5 min)"
+          for i in $(seq 1 $TOTAL_PINGS); do
+            TS=$(date -u +%H:%M:%S)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://mandiiq-api.onrender.com/health) || true
+            echo "[$TS] Ping $i/$TOTAL_PINGS - HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "  Server returned $HTTP_CODE - waiting for wake-up..."
+            fi
+            if [ $i -lt $TOTAL_PINGS ]; then
+              sleep 300
+            fi
+          done
+          echo "Keepalive complete after ${HOURS}h"

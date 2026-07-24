@@ -1,0 +1,22 @@
+# Funding / Sponsorship Configuration — MandiIQ
+# ───────────────────────────────────────────────
+# The "Sponsor" button appears on the repo once you publish your
+# GitHub Sponsors profile at https://github.com/sponsors
+# (identity verification + payout setup required — browser step).
+#
+# Platforms below are the natively supported ones. Fill in your
+# username/URL for any you want active; GitHub Sponsors is enabled.
+
+# GitHub Sponsors (native — enabled once your profile is published)
+github: [flawsom]
+
+# Optional third-party platforms
+patreon: [flawsome]
+ko_fi: [flawsom]
+# open_collective: [your-open-collective-name]
+# liberapay: [your-liberapay-username]
+# community_bridge: [project-name]
+# tidelift: [package-name]
+# issuehunt: [username]
+# otechie: [username]
+# custom: ["https://your-custom-donation-url"]

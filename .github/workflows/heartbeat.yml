@@ -1,0 +1,61 @@
+name: Heartbeat
+
+# GitHub disables scheduled workflows after 60 days with no repository activity.
+# During a sustained zero-new-rows data lull, the daily-ingest job skips its
+# commit (no DB change), so the repo could go inactive and the cron would be
+# silently disabled. This weekly heartbeat keeps the repo "active" so the
+# daily ingestion schedule survives legitimate data gaps (PRD Phase 9).
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # Keep-alive: every 10 min (prevents free-tier cold starts)
+    - cron: '17 3 * * 1'     # Weekly repo heartbeat: Monday 03:17 UTC (keeps GH cron alive)
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    # Only run the repo-write heartbeat on the weekly cron or manual dispatch,
+    # NOT on the every-10-min keep-alive schedule.
+    if: github.event.schedule == '17 3 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Touch heartbeat marker
+        run: |
+          git config user.name "mandiiq-bot"
+          git config user.email "bot@mandiiq.local"
+          echo "$(date -u)" > last_heartbeat.txt
+          git add last_heartbeat.txt
+          git commit -m "chore: weekly heartbeat" || echo "nothing to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master || echo "push skipped"
+
+  # Keep-alive pings: free-tier hosts (Render, Streamlit) spin down after
+  # inactivity. Pinging their public URLs on a schedule prevents cold starts.
+  # Configure the URLs via repo secrets: RENDER_API_URL, STREAMLIT_APP_URL.
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render API (if configured)
+        if: ${{ env.RENDER_API_URL != '' }}
+        env:
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+        run: |
+          echo "Pinging Render API health endpoint..."
+          curl -fsS --max-time 30 "${RENDER_API_URL%/}/health" && echo "Render API OK" || echo "Render API ping failed (may be cold-starting)"
+      - name: Ping Streamlit app (if configured)
+        if: ${{ env.STREAMLIT_APP_URL != '' }}
+        env:
+          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+        run: |
+          echo "Pinging Streamlit app..."
+          curl -fsS --max-time 30 "${STREAMLIT_APP_URL}" >/dev/null && echo "Streamlit OK" || echo "Streamlit ping failed"
+      - name: Skip notice
+        if: ${{ env.RENDER_API_URL == '' && env.STREAMLIT_APP_URL == '' }}
+        env:
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+        run: echo "No RENDER_API_URL / STREAMLIT_APP_URL secrets set — keep-alive skipped. Add them in repo Settings > Secrets to enable."

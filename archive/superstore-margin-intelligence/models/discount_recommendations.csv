@@ -1,0 +1,390 @@
+category,sub_category,region,segment,order_count,safe_max_discount_pct
+Furniture,Chairs & Chairmats,Prarie,Small Business,13,0.0
+Technology,Telephones and Communication,Ontario,Consumer,35,0.0
+Technology,Telephones and Communication,Ontario,Corporate,68,0.0
+Technology,Telephones and Communication,Ontario,Home Office,48,0.0
+Technology,Telephones and Communication,Ontario,Small Business,31,0.0
+Technology,Telephones and Communication,Prarie,Consumer,35,0.0
+Technology,Telephones and Communication,Prarie,Corporate,66,0.0
+Technology,Telephones and Communication,Prarie,Home Office,43,0.0
+Technology,Telephones and Communication,Prarie,Small Business,31,0.0
+Technology,Telephones and Communication,Quebec,Consumer,20,0.0
+Technology,Telephones and Communication,Quebec,Corporate,26,0.0
+Technology,Telephones and Communication,Quebec,Home Office,15,0.0
+Technology,Telephones and Communication,Quebec,Small Business,18,0.0
+Technology,Telephones and Communication,West,Consumer,43,0.0
+Technology,Telephones and Communication,West,Corporate,86,0.0
+Technology,Telephones and Communication,Yukon,Corporate,22,0.0
+Technology,Telephones and Communication,Yukon,Consumer,10,0.0
+Furniture,Bookcases,Atlantic,Home Office,5,0.0
+Furniture,Bookcases,Atlantic,Small Business,9,0.0
+Furniture,Bookcases,Northwest Territories,Corporate,5,0.0
+Furniture,Bookcases,Ontario,Consumer,6,0.0
+Furniture,Bookcases,Ontario,Corporate,12,0.0
+Furniture,Bookcases,Ontario,Home Office,9,0.0
+Furniture,Bookcases,Ontario,Small Business,8,0.0
+Furniture,Bookcases,Prarie,Corporate,13,0.0
+Furniture,Bookcases,Prarie,Home Office,6,0.0
+Furniture,Bookcases,Prarie,Small Business,6,0.0
+Furniture,Bookcases,Quebec,Consumer,6,0.0
+Furniture,Bookcases,Quebec,Corporate,5,0.0
+Furniture,Bookcases,West,Consumer,13,0.0
+Furniture,Bookcases,West,Corporate,16,0.0
+Technology,Telephones and Communication,Yukon,Small Business,7,0.0
+Furniture,Chairs & Chairmats,Quebec,Consumer,10,0.0
+Technology,Copiers and Fax,Atlantic,Corporate,9,0.0
+Technology,Copiers and Fax,Ontario,Home Office,5,0.0
+Furniture,Chairs & Chairmats,Quebec,Small Business,13,0.0
+Furniture,Chairs & Chairmats,West,Consumer,18,0.0
+Furniture,Chairs & Chairmats,West,Corporate,39,0.0
+Furniture,Chairs & Chairmats,West,Home Office,18,0.0
+Furniture,Chairs & Chairmats,West,Small Business,18,0.0
+Furniture,Chairs & Chairmats,Yukon,Corporate,5,0.0
+Furniture,Chairs & Chairmats,Yukon,Home Office,5,0.0
+Technology,Copiers and Fax,Prarie,Corporate,8,0.0
+Technology,Copiers and Fax,West,Consumer,6,0.0
+Technology,Copiers and Fax,West,Corporate,5,0.0
+Technology,Copiers and Fax,West,Small Business,10,0.0
+Technology,Office Machines,Atlantic,Consumer,16,0.0
+Technology,Office Machines,Atlantic,Small Business,7,0.0
+Office Supplies,Appliances,Atlantic,Small Business,12,0.0
+Technology,Office Machines,Northwest Territories,Corporate,9,0.0
+Technology,Office Machines,Northwest Territories,Home Office,8,0.0
+Technology,Office Machines,Ontario,Consumer,8,0.0
+Technology,Office Machines,Ontario,Corporate,27,0.0
+Technology,Office Machines,Ontario,Home Office,15,0.0
+Technology,Office Machines,Ontario,Small Business,13,0.0
+Technology,Office Machines,Prarie,Consumer,17,0.0
+Technology,Office Machines,Prarie,Home Office,14,0.0
+Furniture,Office Furnishings,Quebec,Consumer,10,0.0
+Technology,Office Machines,Prarie,Small Business,8,0.0
+Technology,Office Machines,Quebec,Corporate,9,0.0
+Technology,Office Machines,Quebec,Small Business,6,0.0
+Technology,Office Machines,West,Consumer,18,0.0
+Technology,Office Machines,West,Corporate,28,0.0
+Technology,Office Machines,West,Home Office,19,0.0
+Technology,Office Machines,West,Small Business,18,0.0
+Technology,Office Machines,Yukon,Consumer,9,0.0
+Technology,Office Machines,Yukon,Corporate,9,0.0
+Technology,Office Machines,Yukon,Home Office,8,0.0
+Technology,Telephones and Communication,Atlantic,Consumer,32,0.0
+Furniture,Tables,Atlantic,Consumer,16,0.0
+Furniture,Tables,Atlantic,Corporate,14,0.0
+Furniture,Tables,Atlantic,Home Office,8,0.0
+Furniture,Tables,Atlantic,Small Business,7,0.0
+Furniture,Tables,Northwest Territories,Corporate,7,0.0
+Furniture,Tables,Ontario,Consumer,17,0.0
+Furniture,Tables,Ontario,Corporate,28,0.0
+Furniture,Tables,Ontario,Home Office,18,0.0
+Furniture,Tables,Ontario,Small Business,17,0.0
+Furniture,Tables,Prarie,Consumer,12,0.0
+Furniture,Tables,Prarie,Corporate,32,0.0
+Furniture,Tables,Prarie,Home Office,12,0.0
+Furniture,Tables,Prarie,Small Business,13,0.0
+Furniture,Tables,Quebec,Consumer,12,0.0
+Furniture,Tables,Quebec,Corporate,14,0.0
+Furniture,Tables,Quebec,Home Office,16,0.0
+Furniture,Tables,Quebec,Small Business,6,0.0
+Furniture,Tables,West,Consumer,14,0.0
+Furniture,Tables,West,Corporate,23,0.0
+Furniture,Tables,West,Home Office,18,0.0
+Furniture,Tables,West,Small Business,17,0.0
+Furniture,Tables,Yukon,Consumer,8,0.0
+Furniture,Tables,Yukon,Corporate,11,0.0
+Furniture,Tables,Yukon,Home Office,11,0.0
+Office Supplies,Appliances,Atlantic,Consumer,16,0.0
+Office Supplies,Appliances,Atlantic,Corporate,24,0.0
+Office Supplies,Appliances,Atlantic,Home Office,12,0.0
+Technology,Telephones and Communication,Atlantic,Corporate,34,0.0
+Technology,Telephones and Communication,Atlantic,Home Office,23,0.0
+Office Supplies,Appliances,Northwest Territories,Home Office,7,0.0
+Office Supplies,Appliances,Ontario,Consumer,15,0.0
+Office Supplies,Appliances,Ontario,Corporate,40,0.0
+Office Supplies,Appliances,Ontario,Home Office,33,0.0
+Office Supplies,Appliances,Ontario,Small Business,20,0.0
+Office Supplies,Appliances,Prarie,Consumer,12,0.0
+Office Supplies,Appliances,Prarie,Corporate,38,0.0
+Office Supplies,Appliances,Prarie,Home Office,21,0.0
+Office Supplies,Appliances,Prarie,Small Business,9,0.0
+Office Supplies,Appliances,Quebec,Corporate,15,0.0
+Office Supplies,Appliances,Quebec,Home Office,6,0.0
+Office Supplies,Appliances,Quebec,Small Business,9,0.0
+Office Supplies,Appliances,West,Consumer,21,0.0
+Office Supplies,Appliances,West,Corporate,32,0.0
+Office Supplies,Appliances,West,Home Office,17,0.0
+Office Supplies,Appliances,West,Small Business,21,0.0
+Office Supplies,Appliances,Yukon,Corporate,21,0.0
+Office Supplies,Appliances,Yukon,Home Office,7,0.0
+Office Supplies,Binders and Binder Accessories,Atlantic,Consumer,26,0.0
+Office Supplies,Binders and Binder Accessories,Atlantic,Corporate,47,0.0
+Office Supplies,Binders and Binder Accessories,Atlantic,Home Office,22,0.0
+Office Supplies,Binders and Binder Accessories,Atlantic,Small Business,24,0.0
+Office Supplies,Binders and Binder Accessories,Northwest Territories,Corporate,23,0.0
+Office Supplies,Binders and Binder Accessories,Northwest Territories,Home Office,10,0.0
+Technology,Telephones and Communication,Atlantic,Small Business,28,0.0
+Office Supplies,Binders and Binder Accessories,Ontario,Consumer,32,0.0
+Office Supplies,Binders and Binder Accessories,Ontario,Corporate,62,0.0
+Office Supplies,Binders and Binder Accessories,Ontario,Home Office,65,0.0
+Office Supplies,Binders and Binder Accessories,Ontario,Small Business,33,0.0
+Office Supplies,Binders and Binder Accessories,Prarie,Consumer,43,0.0
+Office Supplies,Binders and Binder Accessories,Prarie,Corporate,71,0.0
+Office Supplies,Binders and Binder Accessories,Prarie,Home Office,53,0.0
+Office Supplies,Binders and Binder Accessories,Prarie,Small Business,27,0.0
+Office Supplies,Binders and Binder Accessories,Quebec,Consumer,20,0.0
+Office Supplies,Binders and Binder Accessories,Quebec,Corporate,26,0.0
+Office Supplies,Binders and Binder Accessories,Quebec,Home Office,24,0.0
+Technology,Telephones and Communication,Northwest Territories,Consumer,6,0.0
+Office Supplies,Binders and Binder Accessories,West,Consumer,37,0.0
+Office Supplies,Binders and Binder Accessories,West,Corporate,88,0.0
+Office Supplies,Binders and Binder Accessories,West,Home Office,48,0.0
+Office Supplies,Binders and Binder Accessories,West,Small Business,47,0.0
+Office Supplies,Binders and Binder Accessories,Yukon,Consumer,8,0.0
+Office Supplies,Binders and Binder Accessories,Yukon,Corporate,22,0.0
+Office Supplies,Binders and Binder Accessories,Yukon,Home Office,6,0.0
+Office Supplies,Binders and Binder Accessories,Yukon,Small Business,7,0.0
+Technology,Telephones and Communication,Northwest Territories,Corporate,22,0.0
+Technology,Telephones and Communication,Northwest Territories,Home Office,7,0.0
+Technology,Telephones and Communication,Northwest Territories,Small Business,6,0.0
+Office Supplies,Envelopes,Northwest Territories,Corporate,5,0.0
+Office Supplies,Envelopes,Ontario,Consumer,10,0.0
+Technology,Telephones and Communication,Yukon,Home Office,14,0.0
+Office Supplies,Envelopes,Ontario,Home Office,15,0.0
+Furniture,Bookcases,Yukon,Corporate,7,0.0
+Furniture,Chairs & Chairmats,Atlantic,Consumer,9,0.0
+Furniture,Chairs & Chairmats,Atlantic,Corporate,19,0.0
+Office Supplies,Envelopes,Prarie,Home Office,10,0.0
+Furniture,Chairs & Chairmats,Atlantic,Home Office,5,0.0
+Office Supplies,Envelopes,Quebec,Consumer,5,0.0
+Furniture,Chairs & Chairmats,Northwest Territories,Corporate,14,0.0
+Office Supplies,Envelopes,Quebec,Small Business,7,0.0
+Office Supplies,Envelopes,West,Consumer,11,0.0
+Furniture,Chairs & Chairmats,Northwest Territories,Home Office,6,0.0
+Furniture,Chairs & Chairmats,Ontario,Consumer,19,0.0
+Furniture,Chairs & Chairmats,Ontario,Corporate,33,0.0
+Furniture,Chairs & Chairmats,Ontario,Home Office,31,0.0
+Furniture,Chairs & Chairmats,Ontario,Small Business,15,0.0
+Office Supplies,Envelopes,Yukon,Small Business,6,0.0
+Office Supplies,Labels,Atlantic,Consumer,8,0.0
+Furniture,Chairs & Chairmats,Prarie,Consumer,18,0.0
+Office Supplies,Labels,Atlantic,Home Office,8,0.0
+Furniture,Chairs & Chairmats,Prarie,Corporate,29,0.0
+Furniture,Chairs & Chairmats,Prarie,Home Office,16,0.0
+Technology,Telephones and Communication,West,Small Business,47,0.0
+Office Supplies,Labels,Ontario,Corporate,17,0.0
+Office Supplies,Labels,Ontario,Home Office,13,0.0
+Furniture,Bookcases,Atlantic,Consumer,11,0.0
+Office Supplies,Labels,Prarie,Consumer,15,0.0
+Technology,Telephones and Communication,West,Home Office,51,0.0
+Furniture,Bookcases,West,Small Business,10,0.0
+Office Supplies,Labels,Prarie,Small Business,10,0.0
+Office Supplies,Labels,Quebec,Consumer,6,0.0
+Office Supplies,Labels,Quebec,Corporate,6,0.0
+Office Supplies,Labels,Quebec,Home Office,11,0.0
+Office Supplies,Labels,Quebec,Small Business,8,0.0
+Office Supplies,Labels,West,Consumer,17,0.0
+Furniture,Bookcases,West,Home Office,13,0.0
+Office Supplies,Labels,West,Home Office,13,0.0
+Technology,Telephones and Communication,Nunavut,Corporate,5,0.0
+Office Supplies,Labels,Yukon,Consumer,5,0.0
+Office Supplies,Labels,Yukon,Corporate,5,0.0
+Office Supplies,Paper,Atlantic,Consumer,45,0.0
+Office Supplies,Paper,Atlantic,Corporate,42,0.0
+Office Supplies,Paper,Atlantic,Home Office,33,0.0
+Office Supplies,Paper,Atlantic,Small Business,31,0.0
+Office Supplies,Paper,Northwest Territories,Consumer,6,0.0
+Office Supplies,Paper,Northwest Territories,Corporate,15,0.0
+Office Supplies,Paper,Northwest Territories,Home Office,8,0.0
+Office Supplies,Paper,Nunavut,Corporate,5,0.0
+Office Supplies,Paper,Nunavut,Home Office,7,0.0
+Office Supplies,Paper,Ontario,Consumer,39,0.0
+Office Supplies,Paper,Ontario,Corporate,101,0.0
+Office Supplies,Paper,Ontario,Home Office,75,0.0
+Office Supplies,Paper,Ontario,Small Business,55,0.0
+Office Supplies,Paper,Prarie,Consumer,48,0.0
+Office Supplies,Paper,Prarie,Corporate,108,0.0
+Office Supplies,Paper,Prarie,Home Office,67,0.0
+Office Supplies,Paper,Prarie,Small Business,35,0.0
+Office Supplies,Paper,Quebec,Consumer,16,0.0
+Office Supplies,Paper,Quebec,Corporate,32,0.0
+Office Supplies,Paper,Quebec,Home Office,28,0.0
+Office Supplies,Paper,Quebec,Small Business,28,0.0
+Office Supplies,Paper,West,Consumer,61,0.0
+Office Supplies,Paper,West,Corporate,100,0.0
+Office Supplies,Paper,West,Home Office,77,0.0
+Office Supplies,Paper,West,Small Business,75,0.0
+Office Supplies,Paper,Yukon,Consumer,19,0.0
+Office Supplies,Paper,Yukon,Corporate,25,0.0
+Office Supplies,Paper,Yukon,Home Office,14,0.0
+Office Supplies,Paper,Yukon,Small Business,12,0.0
+Office Supplies,Pens & Art Supplies,Atlantic,Consumer,15,0.0
+Office Supplies,Pens & Art Supplies,Atlantic,Corporate,45,0.0
+Office Supplies,Pens & Art Supplies,Atlantic,Small Business,19,0.0
+Office Supplies,Pens & Art Supplies,Northwest Territories,Corporate,13,0.0
+Office Supplies,Pens & Art Supplies,Northwest Territories,Small Business,5,0.0
+Office Supplies,Pens & Art Supplies,Ontario,Consumer,22,0.0
+Office Supplies,Pens & Art Supplies,Ontario,Corporate,48,0.0
+Office Supplies,Pens & Art Supplies,Ontario,Home Office,39,0.0
+Office Supplies,Pens & Art Supplies,Ontario,Small Business,29,0.0
+Office Supplies,Pens & Art Supplies,Prarie,Consumer,23,0.0
+Office Supplies,Pens & Art Supplies,Prarie,Corporate,48,0.0
+Office Supplies,Pens & Art Supplies,Prarie,Home Office,34,0.0
+Office Supplies,Pens & Art Supplies,Prarie,Small Business,16,0.0
+Office Supplies,Pens & Art Supplies,Quebec,Consumer,17,0.0
+Office Supplies,Pens & Art Supplies,Quebec,Corporate,20,0.0
+Office Supplies,Pens & Art Supplies,Quebec,Home Office,19,0.0
+Office Supplies,Pens & Art Supplies,Quebec,Small Business,15,0.0
+Office Supplies,Pens & Art Supplies,West,Consumer,33,0.0
+Office Supplies,Pens & Art Supplies,West,Corporate,44,0.0
+Office Supplies,Pens & Art Supplies,West,Home Office,32,0.0
+Office Supplies,Pens & Art Supplies,West,Small Business,30,0.0
+Office Supplies,Pens & Art Supplies,Yukon,Corporate,18,0.0
+Office Supplies,Pens & Art Supplies,Yukon,Home Office,12,0.0
+Office Supplies,Pens & Art Supplies,Yukon,Small Business,10,0.0
+Office Supplies,Rubber Bands,Atlantic,Consumer,5,0.0
+Office Supplies,Rubber Bands,Atlantic,Corporate,8,0.0
+Office Supplies,Rubber Bands,Atlantic,Small Business,6,0.0
+Office Supplies,Rubber Bands,Northwest Territories,Corporate,5,0.0
+Office Supplies,Rubber Bands,Ontario,Consumer,6,0.0
+Office Supplies,Rubber Bands,Ontario,Corporate,13,0.0
+Office Supplies,Rubber Bands,Ontario,Home Office,13,0.0
+Office Supplies,Rubber Bands,Ontario,Small Business,9,0.0
+Office Supplies,Rubber Bands,Prarie,Consumer,7,0.0
+Office Supplies,Rubber Bands,Prarie,Corporate,14,0.0
+Office Supplies,Rubber Bands,Prarie,Home Office,8,0.0
+Office Supplies,Rubber Bands,Prarie,Small Business,9,0.0
+Office Supplies,Rubber Bands,Quebec,Small Business,7,0.0
+Office Supplies,Rubber Bands,West,Consumer,6,0.0
+Office Supplies,Rubber Bands,West,Corporate,11,0.0
+Office Supplies,Rubber Bands,West,Home Office,15,0.0
+Office Supplies,Rubber Bands,West,Small Business,9,0.0
+Office Supplies,Rubber Bands,Yukon,Corporate,6,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Northwest Territories,Corporate,6,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Ontario,Consumer,6,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Ontario,Corporate,9,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Ontario,Home Office,11,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Prarie,Consumer,5,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Prarie,Corporate,12,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Prarie,Home Office,8,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Prarie,Small Business,7,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",Quebec,Corporate,5,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",West,Consumer,13,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",West,Corporate,16,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",West,Home Office,8,0.0
+Office Supplies,"Scissors, Rulers and Trimmers",West,Small Business,5,0.0
+Office Supplies,Storage & Organization,Atlantic,Consumer,16,0.0
+Office Supplies,Storage & Organization,Atlantic,Corporate,18,0.0
+Office Supplies,Storage & Organization,Atlantic,Home Office,15,0.0
+Office Supplies,Storage & Organization,Atlantic,Small Business,17,0.0
+Office Supplies,Storage & Organization,Northwest Territories,Corporate,13,0.0
+Office Supplies,Storage & Organization,Northwest Territories,Home Office,7,0.0
+Office Supplies,Storage & Organization,Northwest Territories,Small Business,10,0.0
+Office Supplies,Storage & Organization,Ontario,Consumer,24,0.0
+Office Supplies,Storage & Organization,Ontario,Corporate,32,0.0
+Office Supplies,Storage & Organization,Ontario,Home Office,32,0.0
+Office Supplies,Storage & Organization,Ontario,Small Business,26,0.0
+Office Supplies,Storage & Organization,Prarie,Consumer,19,0.0
+Office Supplies,Storage & Organization,Prarie,Corporate,53,0.0
+Office Supplies,Storage & Organization,Prarie,Home Office,30,0.0
+Office Supplies,Storage & Organization,Prarie,Small Business,17,0.0
+Office Supplies,Storage & Organization,Quebec,Consumer,15,0.0
+Office Supplies,Storage & Organization,Quebec,Corporate,22,0.0
+Office Supplies,Storage & Organization,Quebec,Home Office,14,0.0
+Office Supplies,Storage & Organization,Quebec,Small Business,12,0.0
+Office Supplies,Storage & Organization,West,Consumer,20,0.0
+Office Supplies,Storage & Organization,West,Corporate,28,0.0
+Office Supplies,Storage & Organization,West,Home Office,34,0.0
+Office Supplies,Storage & Organization,West,Small Business,18,0.0
+Office Supplies,Storage & Organization,Yukon,Consumer,7,0.0
+Office Supplies,Storage & Organization,Yukon,Corporate,16,0.0
+Office Supplies,Storage & Organization,Yukon,Home Office,13,0.0
+Office Supplies,Storage & Organization,Yukon,Small Business,10,0.0
+Technology,Computer Peripherals,Atlantic,Consumer,21,0.0
+Technology,Computer Peripherals,Atlantic,Corporate,33,0.0
+Technology,Computer Peripherals,Atlantic,Home Office,21,0.0
+Technology,Computer Peripherals,Atlantic,Small Business,20,0.0
+Technology,Computer Peripherals,Northwest Territories,Corporate,18,0.0
+Technology,Computer Peripherals,Northwest Territories,Home Office,7,0.0
+Technology,Computer Peripherals,Northwest Territories,Small Business,6,0.0
+Technology,Computer Peripherals,Ontario,Consumer,38,0.0
+Technology,Computer Peripherals,Ontario,Corporate,63,0.0
+Technology,Computer Peripherals,Ontario,Home Office,47,0.0
+Technology,Computer Peripherals,Ontario,Small Business,31,0.0
+Technology,Computer Peripherals,Prarie,Consumer,35,0.0
+Technology,Computer Peripherals,Prarie,Corporate,68,0.0
+Technology,Computer Peripherals,Prarie,Home Office,36,0.0
+Technology,Computer Peripherals,Prarie,Small Business,26,0.0
+Technology,Computer Peripherals,Quebec,Consumer,13,0.0
+Technology,Computer Peripherals,Quebec,Corporate,18,0.0
+Technology,Computer Peripherals,Quebec,Home Office,14,0.0
+Technology,Computer Peripherals,Quebec,Small Business,13,0.0
+Technology,Computer Peripherals,West,Consumer,34,0.0
+Technology,Computer Peripherals,West,Corporate,51,0.0
+Technology,Computer Peripherals,West,Home Office,43,0.0
+Technology,Computer Peripherals,West,Small Business,45,0.0
+Technology,Computer Peripherals,Yukon,Consumer,10,0.0
+Technology,Computer Peripherals,Yukon,Corporate,21,0.0
+Technology,Computer Peripherals,Yukon,Home Office,12,0.0
+Technology,Computer Peripherals,Yukon,Small Business,5,0.0
+Office Supplies,Binders and Binder Accessories,Quebec,Small Business,21,4.2
+Furniture,Chairs & Chairmats,Quebec,Home Office,6,4.2
+Furniture,Office Furnishings,Ontario,Consumer,37,4.2
+Office Supplies,Labels,Prarie,Corporate,25,4.2
+Technology,Office Machines,Atlantic,Home Office,6,4.2
+Furniture,Chairs & Chairmats,Atlantic,Small Business,9,4.2
+Office Supplies,Paper,Northwest Territories,Small Business,14,4.2
+Furniture,Office Furnishings,Ontario,Corporate,59,8.4
+Office Supplies,Envelopes,Prarie,Corporate,19,8.4
+Technology,Office Machines,Quebec,Home Office,5,8.4
+Furniture,Office Furnishings,Northwest Territories,Home Office,9,80.0
+Furniture,Office Furnishings,Ontario,Home Office,51,80.0
+Furniture,Office Furnishings,Ontario,Small Business,31,80.0
+Furniture,Office Furnishings,Prarie,Consumer,29,80.0
+Furniture,Office Furnishings,Prarie,Corporate,52,80.0
+Furniture,Office Furnishings,Prarie,Home Office,36,80.0
+Furniture,Office Furnishings,Prarie,Small Business,30,80.0
+Furniture,Office Furnishings,Quebec,Corporate,18,80.0
+Furniture,Office Furnishings,Quebec,Home Office,20,80.0
+Furniture,Office Furnishings,Quebec,Small Business,22,80.0
+Furniture,Office Furnishings,West,Consumer,40,80.0
+Furniture,Office Furnishings,West,Corporate,73,80.0
+Furniture,Office Furnishings,West,Home Office,42,80.0
+Furniture,Office Furnishings,West,Small Business,33,80.0
+Furniture,Office Furnishings,Yukon,Consumer,8,80.0
+Furniture,Office Furnishings,Yukon,Corporate,22,80.0
+Furniture,Office Furnishings,Yukon,Home Office,13,80.0
+Furniture,Office Furnishings,Yukon,Small Business,6,80.0
+Furniture,Office Furnishings,Northwest Territories,Small Business,8,80.0
+Office Supplies,Appliances,Northwest Territories,Corporate,7,80.0
+Office Supplies,Binders and Binder Accessories,Northwest Territories,Small Business,10,80.0
+Office Supplies,Envelopes,Atlantic,Consumer,5,80.0
+Office Supplies,Envelopes,Atlantic,Corporate,14,80.0
+Office Supplies,Envelopes,Atlantic,Small Business,9,80.0
+Office Supplies,Envelopes,Ontario,Corporate,20,80.0
+Office Supplies,Envelopes,Ontario,Small Business,10,80.0
+Office Supplies,Envelopes,Prarie,Consumer,8,80.0
+Furniture,Chairs & Chairmats,Quebec,Corporate,6,80.0
+Office Supplies,Envelopes,Prarie,Small Business,11,80.0
+Office Supplies,Envelopes,Quebec,Home Office,5,80.0
+Office Supplies,Envelopes,West,Corporate,21,80.0
+Office Supplies,Envelopes,West,Home Office,13,80.0
+Office Supplies,Envelopes,West,Small Business,17,80.0
+Office Supplies,Envelopes,Yukon,Corporate,5,80.0
+Office Supplies,Envelopes,Yukon,Home Office,5,80.0
+Office Supplies,Labels,Atlantic,Corporate,8,80.0
+Office Supplies,Labels,Atlantic,Small Business,9,80.0
+Office Supplies,Labels,Northwest Territories,Corporate,10,80.0
+Office Supplies,Labels,Ontario,Consumer,9,80.0
+Office Supplies,Labels,Ontario,Small Business,11,80.0
+Furniture,Office Furnishings,Atlantic,Consumer,28,80.0
+Office Supplies,Labels,Prarie,Home Office,17,80.0
+Office Supplies,Labels,West,Corporate,30,80.0
+Office Supplies,Labels,West,Small Business,10,80.0
+Furniture,Office Furnishings,Atlantic,Corporate,49,80.0
+Office Supplies,Pens & Art Supplies,Yukon,Consumer,7,80.0
+Furniture,Office Furnishings,Atlantic,Home Office,17,80.0
+Furniture,Office Furnishings,Atlantic,Small Business,19,80.0
+Office Supplies,Pens & Art Supplies,Atlantic,Home Office,8,80.0
+Technology,Office Machines,Yukon,Small Business,5,80.0
+Furniture,Office Furnishings,Northwest Territories,Corporate,17,80.0
+Technology,Office Machines,Prarie,Corporate,34,80.0
+Technology,Office Machines,Atlantic,Corporate,11,80.0

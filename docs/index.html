@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MandiIQ — Agricultural Margin Intelligence & Causal RDD System</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================================================
+           1. DESIGN SYSTEM & VARIABLE TOKENS (Alche Studio Inspired)
+           ========================================================================== */
+        :root {
+            /* Backgrounds */
+            --bg-base: #000000;
+            --bg-surface: #0a0a0a;
+            --bg-surface-glass: rgba(255, 255, 255, 0.03);
+            --bg-surface-glass-hover: rgba(255, 255, 255, 0.07);
+
+            /* Typography */
+            --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+            --font-body: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+            --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
+            --font-numeric: "Barlow", "IBM Plex Sans", sans-serif;
+
+            /* Core Colors */
+            --color-primary: #d7ff00;      /* Alche Lime Accent */
+            --color-paper: #ffffff;        /* Stark white headings */
+            --color-text-high: #bababa;    /* High contrast body text */
+            --color-text-med: #7e7e7e;     /* Medium contrast description text */
+            --color-text-low: #555555;     /* Low contrast metadata text */
+
+            /* Semantic / Functional Colors */
+            --color-rust: #D9663B;         /* Deficit Rust - price spike/risk */
+            --color-sage: #8FAE89;         /* Monsoon Sage - healthy NDVI */
+            
+            /* Commodity Colors */
+            --color-commodity-onion: #8B6BC4;  /* Dusty violet - onion skin */
+            --color-commodity-tomato: #D9663B; /* Tomato */
+            --color-commodity-wheat: #D4A94E;  /* Dry gold - ripened wheat */
+            --color-commodity-potato: #B98354; /* Clay - tuber/soil */
+
+            /* Hairlines */
+            --hairline: rgba(255, 255, 255, 0.07);
+            --hairline-strong: rgba(255, 255, 255, 0.14);
+
+            /* Timing & Motion */
+            --duration-base: 350ms;
+            --duration-slow: 600ms;
+            --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+            /* Spacing grid */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 2rem;
+            --space-xl: 4rem;
+        }
+
+        /* ==========================================================================
+           2. BASE STYLING
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            background-color: var(--bg-base);
+            color: var(--color-text-high);
+            font-family: var(--font-body);
+            font-size: 15px;
+            line-height: 1.625;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* Dot Grid Background */
+        .dot-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1.5px, transparent 2px);
+            background-size: 38px 38px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Atmosphere Blobs — Alche Studio multi-layer drifter system */
+        .atmosphere {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .atmosphere-flash {
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 70vw;
+            height: 60vh;
+            background: radial-gradient(circle, rgba(215, 255, 0, 0.04) 0%, transparent 70%);
+            filter: blur(100px);
+            animation: drift-a 45s var(--ease-soft) infinite alternate;
+        }
+
+        .atmosphere-cloud {
+            position: absolute;
+            bottom: -20%;
+            left: -10%;
+            width: 80vw;
+            height: 70vh;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+            filter: blur(120px);
+            animation: drift-b 55s var(--ease-soft) infinite alternate;
+        }
+
+        .atmosphere-drifter {
+            position: absolute;
+            width: var(--s, 160px);
+            height: var(--s, 160px);
+            left: var(--x, 50%);
+            top: var(--y, 50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, hsla(var(--hue, 100), var(--sat, 0.8), var(--lit, 0.55), var(--op, 0.06)) 0%, transparent 70%);
+            filter: blur(80px);
+            animation: drifter-float var(--d, 30s) var(--ease-soft) infinite alternate;
+            will-change: transform;
+        }
+
+        @keyframes drifter-float {
+            0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+            25%  { transform: translate(5%, -5%) scale(1.15) rotate(8deg); }
+            50%  { transform: translate(-3%, 3%) scale(0.95) rotate(-5deg); }
+            75%  { transform: translate(4%, -2%) scale(1.08) rotate(3deg); }
+            100% { transform: translate(-5%, 5%) scale(1.05) rotate(-4deg); }
+        }
+
+        @keyframes drift-a {
+            from { transform: translate(0, 0) scale(1); }
+            to { transform: translate(-8%, 10%) scale(1.1); }
+        }
+
+        @keyframes drift-b {
+            from { transform: translate(0, 0) scale(1.1); }
+            to { transform: translate(10%, -8%) scale(0.95); }
+        }
+
+        /* Container Structure */
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Vertical Scrollspy Navigation */
+        .scrollspy-nav {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 90px;
+            height: 100vh;
+            border-right: 1px solid var(--hairline);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+        }
+
+        .scrollspy-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            align-items: center;
+        }
+
+        .scrollspy-item a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: var(--color-text-med);
+            transition: color var(--duration-base) var(--ease-soft);
+            position: relative;
+        }
+
+        .scrollspy-item a .num {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        .scrollspy-item a .label {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            font-size: 0.75rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            margin-top: 0.5rem;
+            opacity: 0;
+            height: 0;
+            transition: opacity var(--duration-base) var(--ease-soft), height var(--duration-base) var(--ease-soft);
+        }
+
+        .scrollspy-item a:hover .label,
+        .scrollspy-item.active a .label {
+            opacity: 1;
+            height: auto;
+            margin-top: 0.8rem;
+        }
+
+        .scrollspy-item a:hover,
+        .scrollspy-item.active a {
+            color: var(--color-primary);
+        }
+
+        .scrollspy-item.active a::before {
+            content: "";
+            position: absolute;
+            left: -12px;
+            top: 5px;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: var(--color-primary);
+        }
+
+        /* Content Area */
+        .main-content {
+            margin-left: 90px;
+            flex: 1;
+            max-width: 1300px;
+            padding: 0 4rem;
+        }
+
+        /* ==========================================================================
+           3. HEADER & NAVIGATION
+           ========================================================================== */
+        header {
+            position: sticky;
+            top: 0;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--hairline);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 90;
+            margin-bottom: 3rem;
+            width: 100%;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 22px;
+            height: 22px;
+            background: var(--color-primary);
+            clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%);
+        }
+
+        .logo-text {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 1.15rem;
+            letter-spacing: 0.12em;
+            color: var(--color-paper);
+            text-transform: uppercase;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 2.5rem;
+        }
+
+        .nav-link {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--color-text-high);
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: color var(--duration-base) var(--ease-soft);
+        }
+
+        .nav-link:hover {
+            color: var(--color-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        /* Heartbeat Status Indicator */
+        .pipeline-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--color-text-med);
+            letter-spacing: 0.05em;
+        }
+
+        .pipeline-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 10px;
+        }
+
+        .pipeline-bar {
+            width: 2px;
+            background-color: var(--color-primary);
+            border-radius: 1px;
+            height: 4px;
+        }
+
+        .pipeline-bar:nth-child(1) { animation: beat 1.2s infinite alternate; }
+        .pipeline-bar:nth-child(2) { animation: beat 1s infinite alternate 0.2s; }
+        .pipeline-bar:nth-child(3) { animation: beat 1.4s infinite alternate 0.4s; }
+
+        @keyframes beat {
+            0% { height: 3px; }
+            100% { height: 10px; }
+        }
+
+        /* SlotButton Component */
+        .slot-btn {
+            position: relative;
+            display: inline-block;
+            color: var(--color-paper);
+            text-decoration: none;
+            overflow: hidden;
+            padding: 0.55rem 1.4rem;
+            border: 1px solid var(--hairline-strong);
+            border-radius: 999px;
+            background: transparent;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            transition: background-color var(--duration-base) var(--ease-soft),
+                        border-color var(--duration-base) var(--ease-soft);
+        }
+
+        .slot-btn:hover {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+
+        .slot-text-wrapper {
+            position: relative;
+            display: block;
+            transition: transform 0.45s var(--ease-bounce);
+        }
+
+        .slot-text-default {
+            display: block;
+            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
+        }
+
+        .slot-text-hover {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            display: block;
+            color: var(--bg-base);
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-50%) scale(0.95);
+            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
+        }
+
+        .slot-btn:hover .slot-text-wrapper {
+            transform: translateY(-100%);
+        }
+
+        .slot-btn:hover .slot-text-default {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        .slot-btn:hover .slot-text-hover {
+            opacity: 1;
+            transform: translateY(-50%) scale(1);
+        }
+
+        /* Slot-Button underline accent on hover */
+        .slot-btn::after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            width: 0;
+            height: 1px;
+            background: var(--color-primary);
+            transition: width 0.4s var(--ease-bounce), left 0.4s var(--ease-bounce);
+            pointer-events: none;
+        }
+
+        .slot-btn:hover::after {
+            width: 80%;
+            left: 10%;
+        }
+
+        /* ==========================================================================
+           4. HERO SECTION
+           ========================================================================== */
+        section {
+            padding: 5rem 0;
+            border-bottom: 1px solid var(--hairline);
+            scroll-margin-top: 110px;
+        }
+
+        .hero-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: calc(85vh - 90px);
+            padding: 2rem 0 5rem;
+            border-bottom: 1px solid var(--hairline);
+            position: relative;
+        }
+
+        .hero-frame-container {
+            position: relative;
+            padding: 3rem;
+            margin-bottom: 2.5rem;
+        }
+
+        /* Animated Stellla Frame Drawing */
+        .hero-frame-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .hero-frame-svg rect {
+            fill: none;
+            stroke: var(--hairline-strong);
+            stroke-width: 1px;
+            stroke-dasharray: 2000;
+            stroke-dashoffset: 2000;
+            animation: drawFrame 2.8s var(--ease-bounce) forwards 0.2s;
+        }
+
+        .hero-frame-svg line {
+            stroke: var(--color-primary);
+            stroke-width: 1.5px;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: drawLine 1.8s var(--ease-bounce) forwards 0.8s;
+        }
+
+        @keyframes drawFrame {
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes drawLine {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* Groovy decorative paths — Alche Studio flowing lines */
+        .hero-groovy-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+            z-index: 1;
+        }
+
+        .groovy-path {
+            stroke-linecap: round;
+            transform-origin: center;
+            animation: groovy-flow 12s ease-in-out infinite alternate;
+        }
+
+        .gp-1 { animation-delay: 0s; }
+        .gp-2 { animation-delay: -4s; opacity: 0.1; }
+        .gp-3 { animation-delay: -8s; opacity: 0.08; }
+
+        @keyframes groovy-flow {
+            0%   { transform: translateX(0) translateY(0); }
+            50%  { transform: translateX(-15px) translateY(-8px); }
+            100% { transform: translateX(0) translateY(0); }
+        }
+
+        .groovy-dot {
+            animation: groovy-dot-float 8s var(--ease-soft) infinite alternate;
+        }
+
+        .gd-1 { animation-delay: 0s; }
+        .gd-2 { animation-delay: -3s; }
+
+        @keyframes groovy-dot-float {
+            0%   { transform: translate(0, 0); opacity: 0.3; }
+            50%  { transform: translate(10px, -15px); opacity: 0.6; }
+            100% { transform: translate(-5px, 8px); opacity: 0.2; }
+        }
+
+        .hero-tagline {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            margin-bottom: 1.2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .hero-tagline::before {
+            content: "";
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: var(--color-primary);
+            border-radius: 1px;
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-weight: 300;
+            font-size: clamp(2.4rem, 5.5vw, 4.8rem);
+            line-height: 1.1;
+            color: var(--color-paper);
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+        }
+
+        .hero-title span {
+            font-weight: 600;
+        }
+
+        .hero-desc {
+            font-size: 1.12rem;
+            color: var(--color-text-high);
+            max-width: 740px;
+            line-height: 1.68;
+            margin-bottom: 2.8rem;
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        /* Secondary Ghost Button */
+        .btn-outline {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            color: var(--color-text-high);
+            padding: 0.6rem 1.6rem;
+            border: 1px solid var(--hairline);
+            border-radius: 999px;
+            transition: all var(--duration-base) var(--ease-soft);
+        }
+
+        .btn-outline:hover {
+            color: var(--color-paper);
+            border-color: var(--color-paper);
+        }
+
+        /* ==========================================================================
+           5. SYSTEM STATS & GLASS KPI CARDS
+           ========================================================================== */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 4rem;
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            padding: 1.8rem;
+            transition: transform 0.35s var(--ease-bounce),
+                        box-shadow 0.35s ease,
+                        border-color 0.35s ease;
+            position: relative;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(215, 255, 0, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Crosshair corner markers — Alche Studio frame-drawing pattern */
+        .glass-card::before {
+            content: "";
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            width: 12px;
+            height: 12px;
+            border-top: 2px solid var(--color-primary);
+            border-left: 2px solid var(--color-primary);
+            opacity: 0;
+            transition: opacity var(--duration-base) ease;
+            pointer-events: none;
+        }
+
+        .glass-card::after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            right: -1px;
+            width: 12px;
+            height: 12px;
+            border-bottom: 2px solid var(--color-primary);
+            border-right: 2px solid var(--color-primary);
+            opacity: 0;
+            transition: opacity var(--duration-base) ease, transform 0.5s var(--ease-bounce);
+            pointer-events: none;
+        }
+
+        .glass-card:hover::before,
+        .glass-card:hover::after {
+            opacity: 1;
+        }
+
+        .glass-card:hover::after {
+            transform: scale(1);
+        }
+
+        /* Secondary corner pair for full frame embrace */
+        .glass-card .corner-tl,
+        .glass-card .corner-br {
+            display: none;
+        }
+
+        .glass-card .label {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--color-text-med);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.75rem;
+        }
+
+        .glass-card .value {
+            font-family: var(--font-mono);
+            font-size: 2.2rem;
+            font-weight: 500;
+            color: var(--color-paper);
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+        }
+
+        .glass-card .value.accent {
+            color: var(--color-primary);
+        }
+
+        .glass-card .meta {
+            font-size: 0.8rem;
+            color: var(--color-text-med);
+        }
+
+        /* ==========================================================================
+           6. COMPONENT STYLING (Ledger, Badges, Tech Pills)
+           ========================================================================== */
+        .section-header {
+            margin-bottom: 3.5rem;
+        }
+
+        .section-num {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--color-primary);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.8rem;
+            display: block;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-weight: 400;
+            font-size: 1.8rem;
+            color: var(--color-paper);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Tech Pills */
+        .tech-pill-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 1.5rem;
+        }
+
+        .tech-pill {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--hairline);
+            color: var(--color-text-high);
+            text-transform: uppercase;
+        }
+
+        .tech-pill:hover {
+            border-color: rgba(215, 255, 0, 0.3);
+            color: var(--color-paper);
+            background: rgba(215, 255, 0, 0.04);
+            box-shadow: 0 0 20px rgba(215, 255, 0, 0.03);
+        }
+
+        /* Findings Ledger Table — Alche Studio crosshair frame */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            margin: 2rem 0;
+            border: 1px solid var(--hairline);
+            background: rgba(10, 10, 10, 0.4);
+            border-radius: 4px;
+        }
+
+        .table-responsive::before {
+            content: "";
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            width: 10px;
+            height: 10px;
+            border-top: 1.5px solid rgba(215, 255, 0, 0.15);
+            border-left: 1.5px solid rgba(215, 255, 0, 0.15);
+            opacity: 1;
+            transition: opacity 0.5s var(--ease-soft);
+            pointer-events: none;
+        }
+
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-body);
+            font-size: 0.88rem;
+            text-align: left;
+        }
+
+        .ledger-table th {
+            padding: 1rem 1.4rem;
+            color: var(--color-paper);
+            border-bottom: 1px solid var(--hairline-strong);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 500;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .ledger-table td {
+            padding: 1rem 1.4rem;
+            color: var(--color-text-high);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .ledger-table tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.015);
+            color: var(--color-paper);
+        }
+
+        .commodity-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .commodity-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 1px;
+        }
+
+        .commodity-dot.onion  { background-color: var(--color-commodity-onion); }
+        .commodity-dot.tomato { background-color: var(--color-commodity-tomato); }
+        .commodity-dot.wheat  { background-color: var(--color-commodity-wheat); }
+        .commodity-dot.potato { background-color: var(--color-commodity-potato); }
+
+        .stat-badge {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 2px;
+            font-weight: 500;
+        }
+
+        .stat-badge.significant {
+            background: rgba(143, 174, 137, 0.12);
+            color: var(--color-sage);
+            border: 1px solid rgba(143, 174, 137, 0.25);
+        }
+
+        .stat-badge.insignificant {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--color-text-med);
+            border: 1px solid var(--hairline);
+        }
+
+        .stat-badge.risk {
+            background: rgba(217, 102, 59, 0.12);
+            color: var(--color-rust);
+            border: 1px solid rgba(217, 102, 59, 0.25);
+        }
+
+        /* ==========================================================================
+           7. DOCUMENTATION LAYOUT (Detailed text blocks)
+           ========================================================================== */
+        .doc-layout {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 3.5rem;
+        }
+
+        @media (max-width: 992px) {
+            .doc-layout {
+                grid-template-columns: 1fr;
+                gap: 2.5rem;
+            }
+        }
+
+        .doc-text h3 {
+            font-family: var(--font-display);
+            font-weight: 400;
+            font-size: 1.25rem;
+            color: var(--color-paper);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 2.2rem 0 1rem;
+        }
+
+        .doc-text h3:first-child {
+            margin-top: 0;
+        }
+
+        .doc-text p {
+            margin-bottom: 1.2rem;
+            color: var(--color-text-high);
+            font-size: 0.95rem;
+            line-height: 1.65;
+        }
+
+        .doc-text ul, .doc-text ol {
+            margin-bottom: 1.5rem;
+            margin-left: 1.5rem;
+            color: var(--color-text-high);
+            font-size: 0.95rem;
+        }
+
+        .doc-text li {
+            margin-bottom: 0.5rem;
+        }
+
+        .doc-text code {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--hairline);
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            color: var(--color-primary);
+        }
+
+        .doc-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .doc-widget {
+            border: 1px solid var(--hairline);
+            background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 1.8rem;
+            transition: transform 0.35s var(--ease-bounce),
+                        border-color 0.35s ease,
+                        box-shadow 0.35s ease;
+            position: relative;
+        }
+
+        .doc-widget:hover {
+            border-color: rgba(215, 255, 0, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Doc-widget crosshair corners */
+        .doc-widget::before {
+            content: "";
+            position: absolute;
+            top: -1px;
+            right: -1px;
+            width: 10px;
+            height: 10px;
+            border-top: 1.5px solid rgba(215, 255, 0, 0.2);
+            border-right: 1.5px solid rgba(215, 255, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.5s var(--ease-soft);
+            pointer-events: none;
+        }
+
+        .doc-widget::after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            left: -1px;
+            width: 10px;
+            height: 10px;
+            border-bottom: 1.5px solid rgba(215, 255, 0, 0.2);
+            border-left: 1.5px solid rgba(215, 255, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.5s var(--ease-soft);
+            pointer-events: none;
+        }
+
+        .doc-widget:hover::before,
+        .doc-widget:hover::after {
+            opacity: 1;
+        }
+
+        .doc-widget-title {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .doc-widget-title::before {
+            content: "";
+            width: 5px;
+            height: 5px;
+            background: var(--color-primary);
+        }
+
+        /* Flowchart ASCII mockup */
+        .flowchart-mockup {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            line-height: 1.5;
+            color: var(--color-text-med);
+            white-space: pre;
+            overflow-x: auto;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 1.2rem;
+            border-radius: 4px;
+            border: 1px solid var(--hairline);
+        }
+
+        .alert-box {
+            background: rgba(217, 102, 59, 0.04);
+            border-left: 2px solid var(--color-rust);
+            padding: 1.2rem;
+            border-radius: 0 4px 4px 0;
+            margin: 1.5rem 0;
+        }
+
+        .alert-box-title {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--color-rust);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert-box-desc {
+            font-size: 0.85rem;
+            color: var(--color-text-high);
+            margin: 0 !important;
+        }
+
+        /* ==========================================================================
+           8. FOOTER
+           ========================================================================== */
+        footer {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--hairline);
+            margin-top: 6rem;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--color-text-low);
+            letter-spacing: 0.05em;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-link {
+            color: var(--color-text-med);
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: color var(--duration-base) var(--ease-soft);
+        }
+
+        .footer-link:hover {
+            color: var(--color-primary);
+        }
+
+        /* Scroll Reveal base style */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+
+        .reveal.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ==========================================================================
+           9. RESPONSIVE DESIGN
+           ========================================================================== */
+        @media (max-width: 768px) {
+            .scrollspy-nav {
+                display: none;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 0 1.5rem;
+            }
+            header {
+                height: auto;
+                padding: 1.5rem 0;
+                flex-direction: column;
+                gap: 1.2rem;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            section {
+                padding: 3rem 0;
+            }
+            .hero-section {
+                min-height: auto;
+                padding: 2rem 0;
+            }
+            .hero-frame-container {
+                padding: 1.5rem;
+            }
+            .hero-title {
+                font-size: 2.2rem;
+            }
+            footer {
+                flex-direction: column;
+                gap: 1rem;
+                justify-content: center;
+                height: auto;
+                padding: 2rem 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Dot Grid Overlay -->
+    <div class="dot-grid" aria-hidden="true"></div>
+
+    <!-- Atmosphere Drifting Glows — Alche Studio Extended -->
+    <div class="atmosphere" aria-hidden="true">
+        <div class="atmosphere-flash"></div>
+        <div class="atmosphere-cloud"></div>
+        <div class="atmosphere-drifter" style="--x:15%;--y:20%;--s:180px;--d:25s;--hue:100;--op:0.06"></div>
+        <div class="atmosphere-drifter" style="--x:75%;--y:30%;--s:140px;--d:35s;--hue:80;--op:0.05"></div>
+        <div class="atmosphere-drifter" style="--x:50%;--y:70%;--s:200px;--d:40s;--hue:60;--sat:0.9;--lit:0.6;--op:0.04"></div>
+        <div class="atmosphere-drifter" style="--x:8%;--y:65%;--s:100px;--d:30s;--op:0.03"></div>
+        <div class="atmosphere-drifter" style="--x:88%;--y:12%;--s:130px;--d:45s;--hue:120;--op:0.035"></div>
+    </div>
+
+    <div class="page-wrapper">
+        
+        <!-- Left Side Scrollspy Navigation -->
+        <nav class="scrollspy-nav" aria-label="Vertical Section Navigation">
+            <ul class="scrollspy-list">
+                <li class="scrollspy-item active" data-target="overview">
+                    <a href="#overview">
+                        <span class="num">01</span>
+                        <span class="label">Overview</span>
+                    </a>
+                </li>
+                <li class="scrollspy-item" data-target="metrics">
+                    <a href="#metrics">
+                        <span class="num">02</span>
+                        <span class="label">Live Metrics</span>
+                    </a>
+                </li>
+                <li class="scrollspy-item" data-target="causal">
+                    <a href="#causal">
+                        <span class="num">03</span>
+                        <span class="label">Causal RDD</span>
+                    </a>
+                </li>
+                <li class="scrollspy-item" data-target="architecture">
+                    <a href="#architecture">
+                        <span class="num">04</span>
+                        <span class="label">System Design</span>
+                    </a>
+                </li>
+                <li class="scrollspy-item" data-target="failure">
+                    <a href="#failure">
+                        <span class="num">05</span>
+                        <span class="label">Failure Modes</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Column -->
+        <main class="main-content">
+            
+            <!-- Sticky Top Header -->
+            <header>
+                <div class="logo-container">
+                    <div class="logo-icon"></div>
+                    <div class="logo-text">MandiIQ</div>
+                </div>
+                <nav aria-label="Main Navigation">
+                    <a class="nav-link" href="#overview" data-scramble>Overview</a>
+                    <a class="nav-link" href="#causal" data-scramble>Causal RDD</a>
+                    <a class="nav-link" href="#architecture" data-scramble>Architecture</a>
+                    <a class="nav-link" href="https://github.com/flawsom/MandiIQ" target="_blank" data-scramble>GitHub</a>
+                </nav>
+                <div class="header-actions">
+                    <div class="pipeline-status">
+                        <span>PIPE RUNNING</span>
+                        <div class="pipeline-bars" aria-hidden="true">
+                            <div class="pipeline-bar"></div>
+                            <div class="pipeline-bar"></div>
+                            <div class="pipeline-bar"></div>
+                        </div>
+                    </div>
+                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn">
+                        <span class="slot-text-wrapper">
+                            <span class="slot-text-default">LAUNCH APP</span>
+                            <span class="slot-text-hover">LIVE DASHBOARD</span>
+                        </span>
+                    </a>
+                </div>
+            </header>
+
+            <!-- Hero Section -->
+            <section class="hero-section" id="overview">
+                <div class="hero-frame-container">
+                    <svg class="hero-frame-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <rect x="0" y="0" width="100" height="100" />
+                        <line x1="0" y1="50" x2="6" y2="50" />
+                        <line x1="94" y1="50" x2="100" y2="50" />
+                        <line x1="50" y1="0" x2="50" y2="6" />
+                        <line x1="50" y1="94" x2="50" y2="100" />
+                    </svg>
+                    <!-- Alche-inspired decorative groovy paths -->
+                    <svg class="hero-groovy-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <path class="groovy-path gp-1" d="M -50 350 Q 100 200 250 320 T 550 280 T 850 350" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" opacity="0.15" />
+                        <path class="groovy-path gp-2" d="M -50 400 Q 150 250 300 370 T 600 330 T 850 400" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.3" opacity="0.1" />
+                        <path class="groovy-path gp-3" d="M -50 300 Q 200 450 350 280 T 500 350 T 850 280" fill="none" stroke="var(--color-primary)" stroke-width="0.4" opacity="0.08" />
+                        <circle class="groovy-dot gd-1" cx="250" cy="320" r="2" fill="var(--color-primary)" opacity="0.3" />
+                        <circle class="groovy-dot gd-2" cx="550" cy="280" r="1.5" fill="var(--color-primary)" opacity="0.2" />
+                    </svg>
+                    <div class="hero-tagline">Causal Agricultural Intelligence</div>
+                    <h1 class="hero-title">Testing Policy Thresholds<br>On <span>Mandi Margins</span></h1>
+                    <p class="hero-desc">
+                        MandiIQ is an open-source analytical warehouse and dashboard that applies Causal Regression Discontinuity Designs (RDD) to test whether Indian Meteorological Department (IMD) rainfall-deficit thresholds drive structural margins in national commodity markets.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn" style="padding: 0.75rem 2rem; font-size: 0.85rem;">
+                            <span class="slot-text-wrapper">
+                                <span class="slot-text-default">OPEN ACTIVE DASHBOARD</span>
+                                <span class="slot-text-hover">MANDIIQ APP ➔</span>
+                            </span>
+                        </a>
+                        <a href="#causal" class="btn-outline">EXPLORE FINDINGS</a>
+                    </div>
+                </div>
+
+                <div class="tech-pill-container">
+                    <span class="tech-pill">Regression Discontinuity</span>
+                    <span class="tech-pill">Causal Inference</span>
+                    <span class="tech-pill">DuckDB Analytical Store</span>
+                    <span class="tech-pill">FastAPI inference</span>
+                    <span class="tech-pill">Streamlit Front</span>
+                    <span class="tech-pill">MLflow Models</span>
+                </div>
+            </section>
+
+            <!-- Section 02: Live Metrics -->
+            <section id="metrics" class="reveal">
+                <div class="section-header">
+                    <span class="section-num">02 / REAL-TIME LEDGER</span>
+                    <h2 class="section-title">Warehouse Scale & Coverage</h2>
+                </div>
+                <div class="kpi-grid">
+                    <div class="glass-card">
+                        <div class="label">Database Coverage</div>
+                        <div class="value accent">26,994</div>
+                        <div class="meta">Live transaction records</div>
+                    </div>
+                    <div class="glass-card">
+                        <div class="label">Commodity Scope</div>
+                        <div class="value">268</div>
+                        <div class="meta">Unique agricultural commodities</div>
+                    </div>
+                    <div class="glass-card">
+                        <div class="label">Temporal Window</div>
+                        <div class="value">2018–25</div>
+                        <div class="meta">Joined IMD weather reports</div>
+                    </div>
+                    <div class="glass-card">
+                        <div class="label">API Serving Latency</div>
+                        <div class="value">&lt; 85ms</div>
+                        <div class="meta">FastAPI dynamic endpoints</div>
+                    </div>
+                </div>
+                <p>
+                    Our data pipeline runs automated nightly extraction cycles. It pulls arrivals and prices from Agmarknet, validates the transaction schema, matches market records with spatial coordinate keys, and resolves weather attributes by joining spatial grid files from the Indian Meteorological Department.
+                </p>
+            </section>
+
+            <!-- Section 03: Causal RDD Findings -->
+            <section id="causal" class="reveal">
+                <div class="section-header">
+                    <span class="section-num">03 / EMPIRICAL FRAMEWORK</span>
+                    <h2 class="section-title">Regression Discontinuity Design</h2>
+                </div>
+                
+                <div class="doc-layout">
+                    <div class="doc-text">
+                        <p>
+                            Does the IMD declaring a region as "rain-deficient" drive agricultural market behavior, or is price movement merely a continuous function of physical precipitation?
+                        </p>
+                        <p>
+                            We test this by placing rain departure on the horizontal axis and modeling the discontinuity at the official <strong>-20% deficit cutoff</strong>. If the policy declaration drives market sentiment, we should observe a sharp discontinuous jump (discontinuity) in prices at the boundary, holding all physical parameters constant.
+                        </p>
+                        <h3>Causal RDD Specification</h3>
+                        <p>
+                            We estimate local linear regressions on both sides of the -20% threshold:
+                        </p>
+                        <code style="display: block; padding: 1rem; margin-bottom: 1.5rem; text-align: center; font-size: 0.95rem;">
+                            Y<sub>it</sub> = α + β D<sub>it</sub> + γ<sub>1</sub> (X<sub>it</sub> - c) + γ<sub>2</sub> D<sub>it</sub>(X<sub>it</sub> - c) + ε<sub>it</sub>
+                        </code>
+                        <p>
+                            Where <code>Y<sub>it</sub></code> is the log market price, <code>X<sub>it</sub></code> is the actual rainfall departure percentage, <code>c = -20%</code> is the threshold, and <code>D<sub>it</sub></code> is the indicator binary equal to 1 if rainfall departure is below -20% (deficit territory).
+                        </p>
+                        <p>
+                            Our findings suggest that while physical rainfall levels strongly affect yields and continuous pricing, the administrative -20% declaration itself produces statistically insignificant jumps in most crops, with the notable exception of <strong>Onions</strong> which show active hoarding signals.
+                        </p>
+                    </div>
+
+                    <div class="doc-sidebar">
+                        <div class="doc-widget">
+                            <div class="doc-widget-title">Empirical Results</div>
+                            <div class="table-responsive" style="margin: 0; border: none;">
+                                <table class="ledger-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Crop</th>
+                                            <th>Discontinuity</th>
+                                            <th>P-Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <div class="commodity-chip">
+                                                    <span class="commodity-dot onion"></span>
+                                                    <span>Onion</span>
+                                                </div>
+                                            </td>
+                                            <td style="color: var(--color-primary); font-family: var(--font-mono);">+0.142</td>
+                                            <td><span class="stat-badge significant">p < 0.05</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="commodity-chip">
+                                                    <span class="commodity-dot tomato"></span>
+                                                    <span>Tomato</span>
+                                                </div>
+                                            </td>
+                                            <td style="font-family: var(--font-mono);">-0.024</td>
+                                            <td><span class="stat-badge insignificant">p = 0.74</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="commodity-chip">
+                                                    <span class="commodity-dot wheat"></span>
+                                                    <span>Wheat</span>
+                                                </div>
+                                            </td>
+                                            <td style="font-family: var(--font-mono);">+0.009</td>
+                                            <td><span class="stat-badge insignificant">p = 0.89</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="commodity-chip">
+                                                    <span class="commodity-dot potato"></span>
+                                                    <span>Potato</span>
+                                                </div>
+                                            </td>
+                                            <td style="font-family: var(--font-mono);">+0.053</td>
+                                            <td><span class="stat-badge insignificant">p = 0.31</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="doc-widget">
+                            <div class="doc-widget-title">McCrary Density Check</div>
+                            <p style="font-size: 0.8rem; color: var(--color-text-med); margin: 0;">
+                                We run a McCrary Density Test to examine manipulation of the running variable. The test verifies that rainfall measurements are not artificially sorted or modified around the -20% cutoff boundary, ensuring the validity of our causal estimates.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 04: System Architecture -->
+            <section id="architecture" class="reveal">
+                <div class="section-header">
+                    <span class="section-num">04 / SYSTEM ARCHITECTURE</span>
+                    <h2 class="section-title">Decoupled Processing & Serving</h2>
+                </div>
+
+                <div class="doc-layout">
+                    <div class="doc-text">
+                        <p>
+                            MandiIQ decouples the heavy analytical warehouse from the customer-facing dashboard. The system runs an automated ELT pipeline using DuckDB, fits locally weighted regressions, tracks models in MLflow, and exposes predictions through FastAPI.
+                        </p>
+                        
+                        <div class="flowchart-mockup">
+┌──────────────┐      ┌───────────────┐      ┌──────────────┐
+│  Agmarknet   │ ───▶ │  Local DuckDB │ ───▶ │ MLflow Model │
+│  CSV Ingest  │      │  Warehouse    │      │ Registry     │
+└──────────────┘      └───────────────┘      └──────┬───────┘
+                                                    │
+                                                    ▼
+┌──────────────┐      ┌───────────────┐      ┌──────────────┐
+│  Streamlit   │ ◀─── │  FastAPI      │ ◀─── │ Causal RDD   │
+│  Dashboard   │      │  /forecast    │      │ Estimator    │
+└──────────────┘      └───────────────┘      └──────────────┘</div>
+
+                        <h3>Scaling to 10 Million Orders per Day</h3>
+                        <p>
+                            To transition MandiIQ to support massive transactional data volumes (e.g. 10M transactions per day), the infrastructure expands along several dimensions:
+                        </p>
+                        <ul>
+                            <li><strong>Ingestion:</strong> Replace batch CSV loads with a streaming broker (Apache Kafka or AWS Kinesis) feeding analytical tables in real-time.</li>
+                            <li><strong>Analytical Storage:</strong> Migrate the single-node local DuckDB file to a highly parallel serverless cloud warehouse such as <strong>Google BigQuery</strong> or Snowflake, maintaining similar SQL aggregation syntax but scaling horizontally.</li>
+                            <li><strong>Feature Store:</strong> Introduce <code>Feast</code> or <code>Tecton</code> to serve model features with sub-50ms latency and prevent training-serving skew.</li>
+                            <li><strong>Serving Layer:</strong> Run the FastAPI service inside containerized Kubernetes pods with horizontal autoscaling (HPA) and a Redis caching layer for active market queries.</li>
+                        </ul>
+                    </div>
+
+                    <div class="doc-sidebar">
+                        <div class="doc-widget">
+                            <div class="doc-widget-title">Technology Blueprint</div>
+                            <div class="table-responsive" style="margin: 0; border: none;">
+                                <table class="ledger-table" style="font-size: 0.8rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>Component</th>
+                                            <th>Prototype</th>
+                                            <th>10M Scale Target</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Warehouse</td>
+                                            <td>DuckDB</td>
+                                            <td>Google BigQuery</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Ingestion</td>
+                                            <td>Cron Batch</td>
+                                            <td>Apache Kafka</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Features</td>
+                                            <td>Pandas Engine</td>
+                                            <td>Feast Store</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Deployment</td>
+                                            <td>Docker Compose</td>
+                                            <td>AWS EKS / K8s</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 05: Failure Modes & Degradation -->
+            <section id="failure" class="reveal">
+                <div class="section-header">
+                    <span class="section-num">05 / RISK ENGINEERING</span>
+                    <h2 class="section-title">Failure Modes & Mitigations</h2>
+                </div>
+
+                <div class="doc-layout">
+                    <div class="doc-text">
+                        <p>
+                            A robust intelligence platform must anticipate failure. MandiIQ implements built-in fallback states and active telemetry checks across the following failure boundaries:
+                        </p>
+                        
+                        <h3>1. Model Registry Outages</h3>
+                        <p>
+                            If the active MLflow registry is unreachable at API startup, the FastAPI endpoints fall back to reading a locally serialized model pickle (<code>models/loss_classifier_fallback.pkl</code>). The service generates an active alert while continuing to serve inferences.
+                        </p>
+
+                        <h3>2. Data Drift & Anomalous Weather Jumps</h3>
+                        <p>
+                            Climate variables are highly volatile. When the pipeline detects feature distribution shift exceeding 3σ (e.g. during an unprecedented extreme monsoon departure), it automatically:
+                        </p>
+                        <ol>
+                            <li>Sends telemetry warnings to monitoring dashboards.</li>
+                            <li>Triggers an automated retraining run on the latest 90-day window.</li>
+                            <li>Switches the prediction endpoint to a robust, simple baseline estimator until the new model passes champion verification tests.</li>
+                        </ol>
+
+                        <div class="alert-box">
+                            <div class="alert-box-title">Active Fail-Safe Status</div>
+                            <p class="alert-box-desc">
+                                All forecasting endpoints fallback gracefully. If an API call fails or encounters an invalid parameter, the Streamlit front-end automatically swaps the chart with a historical moving-average baseline, preserving dashboard availability.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="doc-sidebar">
+                        <div class="doc-widget">
+                            <div class="doc-widget-title">Recovery Plan</div>
+                            <ul style="font-size: 0.8rem; color: var(--color-text-med); margin: 0; padding-left: 1.1rem;">
+                                <li style="margin-bottom: 0.8rem;"><strong>Prefect Retries:</strong> Exponential backoffs are configured on the ETL task block.</li>
+                                <li style="margin-bottom: 0.8rem;"><strong>FastAPI Rates:</strong> Inbound prediction traffic is capped using token bucket rate limiters.</li>
+                                <li><strong>Telemetry Checks:</strong> Daily z-score evaluations monitor feature boundaries for outlier values.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer>
+                <div>&copy; 2026 MandiIQ Project. Alche-inspired creative-studio layout.</div>
+                <div class="footer-links">
+                    <a href="https://github.com/flawsom/MandiIQ" target="_blank" class="footer-link" data-scramble>GitHub Source</a>
+                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="footer-link" data-scramble>Streamlit App</a>
+                </div>
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- Interactive Scripts -->
+    <script>
+        // ── Scrollspy Indicator Logic ──
+        document.addEventListener('DOMContentLoaded', () => {
+            const spyItems = document.querySelectorAll('.scrollspy-item');
+            const sections = document.querySelectorAll('section');
+
+            const observerOptions = {
+                root: null,
+                rootMargin: '-10% 0px -60% 0px',
+                threshold: 0
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const activeId = entry.target.getAttribute('id');
+                        spyItems.forEach(item => {
+                            if (item.getAttribute('data-target') === activeId) {
+                                item.classList.add('active');
+                            } else {
+                                item.classList.remove('active');
+                            }
+                        });
+                    }
+                });
+            }, observerOptions);
+
+            sections.forEach(section => observer.observe(section));
+        });
+
+        // ── Text Scramble Animation Class ──
+        class TextScrambler {
+            constructor(el) {
+                this.el = el;
+                this.chars = '!<>-_\\/[]{}—=+*^?#________';
+                this.update = this.update.bind(this);
+            }
+            setText(newText) {
+                const oldText = this.el.innerText;
+                const length = Math.max(oldText.length, newText.length);
+                const promise = new Promise((resolve) => this.resolve = resolve);
+                this.queue = [];
+                for (let i = 0; i < length; i++) {
+                    const from = oldText[i] || '';
+                    const to = newText[i] || '';
+                    const start = Math.floor(Math.random() * 38);
+                    const end = start + Math.floor(Math.random() * 38);
+                    this.queue.push({ from, to, start, end });
+                }
+                cancelAnimationFrame(this.frameId);
+                this.frame = 0;
+                this.update();
+                return promise;
+            }
+            update() {
+                let output = '';
+                let complete = 0;
+                for (let i = 0, n = this.queue.length; i < n; i++) {
+                    let { from, to, start, end, char } = this.queue[i];
+                    if (this.frame >= end) {
+                        complete++;
+                        output += to;
+                    } else if (this.frame >= start) {
+                        if (!char || Math.random() < 0.28) {
+                            char = this.randomChar();
+                            this.queue[i].char = char;
+                        }
+                        output += `<span style="color:var(--color-primary)">${char}</span>`;
+                    } else {
+                        output += from;
+                    }
+                }
+                this.el.innerHTML = output;
+                if (complete === this.queue.length) {
+                    this.resolve();
+                } else {
+                    this.frameId = requestAnimationFrame(this.update);
+                    this.frame++;
+                }
+            }
+            randomChar() {
+                return this.chars[Math.floor(Math.random() * this.chars.length)];
+            }
+        }
+
+        // Apply Scramble effect on elements with [data-scramble]
+        document.querySelectorAll('[data-scramble]').forEach(el => {
+            const originalText = el.innerText;
+            const scrambler = new TextScrambler(el);
+            el.addEventListener('mouseenter', () => {
+                scrambler.setText(originalText);
+            });
+        });
+
+        // ── Scroll Reveal Trigger ──
+        const revealElements = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    revealObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        
+        revealElements.forEach(el => revealObserver.observe(el));
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+title: Show & Tell
+description: Share something you built with or for MandiIQ — forks, extensions, visualizations, data integrations
+labels: []
+body:
+  - type: textarea
+    id: show
+    attributes:
+      label: What did you build?
+      description: Describe your project and how it relates to MandiIQ.
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Link to your repo, deployed app, or gist.
+  - type: textarea
+    id: details
+    attributes:
+      label: How it works
+      description: Brief technical explanation.

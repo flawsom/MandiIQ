@@ -1,0 +1,79 @@
+name: Dashboard Integration
+
+on:
+  pull_request:
+    paths:
+      - 'mandi_rdd/dashboard/**'
+      - 'mandi_rdd/styles/**'
+      - 'mandi_rdd/tests/**'
+      - '.github/workflows/dashboard-integration.yml'
+  push:
+    paths:
+      - 'mandi_rdd/dashboard/**'
+      - 'mandi_rdd/styles/**'
+      - 'mandi_rdd/tests/**'
+      - '.github/workflows/dashboard-integration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mandi_rdd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: mandi_rdd/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright
+          python -m playwright install chromium
+
+      - name: Start Streamlit dashboard (background)
+        run: |
+          python -m streamlit run dashboard/app.py \
+            --server.port 8502 \
+            --server.headless true \
+            --server.fileWatcherType none \
+            2> streamlit_stderr.log &
+          echo "Streamlit PID: $!"
+          # Wait for the dashboard to be ready (up to 90s for cold start)
+          for i in $(seq 1 45); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8502/ 2>/dev/null)
+            if [ "$STATUS" = "200" ]; then
+              echo "Dashboard is UP (attempt $i, HTTP $STATUS)"
+              break
+            fi
+            echo "  Waiting... attempt $i (HTTP $STATUS)"
+            sleep 2
+          done
+          curl -s -o /dev/null -w "Final status: %{http_code}\n" http://localhost:8502/
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest tests/test_dashboard_integration.py -v --tb=short --timeout=120
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts
+          path: |
+            mandi_rdd/streamlit_stderr.log
+          retention-days: 7

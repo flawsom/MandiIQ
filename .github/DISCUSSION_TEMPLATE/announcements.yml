@@ -1,0 +1,14 @@
+title: Announcements
+description: Release notes, major updates, and project milestones (maintainer only)
+labels: ["announcement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This category is for maintainer announcements. New releases, breaking changes, and project milestones will be posted here.
+  - type: textarea
+    id: content
+    attributes:
+      label: Announcement
+    validations:
+      required: true

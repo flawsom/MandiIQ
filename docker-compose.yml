@@ -1,0 +1,54 @@
+# MandiIQ — local development stack
+# Builds both services from the single mandi_rdd/Dockerfile.
+# The API serves FastAPI (mandi_rdd.api.main:app); the dashboard runs the
+# Streamlit app (mandi_rdd.dashboard.app) against it.
+#
+# Usage:
+#   docker compose up --build        # API on :8000, dashboard on :8501
+#   docker compose down              # stop & remove
+#
+# The dashboard can also be deployed standalone on Streamlit Community Cloud
+# (see README "Deployment"). In that mode it loads data directly and needs no API.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: mandi_rdd/Dockerfile
+    image: mandiiq/api
+    container_name: mandiiq-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: mandi_rdd/Dockerfile
+    image: mandiiq/dashboard
+    container_name: mandiiq-dashboard
+    command: >
+      streamlit run mandi_rdd/dashboard/app.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --browser.serverAddress=0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - PORT=8501
+      - PYTHONPATH=/app
+      - API_URL=http://api:8000
+      - STREAMLIT_CONFIG_DIR=/app/mandi_rdd/.streamlit
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

@@ -1,0 +1,70 @@
+name: Nightly Ingestion
+
+# Runs the MandiRDD ingestion pipeline on a schedule and commits the
+# refreshed DuckDB database back to master. Streamlit Cloud auto-deploys
+# from master, so the live dashboard stays current with zero local effort.
+#
+# The Ashoka CEDA historical price import runs autonomously on the Render
+# API server (ashoka_background_import.py) as a daemon thread, kept alive
+# by UptimeRobot pinging /health every 5 minutes.
+#
+# REQUIRED SECRET (repo Settings > Secrets and variables > Actions):
+#   DATA_GOV_IN_API_KEY  - a free key from https://api.data.gov.in/
+
+on:
+  schedule:
+    # Daily 18:30 UTC (~midnight IST, after mandi data for the day is published)
+    - cron: "30 18 * * *"
+  workflow_dispatch: {}   # allow manual "Run workflow" from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Bootstrap historical data (optional, one-time)
+        env:
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+          HISTORICAL_SOURCE_URL: ${{ secrets.HISTORICAL_SOURCE_URL }}
+        run: |
+          if [ -n "$HISTORICAL_SOURCE_URL" ]; then
+            python -m mandi_rdd.ingestion.fetch_historical \
+              --url "$HISTORICAL_SOURCE_URL" --out data/historical
+          else
+            echo "HISTORICAL_SOURCE_URL not set; skipping historical bootstrap."
+          fi
+
+      - name: Run daily ingestion + RDD + forecast
+        env:
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+        run: |
+          python -m mandi_rdd.ingestion.scheduler
+
+      - name: Commit refreshed database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/last_ingest_status.json
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+          else
+            git commit -m "chore: nightly ingestion update"
+            git push
+          fi

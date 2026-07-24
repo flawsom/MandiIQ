@@ -1,0 +1,16 @@
+title: Q&A
+description: Ask a usage question — how to use MandiIQ, interpret metrics, or set up the pipeline
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Be specific — include what you're trying to do and what you've already tried.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which page, metric, or pipeline step are you asking about?

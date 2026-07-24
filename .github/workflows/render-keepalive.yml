@@ -1,0 +1,18 @@
+name: Render Keepalive
+
+# Pings the Render API every 10 minutes to prevent hibernation.
+# Primary keepalive: UptimeRobot (every 5 min, reliable).
+# Backup: this workflow (GitHub cron may be delayed but adds coverage).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render health endpoint
+        run: |
+          curl -s --max-time 15 "https://mandiiq-api.onrender.com/health" -o /dev/null -w "%{http_code}"

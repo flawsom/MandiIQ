@@ -1,0 +1,10 @@
+# System-level packages required by the Streamlit Cloud runtime.
+# Each line is an apt package name. Empty lines and comments (#) are ignored.
+#
+# freetds-dev       — SQL Server / TDS protocol headers (unixODBC bridge)
+# unixodbc-dev      — ODBC driver manager dev headers for pyodbc compilation
+# build-essential   — C toolchain (gcc, g++, make) for pip builds
+# libssl-dev        — OpenSSL headers for cryptography & pyodbc
+# libffi-dev        — Foreign Function Interface (cffi, cryptography)
+# python3-dev       — Python extension headers (pyodbc, numpy, etc.)
+git

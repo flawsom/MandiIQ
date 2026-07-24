@@ -1,0 +1,30 @@
+# Render Blueprints config for the MandiIQ FastAPI server.
+# Deploy: https://dashboard.render.com/blueprints  →  "New Blueprint Instance"
+# Connect the flawsom/MandiIQ repo. Render reads this file automatically.
+
+services:
+  - type: web
+    name: mandiiq-api
+    runtime: python
+    # Use the full ML dependency set (mandi_rdd/requirements.txt) so forecast/risk-score
+    # tools (prophet, xgboost) work in the /ask chat. The root requirements.txt is
+    # dashboard-only and lacks these.
+    plan: free
+    region: oregon          # closest free-tier region to India-friendly latency; change if preferred
+    branch: master
+    buildCommand: pip install -r mandi_rdd/requirements.txt
+    startCommand: uvicorn mandi_rdd.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    # The API reads the committed DuckDB inside the repo. Default path already
+    # resolves to mandi_rdd/data/mandi_iq.duckdb, but we set it explicitly.
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: MANDIIQ_DB_PATH
+        value: mandi_rdd/data/mandi_iq.duckdb
+      - key: GEMINI_API_KEY
+        sync: false          # you paste this in the Render dashboard (or use OPENROUTER_API_KEY)
+      - key: OPENROUTER_API_KEY
+        sync: false          # optional alternative provider
+      - key: PORT
+        value: "8000"        # Render overrides this at runtime via $PORT

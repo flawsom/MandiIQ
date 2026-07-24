@@ -1,0 +1,52 @@
+# ── MandiIQ Daily Data Ingestion ──
+# Runs every day at 03:00 UTC, fetches fresh satellite + price data,
+# and commits the updated NDVI export back to the repo.
+
+name: daily-ingest
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # daily at 03:00 UTC
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                     # full history for commit
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install python-dotenv           # for .env loading
+
+      - name: Run NDVI pipeline
+        env:
+          SENTINEL_CLIENT_ID: ${{ secrets.SENTINEL_CLIENT_ID }}
+          SENTINEL_CLIENT_SECRET: ${{ secrets.SENTINEL_CLIENT_SECRET }}
+          MANDIQ_API_URL: https://mandiiq-api.onrender.com
+        run: |
+          python run_ingest.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "flawsom"
+          git config user.email "siba@unifies.codes"
+          git add -A
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: daily data ingest"
+            git push
+          fi

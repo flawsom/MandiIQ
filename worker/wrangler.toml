@@ -1,0 +1,9 @@
+name = "mandiiq-edge-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+account_id = "e27f25b7a13997395e9a17005dc3cf3c"
+
+# The live Streamlit app sitting behind this zone.
+# Override per-environment with: wrangler secret put UPSTREAM
+[vars]
+UPSTREAM = "https://mandiiq.streamlit.app"

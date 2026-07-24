@@ -1,0 +1,73 @@
+name: Check Ashoka Import Status
+
+# Polls the Render API server every 3h to check progress on the autonomous
+# Ashoka CEDA historical import. Opens a GitHub Issue when the import
+# completes (state == "complete").
+
+on:
+  schedule:
+    # Every 3 hours — fast enough to catch completion within a reasonable window
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}   # manual trigger
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check import status from Render API
+        id: status
+        run: |
+          RESP=$(curl -s --max-time 15 "https://mandiiq-api.onrender.com/historical-import-status")
+          echo "Raw response: $RESP"
+          STATE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','unknown'))")
+          PROGRESS=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('progress',''))")
+          CELLS_DONE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('cells_done',0))")
+          ROWS=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('rows_written',0))")
+          echo "state=$STATE" >> $GITHUB_OUTPUT
+          echo "progress=$PROGRESS" >> $GITHUB_OUTPUT
+          echo "cells_done=$CELLS_DONE" >> $GITHUB_OUTPUT
+          echo "rows=$ROWS" >> $GITHUB_OUTPUT
+
+      - name: Log progress
+        run: |
+          echo "## Ashoka Import Status: ${{ steps.status.outputs.state }}" >> $GITHUB_STEP_SUMMARY
+          echo "Progress: ${{ steps.status.outputs.progress }}" >> $GITHUB_STEP_SUMMARY
+          echo "Cells done: ${{ steps.status.outputs.cells_done }}" >> $GITHUB_STEP_SUMMARY
+          echo "Rows written: ${{ steps.status.outputs.rows }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Open Issue on completion (one-time)
+        if: steps.status.outputs.state == 'complete'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if we already opened an issue for this completion
+          EXISTING=$(gh issue list --label "ashoka-import" --state all --json number --jq 'length' 2>/dev/null || echo 0)
+          if [ "$EXISTING" -eq 0 ]; then
+            gh issue create \
+              --title "Ashoka CEDA historical import completed" \
+              --label "ashoka-import" \
+              --body "The autonomous Ashoka CEDA historical price import has finished.
+
+- Cells processed: ${{ steps.status.outputs.cells_done }}
+- Rows written: ${{ steps.status.outputs.rows }}
+- Progress: ${{ steps.status.outputs.progress }}
+
+The imported data has been backfilled into DuckDB and is available for RDD analysis, forecasts, and classifier runs. Run the 'Nightly Ingestion' workflow to process it into the dashboard."
+          else
+            echo "Issue already exists — skipping duplicate."
+          fi
+
+      - name: Warn if import errored
+        if: steps.status.outputs.state == 'error'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Ashoka import encountered an error" \
+            --label "ashoka-import" \
+            --body "The Ashoka CEDA import failed with error state. Check the server logs at Render dashboard.\n\nStatus: ${{ steps.status.outputs.progress }}"

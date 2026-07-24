@@ -1,0 +1,76 @@
+{
+  "last_updated": "2026-07-19T20:36:18.512777Z",
+  "n_records": 10,
+  "records": [
+    {
+      "state": "Karnataka",
+      "district": "Bellary",
+      "date": "2026-01-21",
+      "ndvi": 0.2793,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Karnataka",
+      "district": "Bellary",
+      "date": "2026-02-21",
+      "ndvi": 0.2249,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Karnataka",
+      "district": "Bellary",
+      "date": "2026-03-21",
+      "ndvi": 0.1962,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Karnataka",
+      "district": "Bellary",
+      "date": "2026-04-21",
+      "ndvi": 0.1465,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Karnataka",
+      "district": "Bellary",
+      "date": "2026-05-21",
+      "ndvi": 0.1538,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Rajasthan",
+      "district": "Jaipur",
+      "date": "2026-01-21",
+      "ndvi": 0.293,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Rajasthan",
+      "district": "Jaipur",
+      "date": "2026-02-21",
+      "ndvi": 0.2544,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Rajasthan",
+      "district": "Jaipur",
+      "date": "2026-03-21",
+      "ndvi": 0.2646,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Rajasthan",
+      "district": "Jaipur",
+      "date": "2026-04-21",
+      "ndvi": 0.2459,
+      "anomaly": 0.0
+    },
+    {
+      "state": "Rajasthan",
+      "district": "Jaipur",
+      "date": "2026-05-21",
+      "ndvi": 0.2742,
+      "anomaly": 0.0
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+======================================================================
+STEP 1: DATA QUALITY AUDIT
+======================================================================
+Raw rows loaded: 9994
+Columns with missing values: none found
+Fully duplicate rows: 0
+Duplicate Order ID + Product ID combinations (possible double-entry): 8
+Orders sold at a loss (negative profit): 1871 (18.7% of all orders)
+Sales outliers beyond IQR upper bound (499): 1167
+
+======================================================================
+STEP 2: CLEANING
+======================================================================
+Removed 8 duplicate order-line records
+Parsed Order Date / Ship Date and derived ShippingDelayDays (range: 0-7 days)
+Final clean dataset: 9986 rows (from 9994 raw rows)
+
+======================================================================
+STEP 3: EXPLORATORY ANALYSIS
+======================================================================
+Total Sales: $2,295,510
+Total Profit: $286,014
+Overall Profit Margin: 12.5%
+Total Orders analyzed: 5,009 unique orders / 9,986 line items
+Date range: 2014-01-03 to 2017-12-30
+
+Category performance:
+                    sales    profit  orders  margin_pct  sales_share_pct
+Category                                                                
+Technology       835760.0  145386.0    1544        17.0             36.0
+Furniture        741432.0   18380.0    1764         2.0             32.0
+Office Supplies  718318.0  122247.0    3742        17.0             31.0
+
+Sub-categories ranked by profit (lowest first):
+                 sales   profit  margin_pct
+Sub-Category                               
+Tables        206966.0 -17725.0        -9.0
+Bookcases     114880.0  -3473.0        -3.0
+Supplies       46674.0  -1189.0        -2.0
+Fasteners       3024.0    950.0        31.0
+Machines      189239.0   3385.0         2.0
+Labels         12486.0   5546.0        44.0
+Art            27119.0   6528.0        24.0
+Envelopes      16476.0   6964.0        42.0
+Furnishings    91419.0  12976.0        14.0
+Appliances    107532.0  18138.0        17.0
+Storage       223299.0  21121.0        10.0
+Chairs        328168.0  26602.0         8.0
+Binders       203323.0  30180.0        15.0
+Paper          78384.0  34009.0        43.0
+Accessories   166986.0  41868.0        25.0
+Phones        330007.0  44516.0        14.0
+Copiers       149528.0  55618.0        37.0
+
+Sub-categories operating at a net loss: ['Tables', 'Bookcases', 'Supplies']
+
+Regional performance:
+            sales    profit  margin_pct
+Region                                 
+West     725355.0  108404.0        15.0
+East     677906.0   91354.0        14.0
+Central  501240.0   39706.0         8.0
+South    391008.0   46549.0        12.0
+
+Customer segment performance:
+                 sales    profit
+Segment                         
+Consumer     1161013.0  134022.0
+Corporate     705602.0   91821.0
+Home Office   428895.0   60170.0
+
+Profit margin by discount band:
+Discount
+0%        29.5
+1-20%     11.9
+21-40%   -15.3
+41%+     -77.4
+
+Peak sales month: 2017-11 ($117,903)
+Lowest sales month: 2014-02 ($4,520)
+
+Average shipping delay by Ship Mode (days):
+Ship Mode
+Same Day          0.0
+First Class       2.2
+Second Class      3.2
+Standard Class    5.0
+
+======================================================================
+STEP 4: KEY BUSINESS INSIGHTS
+======================================================================
+1. Technology generates the most revenue ($835,760, 36.4% of total sales).
+2. 'Furniture' has the weakest category margin (2.5%), dragged down by loss-making sub-categories: ['Tables', 'Bookcases', 'Supplies'].
+3. Discounts above 20% flip several segments unprofitable — margin falls from 29.5% at 0% discount to -77.4% at 41%+ discount.
+4. West is the top-performing region by sales ($725,355), while Central has the thinnest margin (7.9%).
+5. Consumer is the leading customer segment, contributing $1,161,013 in sales.
+6. Same Day shipping has the shortest average delay (0.0 days) vs Standard Class (5.0 days).

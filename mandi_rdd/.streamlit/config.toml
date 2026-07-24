@@ -1,0 +1,22 @@
+[theme]
+base = "dark"
+primaryColor = "#d7ff00"              # turmeric — buttons, active elements, sliders
+backgroundColor = "#000000"           # ink
+secondaryBackgroundColor = "#111111"  # rain slate — sidebar, cards
+textColor = "#ffffff"                 # paper
+font = "monospace"                    # closest native option for numerals;
+                                      # headings/body split applied via injected CSS
+                                      # (Space Grotesk / IBM Plex Sans / IBM Plex Mono)
+
+
+[client]
+toolbarMode = "minimal"
+
+
+[server]
+runOnSave = true
+# Serve SEO/static assets (og-image, robots.txt, sitemap) at /static/*.
+# enableStaticServing MUST be true or Streamlit blocks /static/* entirely.
+enableStaticServing = true
+# Serve SEO/static assets (og-image, robots.txt, sitemap) at /static/*. enableStaticServing
+# MUST be true or Streamlit blocks /static/* entirely.

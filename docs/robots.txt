@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://flawsom.github.io/MandiIQ/seo/sitemap-index.xml

@@ -1,0 +1,65 @@
+name: Deploy SEO to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "mandi_rdd/dashboard/seo.py"
+      - "mandi_rdd/dashboard/seo_sitemap.py"
+      - "static/**"
+      - "docs/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps (for og-image build if needed)
+        run: pip install --quiet pillow
+
+      - name: Generate sitemaps
+        run: python -c "from mandi_rdd.dashboard.seo_sitemap import write_sitemaps; write_sitemaps('static')"
+
+      - name: Build og-image if missing
+        run: |
+          if [ ! -f static/og-image.png ]; then python build_og_image.py; fi
+
+      - name: Publish SEO assets to docs/seo
+        run: |
+          mkdir -p docs/seo
+          cp static/og-image.png static/sitemap-index.xml static/sitemap-0001.xml static/robots.txt docs/seo/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

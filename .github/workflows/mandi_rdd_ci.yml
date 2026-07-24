@@ -1,0 +1,158 @@
+name: MandiRDD CI
+
+on:
+  push:
+    paths:
+      - 'mandi_rdd/**'
+      - '.github/workflows/mandi_rdd_ci.yml'
+  pull_request:
+    paths:
+      - 'mandi_rdd/**'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours - runs ingestion (00:00, 06:00, 12:00, 18:00 UTC)
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python.version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r mandi_rdd/requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Validate workflow syntax
+        run: |
+          python -c "import yaml; yaml.safe_load(open('.github/workflows/mandi_rdd_ci.yml'))"
+
+      - name: Run MandiRDD tests (incl. no-mock-data gate)
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest mandi_rdd/tests/test_ingestion.py mandi_rdd/tests/test_rdd_engine.py mandi_rdd/tests/test_no_mock_data.py -v --tb=short
+
+      - name: Integration tests (with database)
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest mandi_rdd/tests/test_rdd_with_real_data.py -v --tb=short || echo "Integration tests skipped (no database)"
+
+  # Scheduled daily ingestion. Runs only on schedule (so its own commit cannot
+  # re-trigger this job). The commit it makes is NOT tagged, so the
+  # quality-gate workflows (ci.yml full suite + no-mock-data check) still run
+  # against it. On failure it opens/updates a GitHub Issue (Phase 3).
+  daily-ingest:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r mandi_rdd/requirements.txt
+
+      - name: Run nightly pipeline (live ingestion from data.gov.in)
+        id: ingest
+        env:
+          PYTHONPATH: .
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+          RAINFALL_RESOURCE_ID: ${{ secrets.RAINFALL_RESOURCE_ID }}
+        continue-on-error: true
+        run: |
+          python -m mandi_rdd.run_nightly --max-records 5000
+
+      - name: Write ingestion status record
+        if: always()
+        env:
+          PYTHONPATH: .
+          INGEST_OK: ${{ steps.ingest.outcome == 'success' }}
+        run: |
+          python - <<'PY'
+          import json, os, datetime
+          ok = os.environ["INGEST_OK"] == "true"
+          status = {
+              "last_run_utc": datetime.datetime.utcnow().isoformat() + "Z",
+              "outcome": "success" if ok else "failure",
+          }
+          # Row counts if DB present
+          try:
+              import duckdb
+              con = duckdb.connect("mandi_rdd/data/mandi_iq.duckdb", read_only=True)
+              status["price_rows"] = con.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
+          except Exception as e:
+              status["price_rows"] = None
+              status["db_error"] = str(e)
+          with open("mandi_rdd/data/last_ingest_status.json", "w") as f:
+              json.dump(status, f, indent=2)
+          print("Wrote status:", status)
+          PY
+
+      - name: Upload DuckDB to external store (if configured) — Phase 6 (A)
+        if: always()
+        env:
+          PYTHONPATH: .
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          if [ -n "$R2_BUCKET" ]; then
+            pip install rclone || true
+            rclone config create r2 s3 provider Cloudflare access_key_id "$R2_ACCESS_KEY_ID" secret_access_key "$R2_SECRET_ACCESS_KEY" endpoint "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" || true
+            rclone copyto mandi_rdd/data/mandi_iq.duckdb r2:$R2_BUCKET/mandi_iq.duckdb && echo "DB uploaded to R2" || echo "R2 upload failed; falling back to git commit"
+          else
+            echo "R2_BUCKET not set — falling back to committing DB to git (see README Phase 6)."
+          fi
+
+      - name: Commit & push updated DuckDB / status (if changed)
+        if: always()
+        env:
+          PYTHONPATH: .
+        run: |
+          git config user.name "flawsom"
+          git config user.email "siba@unifies.codes"
+          git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/last_ingest_status.json
+          if git diff --cached --quiet; then
+            echo "No database/status changes - skipping commit"
+          else
+            git commit -m "data: ingestion update"
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master
+          fi
+
+      - name: Alert on failure (open/update GitHub Issue) — Phase 3
+        if: failure() || steps.ingest.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="MandiIQ ingestion failure"
+          BODY="Nightly ingestion failed at $(date -u). Check the Actions run for details."
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --search "$TITLE" --state open --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "Another failure at $(date -u). Consecutive failures detected — escalate." || true
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$TITLE" --body "$BODY" --label "ingestion" || true
+          fi

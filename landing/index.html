@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Margin Intelligence System — Loss Prevention Platform</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════════
+           1. DESIGN TOKENS — Alche Studio Inspired
+           ═══════════════════════════════════════════════════════════ */
+        :root {
+            --bg-base: #000000;
+            --bg-surface: #0a0a0a;
+            --bg-glass: rgba(255,255,255,0.03);
+            --bg-glass-hover: rgba(255,255,255,0.06);
+            --bg-surface-glass: rgba(255,255,255,0.02);
+
+            --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+            --font-body: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+            --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
+            --font-numeric: "Barlow", "IBM Plex Sans", sans-serif;
+
+            --color-primary: #d7ff00;
+            --color-paper: #ffffff;
+            --color-text-high: #bababa;
+            --color-text-med: #7e7e7e;
+            --color-text-low: #555555;
+            --color-rust: #D9663B;
+            --color-sage: #8FAE89;
+
+            --hairline: rgba(255,255,255,0.07);
+            --hairline-strong: rgba(255,255,255,0.14);
+
+            --duration-base: 350ms;
+            --duration-slow: 600ms;
+            --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            background-color: var(--bg-base);
+            color: var(--color-text-high);
+            font-family: var(--font-body);
+            font-size: 15px;
+            line-height: 1.625;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* ── Dot Grid ── */
+        .dot-grid {
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-image: radial-gradient(rgba(255,255,255,0.04) 1.5px, transparent 2px);
+            background-size: 38px 38px;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* ── Atmosphere Blobs ── */
+        .atmosphere {
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            overflow: hidden; z-index: 0; pointer-events: none;
+        }
+        .atmosphere-flash {
+            position: absolute; top: -20%; right: -10%;
+            width: 70vw; height: 60vh;
+            background: radial-gradient(circle, rgba(215,255,0,0.04) 0%, transparent 70%);
+            filter: blur(100px);
+            animation: drift-a 45s var(--ease-soft) infinite alternate;
+        }
+        .atmosphere-cloud {
+            position: absolute; bottom: -20%; left: -10%;
+            width: 80vw; height: 70vh;
+            background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, transparent 70%);
+            filter: blur(120px);
+            animation: drift-b 55s var(--ease-soft) infinite alternate;
+        }
+        .atmosphere-drifter {
+            position: absolute;
+            width: var(--s,160px); height: var(--s,160px);
+            left: var(--x,50%); top: var(--y,50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, hsla(var(--hue,100),var(--sat,0.8),var(--lit,0.55),var(--op,0.06)) 0%, transparent 70%);
+            filter: blur(80px);
+            animation: drifter-float var(--d,30s) var(--ease-soft) infinite alternate;
+            will-change: transform;
+        }
+        @keyframes drifter-float {
+            0%   { transform: translate(0,0) scale(1) rotate(0deg); }
+            25%  { transform: translate(5%,-5%) scale(1.15) rotate(8deg); }
+            50%  { transform: translate(-3%,3%) scale(0.95) rotate(-5deg); }
+            75%  { transform: translate(4%,-2%) scale(1.08) rotate(3deg); }
+            100% { transform: translate(-5%,5%) scale(1.05) rotate(-4deg); }
+        }
+        @keyframes drift-a { from { transform: translate(0,0) scale(1); } to { transform: translate(-8%,10%) scale(1.1); } }
+        @keyframes drift-b { from { transform: translate(0,0) scale(1.1); } to { transform: translate(10%,-8%) scale(0.95); } }
+
+        .page-wrap {
+            position: relative; z-index: 1;
+            max-width: 1200px; margin: 0 auto; padding: 0 2rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           2. HEADER
+           ═══════════════════════════════════════════════════════════ */
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--hairline);
+        }
+        .logo-group { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon {
+            width: 20px; height: 20px;
+            background: var(--color-primary);
+            clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%);
+        }
+        .logo-text {
+            font-family: var(--font-display);
+            font-weight: 500; font-size: 1rem;
+            letter-spacing: 0.12em; color: var(--color-paper);
+            text-transform: uppercase;
+        }
+        nav { display: flex; align-items: center; gap: 2rem; }
+        .nav-link {
+            font-family: var(--font-mono);
+            font-size: 0.75rem; color: var(--color-text-med);
+            text-decoration: none; text-transform: uppercase;
+            letter-spacing: 0.08em;
+            transition: color var(--duration-base) var(--ease-soft);
+            cursor: pointer;
+        }
+        .nav-link:hover { color: var(--color-primary); }
+
+        /* ═══════════════════════════════════════════════════════════
+           3. HERO
+           ═══════════════════════════════════════════════════════════ */
+        .hero {
+            padding: 5rem 0 3rem;
+            position: relative;
+            min-height: 80vh;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .hero-frame {
+            position: relative; padding: 2.5rem;
+            margin-bottom: 2rem;
+        }
+        .hero-frame-svg {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; pointer-events: none; overflow: visible;
+        }
+        .hero-frame-svg rect {
+            fill: none; stroke: var(--hairline-strong);
+            stroke-width: 1px; stroke-dasharray: 2000; stroke-dashoffset: 2000;
+            animation: drawFrame 2.8s var(--ease-bounce) forwards 0.2s;
+        }
+        .hero-frame-svg line {
+            stroke: var(--color-primary); stroke-width: 1.5px;
+            stroke-dasharray: 100; stroke-dashoffset: 100;
+            animation: drawLine 1.8s var(--ease-bounce) forwards 0.8s;
+        }
+        @keyframes drawFrame { to { stroke-dashoffset: 0; } }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+        .hero-tagline {
+            font-family: var(--font-mono); font-size: 0.8rem;
+            color: var(--color-primary); text-transform: uppercase;
+            letter-spacing: 0.18em; margin-bottom: 1rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+        .hero-tagline::before {
+            content: ""; display: inline-block;
+            width: 5px; height: 5px; background: var(--color-primary);
+        }
+        .hero h1 {
+            font-family: var(--font-display); font-weight: 300;
+            font-size: clamp(2rem, 5vw, 4.2rem); line-height: 1.1;
+            color: var(--color-paper); letter-spacing: 0.03em;
+            text-transform: uppercase; margin-bottom: 1.5rem;
+        }
+        .hero h1 .hl { color: var(--color-primary); font-weight: 600; }
+        .hero h1 .hl-loss { color: var(--color-rust); font-weight: 600; }
+        .hero-desc {
+            font-size: 1.05rem; color: var(--color-text-high);
+            max-width: 700px; line-height: 1.7; margin-bottom: 2.5rem;
+        }
+        .hero-actions { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+
+        /* ── SlotButton ── */
+        .slot-btn {
+            position: relative; display: inline-block;
+            color: var(--color-paper); text-decoration: none;
+            overflow: hidden;
+            padding: 0.6rem 1.5rem;
+            border: 1px solid var(--hairline-strong); border-radius: 999px;
+            background: transparent; cursor: pointer;
+            font-family: var(--font-mono); font-size: 0.78rem;
+            font-weight: 500; letter-spacing: 0.08em;
+            transition: background-color var(--duration-base) var(--ease-soft),
+                        border-color var(--duration-base) var(--ease-soft);
+        }
+        .slot-btn:hover { background-color: var(--color-primary); border-color: var(--color-primary); }
+        .slot-text-wrapper {
+            position: relative; display: block;
+            transition: transform 0.45s var(--ease-bounce);
+        }
+        .slot-text-default { display: block; transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce); }
+        .slot-text-hover {
+            position: absolute; top: 100%; left: 0; width: 100%; display: block;
+            color: var(--bg-base); font-weight: 600;
+            pointer-events: none; opacity: 0;
+            transform: translateY(-50%) scale(0.95);
+            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
+        }
+        .slot-btn:hover .slot-text-wrapper { transform: translateY(-100%); }
+        .slot-btn:hover .slot-text-default { opacity: 0; transform: scale(0.9); }
+        .slot-btn:hover .slot-text-hover { opacity: 1; transform: translateY(-50%) scale(1); }
+        .slot-btn::after {
+            content: ""; position: absolute; bottom: -1px; left: 50%;
+            width: 0; height: 1px;
+            background: var(--color-primary);
+            transition: width 0.4s var(--ease-bounce), left 0.4s var(--ease-bounce);
+            pointer-events: none;
+        }
+        .slot-btn:hover::after { width: 80%; left: 10%; }
+
+        .btn-outline {
+            display: inline-block;
+            font-family: var(--font-mono); font-size: 0.75rem;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            text-decoration: none;
+            color: var(--color-text-high);
+            padding: 0.55rem 1.4rem;
+            border: 1px solid var(--hairline); border-radius: 999px;
+            transition: all var(--duration-base) var(--ease-soft);
+        }
+        .btn-outline:hover { color: var(--color-paper); border-color: var(--color-paper); }
+
+        /* Tech Pills */
+        .tech-pills {
+            display: flex; flex-wrap: wrap; gap: 0.5rem;
+            margin-top: 2.5rem;
+        }
+        .tech-pill {
+            font-family: var(--font-mono); font-size: 0.7rem;
+            padding: 0.25rem 0.7rem;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--hairline);
+            color: var(--color-text-med);
+            text-transform: uppercase;
+            transition: all var(--duration-base) var(--ease-soft);
+        }
+        .tech-pill:hover {
+            border-color: rgba(215,255,0,0.3);
+            color: var(--color-paper);
+            background: rgba(215,255,0,0.04);
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           4. SECTIONS
+           ═══════════════════════════════════════════════════════════ */
+        section { padding: 4rem 0; border-bottom: 1px solid var(--hairline); }
+        .section-label {
+            font-family: var(--font-mono); font-size: 0.75rem;
+            color: var(--color-primary); letter-spacing: 0.1em;
+            margin-bottom: 0.8rem; display: block;
+        }
+        .section-title {
+            font-family: var(--font-display); font-weight: 400;
+            font-size: 1.6rem; color: var(--color-paper);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Glass Cards ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.2rem; margin-bottom: 3rem;
+        }
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
+            border: 1px solid var(--hairline); border-radius: 8px;
+            padding: 1.6rem;
+            transition: transform 0.35s var(--ease-bounce), border-color 0.35s ease, box-shadow 0.35s ease;
+            position: relative;
+        }
+
+
+        .glass-card::before {
+            content: ""; position: absolute;
+            top: -1px; left: -1px;
+            width: 10px; height: 10px;
+            border-top: 1.5px solid var(--color-primary);
+            border-left: 1.5px solid var(--color-primary);
+            opacity: 0; transition: opacity var(--duration-base) ease;
+            pointer-events: none;
+        }
+        .glass-card::after {
+            content: ""; position: absolute;
+            bottom: -1px; right: -1px;
+            width: 10px; height: 10px;
+            border-bottom: 1.5px solid var(--color-primary);
+            border-right: 1.5px solid var(--color-primary);
+            opacity: 0; transition: opacity var(--duration-base) ease;
+            pointer-events: none;
+        }
+        .glass-card:hover::before, .glass-card:hover::after { opacity: 1; }
+        .glass-card:hover { border-color: rgba(215,255,0,0.15); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+        /* ── Glass backdrop (replication prompt §4) ── */
+        .glass {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(14px) saturate(140%);
+            -webkit-backdrop-filter: blur(14px) saturate(140%);
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            transition: transform 0.35s var(--ease-bounce), box-shadow 0.35s ease, border-color 0.35s ease;
+        }
+        .glass:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 44px rgba(0,0,0,0.7), 0 0 0 1px rgba(215,255,0,0.15);
+            border-color: var(--color-primary);
+        }
+        .card-label {
+            font-family: var(--font-mono); font-size: 0.7rem;
+            color: var(--color-text-med); text-transform: uppercase;
+            letter-spacing: 0.08em; margin-bottom: 0.6rem;
+        }
+        .card-value {
+            font-family: var(--font-mono); font-size: 2rem;
+            font-weight: 500; color: var(--color-paper); line-height: 1.1;
+            margin-bottom: 0.4rem;
+        }
+        .card-value.accent { color: var(--color-primary); }
+        .card-meta { font-size: 0.78rem; color: var(--color-text-med); }
+
+        /* ── Ledger Table ── */
+        .table-responsive {
+            width: 100%; overflow-x: auto;
+            border: 1px solid var(--hairline);
+            background: rgba(10,10,10,0.4); border-radius: 4px;
+        }
+        .ledger { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        .ledger th {
+            padding: 0.9rem 1.2rem; color: var(--color-paper);
+            border-bottom: 1px solid var(--hairline-strong);
+            font-family: var(--font-mono); font-size: 0.7rem;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            font-weight: 500; background: rgba(0,0,0,0.3);
+            text-align: left;
+        }
+        .ledger th:last-child { text-align: right; }
+        .ledger td {
+            padding: 0.9rem 1.2rem; color: var(--color-text-high);
+            border-bottom: 1px solid var(--hairline);
+        }
+        .ledger td:last-child { text-align: right; font-family: var(--font-mono); font-weight: 500; }
+        .ledger tr:last-child td { border-bottom: none; }
+        .ledger tbody tr:hover td { background: rgba(255,255,255,0.015); color: var(--color-paper); }
+        .loss { color: var(--color-rust); }
+        .profit { color: var(--color-sage); }
+        .muted { color: var(--color-text-low); }
+
+        /* ═══════════════════════════════════════════════════════════
+           5. CLIFF CHART
+           ═══════════════════════════════════════════════════════════ */
+        .chart-card {
+            background: rgba(10,10,10,0.4);
+            border: 1px solid var(--hairline); border-radius: 8px;
+            padding: 1.5rem; position: relative;
+        }
+        .chart-card svg { width: 100%; height: auto; display: block; }
+
+        /* ═══════════════════════════════════════════════════════════
+           6. FOOTER
+           ═══════════════════════════════════════════════════════════ */
+        footer {
+            padding: 2.5rem 0; display: flex;
+            align-items: center; justify-content: space-between;
+            font-family: var(--font-mono); font-size: 0.7rem;
+            color: var(--color-text-low); letter-spacing: 0.05em;
+        }
+        .footer-links { display: flex; gap: 1.5rem; }
+        .footer-link {
+            color: var(--color-text-med); text-decoration: none;
+            text-transform: uppercase;
+            transition: color var(--duration-base) var(--ease-soft);
+        }
+        .footer-link:hover { color: var(--color-primary); }
+
+        /* ═══════════════════════════════════════════════════════════
+           7. SCROLL REVEAL
+           ═══════════════════════════════════════════════════════════ */
+        .reveal {
+            opacity: 0; transform: translateY(30px);
+            transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1),
+                        transform 0.8s cubic-bezier(0.16,1,0.3,1);
+        }
+        .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+        /* ── Crosshair Panel (replication prompt §3) ── */
+        .crosshair-panel { position: relative; border: 1px solid var(--hairline); background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 4px; }
+        .crosshair-panel::before {
+            content: ""; position: absolute; top: 0; left: 0;
+            width: 8px; height: 8px;
+            border-top: 1px solid var(--color-primary);
+            border-left: 1px solid var(--color-primary);
+            pointer-events: none;
+        }
+        .crosshair-panel::after {
+            content: ""; position: absolute; top: 0; right: 0;
+            width: 8px; height: 8px;
+            border-top: 1px solid var(--color-primary);
+            border-right: 1px solid var(--color-primary);
+            pointer-events: none;
+        }
+        .crosshair-panel-inner::before {
+            content: ""; position: absolute; bottom: 0; left: 0;
+            width: 8px; height: 8px;
+            border-bottom: 1px solid var(--color-primary);
+            border-left: 1px solid var(--color-primary);
+            pointer-events: none;
+        }
+        .crosshair-panel-inner::after {
+            content: ""; position: absolute; bottom: 0; right: 0;
+            width: 8px; height: 8px;
+            border-bottom: 1px solid var(--color-primary);
+            border-right: 1px solid var(--color-primary);
+            pointer-events: none;
+        }
+
+        /* ── Gradient Text (replication prompt) ── */
+        .gradient-text {
+            background: linear-gradient(110deg, var(--color-primary) 0%, var(--color-paper) 50%, var(--color-primary) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent; color: transparent;
+            animation: gradient-pan 9s ease infinite;
+        }
+        @keyframes gradient-pan {
+            0%   { background-position: 0% 50%; }
+            50%  { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* ── Entrance Animations + Stagger (replication prompt) ── */
+        .fade-in-left { opacity: 0; transform: translateX(-20px); transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-bounce); }
+        .fade-in-right { opacity: 0; transform: translateX(20px); transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-bounce); }
+        .scale-in { opacity: 0; transform: scale(0.92); transition: opacity 0.5s var(--ease-soft), transform 0.5s var(--ease-bounce); }
+        .fade-in-left.is-visible, .fade-in-right.is-visible, .scale-in.is-visible { opacity: 1; transform: none; }
+        .stagger-1 { transition-delay: 0.05s; }
+        .stagger-2 { transition-delay: 0.1s; }
+        .stagger-3 { transition-delay: 0.15s; }
+        .stagger-4 { transition-delay: 0.2s; }
+
+        /* ── Live Dot (replication prompt companion) ── */
+        .live-dot {
+            display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--color-sage);
+            box-shadow: 0 0 0 0 rgba(143,174,137,0.6);
+            animation: live-pulse 2.4s ease-out infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes live-pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(143,174,137,0.6); }
+            70%  { box-shadow: 0 0 0 10px rgba(143,174,137,0); }
+            100% { box-shadow: 0 0 0 0 rgba(143,174,137,0); }
+        }
+
+        /* ── Surface Mode (replication prompt §8) ── */
+        .theme-surface {
+            --bg-base: #111111;
+            --bg-surface: #1a1a1a;
+            --bg-glass: rgba(255,255,255,0.025);
+            --bg-glass-hover: rgba(255,255,255,0.05);
+            --hairline: rgba(255,255,255,0.06);
+            --hairline-strong: rgba(255,255,255,0.12);
+        }
+        .theme-surface .atmosphere-flash { background: radial-gradient(circle, rgba(215,255,0,0.04) 0%, transparent 70%); }
+        .theme-surface .atmosphere-cloud { background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, transparent 70%); }
+        .theme-surface .dot-grid { background-image: radial-gradient(rgba(255,255,255,0.035) 1.5px, transparent 2px); }
+
+        /* ── Reduced Motion ── */
+        @media (prefers-reduced-motion: reduce) {
+            .reveal, .fade-in-left, .fade-in-right, .scale-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+            .atmosphere-flash, .atmosphere-cloud, .atmosphere-drifter, .gradient-text, .live-dot { animation: none !important; }
+            .hero-frame-svg rect, .hero-frame-svg line { animation: none !important; stroke-dashoffset: 0; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           8. RESPONSIVE
+           ═══════════════════════════════════════════════════════════ */
+        @media (max-width: 600px) {
+            .page-wrap { padding: 0 1.2rem; }
+            header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+            nav { width: 100%; justify-content: flex-start; gap: 1rem; }
+            .hero { padding: 3rem 0 2rem; min-height: auto; }
+            .hero-frame { padding: 1.2rem; }
+            .hero h1 { font-size: 1.6rem; }
+            .kpi-grid { grid-template-columns: 1fr; }
+            .ledger th, .ledger td { padding: 0.6rem 0.8rem; font-size: 0.8rem; }
+            footer { flex-direction: column; gap: 1rem; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Atmosphere / Dot Grid Layer -->
+    <div class="dot-grid" aria-hidden="true"></div>
+    <div class="atmosphere" aria-hidden="true">
+        <div class="atmosphere-flash"></div>
+        <div class="atmosphere-cloud"></div>
+        <div class="atmosphere-drifter" style="--x:20%;--y:30%;--s:160px;--d:28s;--op:0.05"></div>
+        <div class="atmosphere-drifter" style="--x:70%;--y:20%;--s:120px;--d:38s;--hue:80;--op:0.04"></div>
+        <div class="atmosphere-drifter" style="--x:50%;--y:75%;--s:180px;--d:42s;--op:0.035"></div>
+        <!-- Two additional drifters per replication prompt: 5 total for full Alche coverage -->
+        <div class="atmosphere-drifter" style="--x:88%;--y:12%;--s:130px;--d:45s;--hue:120;--op:0.035"></div>
+        <div class="atmosphere-drifter" style="--x:8%;--y:65%;--s:100px;--d:30s;--op:0.03"></div>
+    </div>
+
+    <div class="page-wrap">
+
+        <!-- ── Header ── -->
+        <header>
+            <div class="logo-group">
+                <div class="logo-icon"></div>
+                <span class="logo-text">Margin IQ</span>
+            </div>
+            <nav>
+                <a class="nav-link" href="#findings" data-scramble>Findings</a>
+                <a class="nav-link" href="#cliff" data-scramble>The Cliff</a>
+                <a class="nav-link" href="https://github.com/flawsom/Margin-Intelligence-System" target="_blank" data-scramble>GitHub</a>
+                <a href="#dashboard" class="slot-btn" style="padding:0.45rem 1.2rem;font-size:0.72rem;">
+                    <span class="slot-text-wrapper">
+                        <span class="slot-text-default">Dashboard</span>
+                        <span class="slot-text-hover">Launch App →</span>
+                    </span>
+                </a>
+            </nav>
+        </header>
+
+        <!-- ── Hero ── -->
+        <section class="hero" id="overview">
+            <div class="hero-frame">
+                <svg class="hero-frame-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <rect x="0" y="0" width="100" height="100" />
+                    <line x1="0" y1="50" x2="5" y2="50" />
+                    <line x1="95" y1="50" x2="100" y2="50" />
+                    <line x1="50" y1="0" x2="50" y2="5" />
+                    <line x1="50" y1="95" x2="50" y2="100" />
+                </svg>
+                <div class="hero-tagline">Superstore Margin Intelligence v2.0</div>
+                <h1>1 in 5 orders <span class="hl-loss">lost money</span>.<br>This system catches them <span class="hl">before they ship</span>.</h1>
+                <p class="hero-desc">
+                    A production-grade MLOps system that predicts unprofitable discounts,
+                    recommends safe pricing ceilings, and forecasts demand — deployed as a live, monitored API.
+                    Built on the Tableau Sample Superstore dataset.
+                </p>
+                <div class="hero-actions">
+                    <a href="#" id="dashboard-link" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
+                        <span class="slot-text-wrapper">
+                            <span class="slot-text-default">Open Interactive Simulator</span>
+                            <span class="slot-text-hover">Launch Dashboard →</span>
+                        </span>
+                    </a>
+                    <a href="#cliff" class="btn-outline">Explore Findings</a>
+                </div>
+                <div class="tech-pills">
+                    <span class="tech-pill">Python</span>
+                    <span class="tech-pill">FastAPI</span>
+                    <span class="tech-pill">Streamlit</span>
+                    <span class="tech-pill">XGBoost</span>
+                    <span class="tech-pill">SHAP</span>
+                    <span class="tech-pill">Prophet</span>
+                    <span class="tech-pill">DuckDB</span>
+                    <span class="tech-pill">MLflow</span>
+                    <span class="tech-pill">Docker</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Cliff Chart Section ── -->
+        <section id="cliff" class="reveal">
+            <span class="section-label">01 / The Margin Cliff</span>
+            <h2 class="section-title">Where Discounts Destroy Profit</h2>
+            <p style="color:var(--color-text-med);margin-bottom:1.5rem;max-width:700px;">
+                Average profit margin by discount tier. The 20% threshold is where margin flips from
+                positive to negative — the single most important number in the dataset.
+            </p>
+            <div class="chart-card">
+                <svg viewBox="0 0 600 240" role="img" aria-label="Line chart showing profit margin declining from +29.5% at 0% discount to -77.4% at 41%+ discount, with the 20% threshold marked as the crossing point.">
+                    <line x1="60" y1="30" x2="60" y2="210" stroke="var(--hairline)" stroke-width="1"/>
+                    <line x1="60" y1="210" x2="560" y2="210" stroke="var(--hairline)" stroke-width="1"/>
+                    <line x1="60" y1="85" x2="560" y2="85" stroke="var(--hairline)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="60" y1="145" x2="560" y2="145" stroke="var(--hairline)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="60" y1="118" x2="560" y2="118" stroke="var(--hairline-strong)" stroke-width="1" stroke-dasharray="2,3"/>
+                    <text x="555" y="115" fill="var(--color-text-low)" font-size="10" font-family="IBM Plex Mono, monospace">0%</text>
+                    <polyline points="110,42 260,78 410,148 530,205" fill="none" stroke="var(--color-rust)" stroke-width="2.5" stroke-linejoin="round"/>
+                    <circle cx="110" cy="42" r="4" fill="var(--color-rust)"/>
+                    <circle cx="260" cy="78" r="4" fill="var(--color-rust)"/>
+                    <circle cx="410" cy="148" r="4" fill="var(--color-rust)"/>
+                    <circle cx="530" cy="205" r="4" fill="var(--color-rust)"/>
+                    <line x1="260" y1="60" x2="260" y2="218" stroke="var(--color-primary)" stroke-width="1.5" stroke-dasharray="6,3"/>
+                    <text x="235" y="230" fill="var(--color-primary)" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">20% threshold</text>
+                    <text x="80" y="45" fill="var(--color-sage)" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">+29.5%</text>
+                    <text x="230" y="72" fill="var(--color-text-med)" font-size="9" font-family="IBM Plex Mono, monospace">+14.8%</text>
+                    <text x="380" y="143" fill="var(--color-rust)" font-size="9" font-family="IBM Plex Mono, monospace">−3.2%</text>
+                    <text x="505" y="202" fill="var(--color-rust)" font-size="9" font-family="IBM Plex Mono, monospace">−77.4%</text>
+                    <text x="110" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">0%</text>
+                    <text x="260" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">1–20%</text>
+                    <text x="410" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">21–40%</text>
+                    <text x="530" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">41%+</text>
+                    <text x="10" y="130" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle" transform="rotate(-90,10,130)">Margin %</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- ── KPI Dashboard Preview ── -->
+        <section id="dashboard" class="reveal">
+            <span class="section-label">02 / System Metrics</span>
+            <h2 class="section-title">Live Performance Ledger</h2>
+            <div class="kpi-grid">
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Loss Rate</div>
+                    <div class="card-value accent">18.7%</div>
+                    <div class="card-meta">of all orders unprofitable</div>
+                </div>
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Margin at 0% Discount</div>
+                    <div class="card-value">+29.5%</div>
+                    <div class="card-meta">full-price orders</div>
+                </div>
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Margin at 41%+ Discount</div>
+                    <div class="card-value" style="color:var(--color-rust);">−77.4%</div>
+                    <div class="card-meta">deep discount losses</div>
+                </div>
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Forecast MAPE</div>
+                    <div class="card-value">12.78%</div>
+                    <div class="card-meta">Prophet model accuracy</div>
+                </div>
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Classifier ROC-AUC</div>
+                    <div class="card-value">0.77</div>
+                    <div class="card-meta">XGBoost loss predictor</div>
+                </div>
+                <div class="glass-card crosshair-panel">
+                    <div class="crosshair-panel-inner"></div>
+                    <div class="card-label">Records</div>
+                    <div class="card-value">9,994</div>
+                    <div class="card-meta">Tableau Sample Superstore</div>
+                </div>
+            </div>
+            <div style="margin-top:2rem;">
+                <a href="#" id="dashboard-cta" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
+                    <span class="slot-text-wrapper">
+                        <span class="slot-text-default">Launch Interactive Simulator</span>
+                        <span class="slot-text-hover">Open Dashboard →</span>
+                    </span>
+                </a>
+            </div>
+        </section>
+
+        <!-- ── Findings Ledger ── -->
+        <section id="findings" class="reveal">
+            <span class="section-label">03 / Headline Findings</span>
+            <h2 class="section-title">What the Data Reveals</h2>
+            <div class="table-responsive">
+                <table class="ledger">
+                    <thead>
+                        <tr>
+                            <th>Finding</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Loss rate</td><td class="loss">18.7%</td></tr>
+                        <tr><td>Margin at 0% discount</td><td class="profit">+29.5%</td></tr>
+                        <tr><td>Margin at 41%+ discount</td><td class="loss">−77.4%</td></tr>
+                        <tr><td>Worst category</td><td class="loss">Tables (−9% margin)</td></tr>
+                        <tr><td>Best region</td><td class="profit">West (15% margin)</td></tr>
+                        <tr><td>Classifier ROC-AUC</td><td class="profit">0.77</td></tr>
+                        <tr><td>Forecast MAPE (Prophet)</td><td class="profit">12.78%</td></tr>
+                        <tr><td>Dataset</td><td class="muted">Tableau Sample Superstore · 9,994 orders</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── Footer ── -->
+        <footer>
+            <div>© 2026 · Superstore Margin Intelligence System</div>
+            <div class="footer-links">
+                <a href="https://github.com/flawsom/Margin-Intelligence-System" target="_blank" class="footer-link" data-scramble>GitHub</a>
+                <a href="https://github.com/flawsom/Margin-Intelligence-System/blob/master/docs/system_design.md" target="_blank" class="footer-link" data-scramble>System Design</a>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- ── Surface Mode Toggle Button (replication prompt §8) ── -->
+    <button id="surface-toggle" aria-label="Toggle surface mode" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;width:36px;height:36px;border-radius:50%;border:1px solid var(--hairline);background:var(--bg-glass);color:var(--color-text-med);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all var(--duration-base) var(--ease-soft);" title="Toggle surface mode">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+    </button>
+
+    <!-- ── Scripts ── -->
+    <script>
+        /* Deploy URLs */
+        const DEPLOY = {
+            API: 'https://your-api.onrender.com',
+            DASH: 'https://your-dashboard.onrender.com',
+        };
+        document.getElementById('dashboard-link')?.addEventListener('click', e => {
+            e.preventDefault();
+            window.open(DEPLOY.DASH, '_blank');
+        });
+        document.getElementById('dashboard-cta')?.addEventListener('click', e => {
+            e.preventDefault();
+            window.open(DEPLOY.DASH, '_blank');
+        });
+
+        /* Text Scramble */
+        class Scrambler {
+            constructor(el) {
+                this.el = el;
+                this.chars = '!<>-_\\/[]{}—=+*^?#________';
+                this.update = this.update.bind(this);
+            }
+            setText(newText) {
+                const oldText = this.el.innerText;
+                const len = Math.max(oldText.length, newText.length);
+                this.queue = [];
+                for (let i = 0; i < len; i++) {
+                    const from = oldText[i] || '';
+                    const to = newText[i] || '';
+                    this.queue.push({
+                        from, to,
+                        start: Math.floor(Math.random() * 38),
+                        end: Math.floor(Math.random() * 38) + 10,
+                    });
+                }
+                cancelAnimationFrame(this.frameId);
+                this.frame = 0;
+                this.update();
+            }
+            update() {
+                let out = '', complete = 0;
+                for (const item of this.queue) {
+                    if (this.frame >= item.end) { complete++; out += item.to; }
+                    else if (this.frame >= item.start) {
+                        out += `<span style="color:var(--color-primary)">${this.chars[Math.floor(Math.random() * this.chars.length)]}</span>`;
+                    } else { out += item.from; }
+                }
+                this.el.innerHTML = out;
+                if (complete === this.queue.length) return;
+                this.frameId = requestAnimationFrame(this.update);
+                this.frame++;
+            }
+        }
+        document.querySelectorAll('[data-scramble]').forEach(el => {
+            const orig = el.innerText;
+            const s = new Scrambler(el);
+            el.addEventListener('mouseenter', () => s.setText(orig));
+        });
+
+        /* Scroll Reveal */
+        const revealObserver = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('is-visible');
+                    revealObserver.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+        /* Surface Mode Toggle (replication prompt §8) */
+        (function() {
+            function applySurface(enabled) {
+                document.body.classList.toggle('theme-surface', enabled);
+                const btn = document.getElementById('surface-toggle');
+                if (btn) {
+                    btn.innerHTML = enabled
+                        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+                        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+                }
+                localStorage.setItem('alche_surface', enabled ? '1' : '0');
+            }
+            // Restore saved preference
+            if (localStorage.getItem('alche_surface') === '1') applySurface(true);
+            // Toggle button click
+            document.getElementById('surface-toggle')?.addEventListener('click', function() {
+                applySurface(!document.body.classList.contains('theme-surface'));
+            });
+            // Cross-tab sync
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'alche_surface') applySurface(e.newValue === '1');
+            });
+        })();
+    </script>
+</body>
+</html>

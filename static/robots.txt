@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# SEO assets (og-image, sitemaps) are served from GitHub Pages because
+# Streamlit reserves /static/ for its own frontend.
+Sitemap: https://flawsom.github.io/MandiIQ/seo/sitemap-index.xml
