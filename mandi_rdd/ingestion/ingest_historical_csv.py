@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+# Ashoka CSV exports can have commodity/variety descriptions > 131 KB default limit
+csv.field_size_limit(2**30)
 import os
 import sys
 import logging
