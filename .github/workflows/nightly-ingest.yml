@@ -74,3 +74,21 @@ jobs:
             git commit -m "chore: nightly ingestion update"
             git push
           fi
+
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_HOOK: \${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "\$RENDER_HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL not set -- skipping Render deploy"
+            exit 0
+          fi
+          echo "Triggering Render deploy..."
+          HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}"             -X POST "\$RENDER_HOOK" --max-time 30)
+          echo "Render responded HTTP \$HTTP_CODE"
+          if [ "\$HTTP_CODE" = "200" ] || [ "\$HTTP_CODE" = "201" ]; then
+            echo "Render deploy triggered successfully."
+          else
+            echo "::error::Render deploy hook returned HTTP \$HTTP_CODE"
+            exit 1
+          fi
