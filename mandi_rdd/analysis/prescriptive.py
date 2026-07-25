@@ -14,7 +14,6 @@ Output example:
    ₹1,350. Consider locking procurement now rather than waiting."
 """
 
-import numpy as np
 import pandas as pd
 from typing import Optional
 import logging

@@ -11,7 +11,6 @@ Model: modal_price ~ rainfall_departure + district_dummies + month_dummies
 """
 import numpy as np
 import pandas as pd
-from typing import Optional
 from scipy import stats
 import logging
 

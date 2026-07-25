@@ -9,7 +9,6 @@ reported what they said, and chose the one that earned it on this data."
 """
 
 import numpy as np
-import pandas as pd
 from typing import Optional
 import warnings
 import logging

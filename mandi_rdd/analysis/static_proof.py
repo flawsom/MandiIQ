@@ -23,8 +23,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-import numpy as np
-import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("static_proof")

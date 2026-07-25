@@ -11,7 +11,6 @@ This is the layer that turns "we found an effect" into
 
 import numpy as np
 import pandas as pd
-from typing import Optional
 import warnings
 import logging
 import json
