@@ -447,6 +447,19 @@
         .arch-node.highlight { border-color: var(--color-primary); color: var(--color-primary); }
         .arch-arrow { color: var(--color-text-low); font-size: 1rem; font-family: var(--font-mono); }
 
+        /* Mermaid diagram wrapper */
+        .mermaid-wrapper {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border: 1px solid var(--hairline);
+            overflow-x: auto;
+        }
+        .mermaid-wrapper .mermaid {
+            font-family: "Space Grotesk", "Inter", sans-serif;
+        }
+
         /* ── AI Chat Code Block ── */
         .code-block {
             font-family: var(--font-mono); font-size: 0.78rem;
@@ -495,6 +508,29 @@
             .ledger th, .ledger td { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
         }
     </style>
+    <!-- Mermaid.js for architecture diagrams -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#1a1a2e',
+                primaryTextColor: '#ffffff',
+                lineColor: '#d7ff00',
+                secondaryColor: '#16213e',
+                tertiaryColor: '#0f3460',
+                mainBkg: '#1a1a2e',
+                nodeBorder: '#d7ff00',
+                clusterBkg: '#0d0d1a',
+                clusterBorder: '#533483',
+                titleColor: '#d7ff00',
+                nodeTextColor: '#ffffff'
+            },
+            fontFamily: '"Space Grotesk", "Inter", sans-serif'
+        });
+    </script>
+    
 </head>
 <body>
 
@@ -727,26 +763,35 @@
         <section class="reveal">
             <span class="section-label">05 / System Design</span>
             <h2 class="section-title">Architecture Flow</h2>
-            <div class="arch-flow">
-                <div class="arch-node highlight">
-                    <span class="node-icon">📡</span>data.gov.in
-                </div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node"><span class="node-icon">📥</span>Ingestion</div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node"><span class="node-icon">🦆</span>DuckDB</div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node"><span class="node-icon">🔬</span>RDD + FE</div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node"><span class="node-icon">🤖</span>XGBoost<br>Prophet</div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node" style="border-color:var(--color-primary);color:var(--color-primary);">
-                    <span class="node-icon">🧠</span>AI Orchestrator
-                </div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node highlight"><span class="node-icon">⚡</span>FastAPI</div>
-                <span class="arch-arrow">→</span>
-                <div class="arch-node highlight"><span class="node-icon">📊</span>Dashboard</div>
+            <p style="color:var(--color-text-low);margin-bottom:1rem;font-size:0.85rem;max-width:640px;">
+                An automated ELT pipeline ingests live mandi prices and rainfall data, runs causal RDD analysis + ML forecasts, serves results through a FastAPI gateway, and renders them in an interactive Streamlit dashboard.
+            </p>
+            <div class="mermaid-wrapper">
+<pre class="mermaid" style="text-align: center;">
+%%{init: {"theme": "dark", "themeVariables": { "primaryColor": "#1a1a2e", "primaryTextColor": "#fff", "lineColor": "#d7ff00", "secondaryColor": "#16213e", "tertiaryColor": "#0f3460"}}}%%
+flowchart LR
+    A["data.gov.in<br/>Mandi Prices"]
+    B["IMD Rainfall<br/>Monthly Grids"]
+    C["Ingestion<br/>Pagination + Retry"]
+    D["DuckDB<br/>Analytical Store"]
+    E["RDD Engine<br/>Causal Inference"]
+    F["ML Pipeline<br/>XGBoost + Prophet"]
+    G["Prescriptive<br/>Procurement Advice"]
+    H["FastAPI Gateway<br/>10 Endpoints"]
+    I["Streamlit Dashboard<br/>5 Interactive Pages"]
+    J["AI Orchestrator<br/>Multi-model Router"]
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> G
+    G --> H
+    H --> I
+    H --> J
+    J --> I
+</pre>
             </div>
         </section>
 
