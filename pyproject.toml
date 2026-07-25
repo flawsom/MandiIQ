@@ -1,0 +1,68 @@
+[tool.skylos]
+complexity = 10
+nesting = 3
+max_args = 5
+max_lines = 50
+god_file_max_lines = 500
+god_file_max_definitions = 40
+god_file_max_top_level_definitions = 25
+duplicate_strings = 3
+model = "gpt-4.1"
+exclude = [
+    "**/node_modules",
+    "**/.venv*",
+    "**/__pycache__",
+    "**/package-lock.json",
+    "**/frontend/dist",
+    "**/data/*.duckdb",
+    "mandi_rdd/dashboard/frontend",  # pre-built JS bundle, not source
+]
+ignore = [
+    "SKY-D222",        # "Hallucinated dependency" — mandi_rdd is a local package
+    "SKY-D224",        # "API signature hallucination" — pandas/openai pattern false positives
+    "SKY-S101",        # "Secret detected" — npm integrity hashes in package-lock
+]
+
+[tool.skylos.masking]
+names = []
+decorators = []
+bases = []
+
+[tool.skylos.dead_code]
+entrypoints = [
+    { type = "module", path = "**/dashboard/pages/*.py", reason = "Streamlit multi-page entrypoints" },
+    { type = "module", path = "**/dashboard/components.py", reason = "Streamlit component builders" },
+    { type = "module", path = "**/dashboard/data_access.py", reason = "Data access helpers" },
+    { type = "function", path = "**/api/main.py", reason = "FastAPI route handlers" },
+    { type = "function", name = ["lifespan", "startup_event", "shutdown_event"], path = "**/api/main.py", reason = "FastAPI lifespan hooks" },
+]
+
+[tool.skylos.vibe]
+extra_phantom_names = [
+    "DataFrame", "to_datetime", "get_dummies", "concat",
+    "date_range", "Timedelta", "DateOffset", "read_sql_query",
+    "isna", "notna", "OpenAI",
+]
+extra_phantom_decorators = []
+extra_credential_names = []
+extra_sensitive_file_keywords = []
+extra_network_timeout_calls = []
+
+[tool.skylos.architecture]
+strict = false
+enforce_iad = false
+
+[tool.skylos.whitelist]
+names = ["mandi_rdd", "mandi_iq"]
+
+[tool.skylos.whitelist.documented]
+
+[tool.skylos.whitelist.temporary]
+
+[tool.skylos.gate]
+fail_on_critical = true
+max_critical = 0
+max_high = 5
+max_security = 0
+max_quality = 10
+strict = false
