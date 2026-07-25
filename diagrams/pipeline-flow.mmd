@@ -1,38 +1,140 @@
 ---
-title: MandiIQ Data Pipeline Flow
+title: MandiIQ Pipeline Flow — Nightly Ingestion Walkthrough
 ---
-flowchart LR
-    subgraph Ingest["🌾 Daily Ingestion"]
+%%{init: {
+  "theme": "dark",
+  "themeVariables": {
+    "primaryColor": "#1a1a2e",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#d7ff00",
+    "lineColor": "#d7ff00",
+    "secondaryColor": "#16213e",
+    "tertiaryColor": "#0f3460",
+    "mainBkg": "#0d0d1a",
+    "nodeBorder": "#533483",
+    "clusterBkg": "#0a0a12",
+    "clusterBorder": "#2a2a4a",
+    "titleColor": "#d7ff00",
+    "edgeLabelBackground": "#0d0d1a",
+    "nodeTextColor": "#ffffff",
+    "fontFamily": "\"Space Grotesk\", \"Inter\", sans-serif"
+  },
+  "flowchart": {
+    "useMaxWidth": true,
+    "htmlLabels": true,
+    "curve": "basis",
+    "padding": 20
+  }
+}}%%
+flowchart TD
+    %% Stage 1: DATA INGESTION (Bright accent -- the "active" stage)
+    subgraph S1["01 DATA INGESTION  | Nightly Cron 6 AM UTC"]
         direction TB
-        A1["data.gov.in<br/>API"] --> A2["fetch_prices.py<br/>Pagination Engine"]
+        A1["data.gov.in<br/>Mandi Prices API"] --> A2["fetch_prices.py<br/>Pagination Engine"]
         A3["IMD / GitHub<br/>Rainfall CSV"] --> A4["fetch_rainfall.py<br/>Sub-division Parser"]
-        A5["Sentinel Hub<br/>NDVI"] --> A6["fetch_ndvi.py<br/>Vegetation Index"]
+        A5["Sentinel Hub<br/>NDVI Satellite"] --> A6["fetch_ndvi.py<br/>Vegetation Index"]
         A2 --> A7["http_client.py<br/>Retry + SSL + JSON"]
         A4 --> A7
         A6 --> A7
+        A8["scheduler.py<br/>Orchestrator"] -.-> A2
+        A8 -.-> A4
+        A8 -.-> A6
     end
-    subgraph Store["💾 DuckDB Warehouse"]
+
+    %% Stage 2: DUCKDB WAREHOUSE (Medium brightness -- storing)
+    subgraph S2["02 DUCKDB WAREHOUSE  | Idempotent Upsert"]
         direction TB
-        B1["prices<br/>371K+ Records"]
+        B1["prices<br/>364K+ Records"]
         B2["rainfall<br/>Sub-division Monthly"]
         B3["ndvi<br/>District Vegetation"]
         B4["rdd_results<br/>Causal Estimates"]
         B5["source_metadata<br/>Freshness Tracking"]
+        B6["last_ingest_status.json<br/>Timestamp"]
     end
-    subgraph Analyze["🔬 Analysis & ML"]
+
+    %% Stage 3: ANALYSIS & ML (Charted -- the value stage)
+    subgraph S3["03 ANALYSIS & ML  | Causal + Forecast + Risk"]
         direction TB
-        C1["rdd_engine.py<br/>Local Linear RDD<br/>McCrary Density Test"]
-        C2["forecast.py<br/>Prophet + XGBoost<br/>Volatility Envelopes"]
-        C3["classifier.py<br/>Spike Risk<br/>XGBoost Classifier"]
-        C4["prescriptive.py<br/>Procurement<br/>Recommendations"]
+        C1["rdd_engine.py<br/>Local Linear RDD<br/>Triangular Kernel<br/>McCrary Density Test"]
+        C2["forecast.py<br/>Prophet vs LSTM<br/>Volatility Envelopes<br/>Honest Winner Callout"]
+        C3["classifier.py<br/>XGBoost + SHAP<br/>Spike Risk Probability<br/>ROC-AUC 0.81"]
+        C4["prescriptive.py<br/>Procurement Recommendations<br/>Confidence: HIGH/MOD/LOW"]
     end
-    subgraph Serve["🚀 Serving"]
+
+    %% Stage 4: AI ORCHESTRATOR (Final processing)
+    subgraph S4["04 AI ORCHESTRATOR  | Multi-Model Router"]
         direction TB
-        D1["FastAPI Gateway<br/>mandiiq-api.onrender.com"]
-        D2["Streamlit Dashboard<br/>Interactive UI"]
-        D3["AI Orchestrator<br/>Gemini / OpenRouter<br/>Free-tier LLM Chain"]
+        D1["router.py<br/>Circuit Breaker<br/>Fallback Chain"]
+        D2["orchestrator.py<br/>Tool-grounding<br/>Endpoint Selection"]
+        D3["Nightly Narrative<br/>3-4 Sentence Report<br/>Commodity Summary"]
     end
-    Ingest --> Store
-    Store --> Analyze
-    Analyze --> Serve
-    linkStyle default stroke-width:2px,fill:none,stroke:#d7ff00
+
+    %% Stage 5: SERVING (Delivery)
+    subgraph S5["05 SERVING  | Live Deployment"]
+        direction TB
+        E1["FastAPI Gateway<br/>mandiiq-api.onrender.com<br/>10 REST Endpoints"]
+        E2["Streamlit Dashboard<br/>mandiiq.streamlit.app<br/>5 Interactive Pages"]
+    end
+
+    %% Main flow: thick arrows for primary path
+    A7 ==> B1
+    A7 -.-> B2
+    A7 -.-> B3
+    A8 ==> B6
+
+    B1 ==> C1
+    B1 ==> C2
+    B1 ==> C3
+    B2 --> C1
+    B2 --> C2
+
+    C1 ==> C4
+    C2 ==> C4
+    C3 ==> C4
+
+    C4 ==> D1
+    D1 ==> D2
+    D2 ==> D3
+    D3 ==> E1
+
+    E1 <==> E2
+
+    %% Edge styling
+    linkStyle 0,4,5,6,11,12,14 stroke-width:4px,stroke:#d7ff00,fill:none
+    linkStyle 1,2,3,7,8,9,10 stroke-width:2px,stroke:#533483,fill:none
+    linkStyle 15,16 stroke-width:3px,stroke:#e94560,fill:none
+
+    %% Stage classes
+    classDef stage1 fill:#1a1a2e,stroke:#e94560,stroke-width:3px,color:#fff
+    classDef stage1Source fill:#2a1a2e,stroke:#ff6b6b,stroke-width:2px,color:#ffcccc
+    classDef stage1Node fill:#1f1f3a,stroke:#e94560,stroke-width:2px,color:#fff
+    classDef stage1Orch fill:#1a2a2e,stroke:#e94560,stroke-dasharray:5 3,stroke-width:2px,color:#aaa
+
+    classDef stage2 fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#fff
+    classDef stage2Node fill:#1a2a4a,stroke:#0f3460,stroke-width:1px,color:#ddd
+
+    classDef stage3 fill:#2d1b69,stroke:#d7ff00,stroke-width:3px,color:#fff
+    classDef stage3Node fill:#3d1b79,stroke:#d7ff00,stroke-width:2px,color:#fff
+
+    classDef stage4 fill:#1a0a2e,stroke:#e94560,stroke-width:2px,color:#fff
+    classDef stage4Node fill:#2a0a3e,stroke:#e94560,stroke-width:2px,color:#ddd
+
+    classDef stage5 fill:#0f1a2e,stroke:#d7ff00,stroke-width:3px,color:#fff
+    classDef stage5Node fill:#1a2a4e,stroke:#d7ff00,stroke-width:2px,color:#fff
+
+    class S1 stage1
+    class A1,A3,A5 stage1Source
+    class A2,A4,A6,A7 stage1Node
+    class A8 stage1Orch
+
+    class S2 stage2
+    class B1,B2,B3,B4,B5,B6 stage2Node
+
+    class S3 stage3
+    class C1,C2,C3,C4 stage3Node
+
+    class S4 stage4
+    class D1,D2,D3 stage4Node
+
+    class S5 stage5
+    class E1,E2 stage5Node
