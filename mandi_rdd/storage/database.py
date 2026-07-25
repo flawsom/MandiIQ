@@ -1,5 +1,5 @@
 """
-MandiRDD â€” storage layer.
+MandiRDD — storage layer.
 
 SQLite-backed storage with upsert-on-conflict deduplication.
 Schema mirrors the data.gov.in API fields.
@@ -10,9 +10,7 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 
-
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "mandi_rdd.db"
-
 
 def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Get a SQLite connection with row factory."""
@@ -23,7 +21,6 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
-
 
 def init_schema(conn: sqlite3.Connection):
     """Create tables if they don't exist."""
@@ -94,9 +91,8 @@ def init_schema(conn: sqlite3.Connection):
     """)
     conn.commit()
 
-
 def upsert_prices(conn: sqlite3.Connection, records: list[dict]) -> int:
-    """Bulk upsert price records â€” idempotent, never duplicates."""
+    """Bulk upsert price records — idempotent, never duplicates."""
     if not records:
         return 0
 
@@ -153,7 +149,6 @@ def upsert_prices(conn: sqlite3.Connection, records: list[dict]) -> int:
     conn.commit()
     return count
 
-
 def upsert_rainfall(conn: sqlite3.Connection, records: list[dict]) -> int:
     """Bulk upsert rainfall departure records."""
     if not records:
@@ -182,59 +177,6 @@ def upsert_rainfall(conn: sqlite3.Connection, records: list[dict]) -> int:
     conn.commit()
     return count
 
-
-def save_rdd_result(conn: sqlite3.Connection, result: dict):
-    """Save RDD computation result (including interpretation)."""
-    conn.execute(
-        """INSERT INTO rdd_results
-           (commodity, effect, std_error, p_value, n_left, n_right,
-            bandwidth_pct, placebo_effect, placebo_p_value, interpretation)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            result.get("commodity", ""),
-            _safe_float(result.get("effect")),
-            _safe_float(result.get("std_error")),
-            _safe_float(result.get("p_value")),
-            int(result.get("n_left", 0)),
-            int(result.get("n_right", 0)),
-            _safe_float(result.get("bandwidth_pct")),
-            _safe_float(result.get("placebo_effect")),
-            _safe_float(result.get("placebo_p_value")),
-            str(result.get("interpretation", "")),
-        ),
-    )
-    conn.commit()
-
-
-def save_classification_result(conn: sqlite3.Connection, result: dict):
-    """Save classifier result to the database."""
-    conn.execute(
-        """INSERT INTO classification_results
-           (commodity, district, risk_score, model_roc_auc, top_features, n_training_rows)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (
-            result.get("commodity", ""),
-            result.get("district", "All"),
-            _safe_float(result.get("risk_score")),
-            _safe_float(result.get("roc_auc")),
-            str(result.get("top_features", "")),
-            int(result.get("n_training_rows", 0)),
-        ),
-    )
-    conn.commit()
-
-
-def get_latest_rdd(conn: sqlite3.Connection, commodity: str) -> Optional[dict]:
-    """Get the most recent RDD result for a commodity."""
-    row = conn.execute(
-        "SELECT * FROM rdd_results WHERE commodity = ? ORDER BY computed_at DESC LIMIT 1",
-        (commodity,),
-    ).fetchone()
-    if row:
-        return dict(row)
-    return None
-
-
 def get_prices(
     conn: sqlite3.Connection,
     state: Optional[str] = None,
@@ -261,39 +203,6 @@ def get_prices(
 
     df = pd.read_sql_query(query, conn, params=params)
     return df
-
-
-def get_monthly_avg_prices(
-    conn: sqlite3.Connection,
-    commodity: str,
-    state: Optional[str] = None,
-) -> pd.DataFrame:
-    """Get monthly average modal_price for a commodity, for RDD join."""
-    query = """
-        SELECT
-            state, district,
-            CAST(strftime('%Y', arrival_date) AS INTEGER) AS year,
-            CAST(strftime('%m', arrival_date) AS INTEGER) AS month,
-            AVG(modal_price) AS avg_modal_price,
-            COUNT(*) AS n_observations
-        FROM prices
-        WHERE commodity = ?
-    """
-    params = [commodity]
-
-    if state:
-        query += " AND state = ?"
-        params.append(state)
-
-    query += """
-        GROUP BY state, district, year, month
-        HAVING n_observations >= 3
-        ORDER BY year, month
-    """
-
-    df = pd.read_sql_query(query, conn, params=params)
-    return df
-
 
 def _safe_float(val):
     """Convert to float or None."""
