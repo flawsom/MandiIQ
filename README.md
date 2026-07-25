@@ -1,5 +1,9 @@
 # MandiIQ: Agricultural Margin Intelligence & Causal RDD System
 
+[![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
+[![Deploy to Render](https://github.com/flawsom/MandiIQ/actions/workflows/deploy-render.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/deploy-render.yml)
+[![Nightly Ingestion](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
+
 MandiIQ is an open-source agricultural price-intelligence platform. It implements a **Causal Regression Discontinuity Design (RDD)** to analyze price discontinuities at administrative drought thresholds, joined with a machine learning forecasting engine and a high-performance serving layer.
 
 Designed with a premium dark creative-studio aesthetic inspired by **Alche Studio (alche.studio)**.
