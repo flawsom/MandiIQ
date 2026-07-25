@@ -5,8 +5,10 @@ import argparse
 import json
 import logging
 import os
-import ssl
-import urllib.request
+from pathlib import Path
+
+from mandi_rdd.ingestion.http_client import http_get_json
+from mandi_rdd.storage.duckdb_store import get_connection
 
 log = logging.getLogger("mandi_rdd.backfill_state")
 
@@ -91,7 +93,11 @@ MANUAL_OVERRIDES: dict[str, str] = {
 }
 
 
-def _load_coord_mapping(path: str = "data/district_coords.json") -> dict[str, str]:
+def _load_coord_mapping(
+    path: str | None = None,
+) -> dict[str, str]:
+    if path is None:
+        path = str(Path(__file__).resolve().parent.parent.parent / "data" / "district_coords.json")
     mapping: dict[str, str] = {}
     if not os.path.isfile(path):
         log.warning("Coords file not found at %s", path)
@@ -111,15 +117,10 @@ def _load_coord_mapping(path: str = "data/district_coords.json") -> dict[str, st
 def _fetch_ashoka_mapping() -> dict[str, str]:
     mapping: dict[str, str] = {}
     BASE = "https://agmarknet.ceda.ashoka.edu.in"
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
     headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
     def _get(path: str):
-        req = urllib.request.Request(BASE + path, headers=headers)
-        with urllib.request.urlopen(req, timeout=20, context=ctx) as f:
-            return json.loads(f.read()).get("data", [])
+        return http_get_json(BASE + path, headers=headers, timeout=20).get("data", [])
 
     try:
         states = _get("/api/states")
@@ -155,8 +156,6 @@ def build_lookup(use_ashoka: bool = False) -> dict[str, str]:
 
 
 def backfill(lookup: dict[str, str], dry_run: bool = False) -> int:
-    from mandi_rdd.storage.duckdb_store import get_connection
-
     conn = get_connection(read_only=False)
     try:
         rows = conn.execute(

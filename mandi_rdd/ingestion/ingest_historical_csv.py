@@ -30,8 +30,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-# Ashoka CSV exports can have commodity/variety descriptions > 131 KB default limit
-csv.field_size_limit(2**30)
 import os
 import sys
 import logging
@@ -141,6 +139,8 @@ def ingest_file(path: str, batch: int = 5000) -> int:
         total = 0
         buffer = []
         with open(path, "r", encoding="utf-8-sig", newline="") as fh:
+            # Ashoka CSV exports can have commodity/variety descriptions > 131 KB default limit
+            csv.field_size_limit(2**30)
             reader = csv.DictReader(fh)
             for raw in reader:
                 rec = _normalize_row(raw)

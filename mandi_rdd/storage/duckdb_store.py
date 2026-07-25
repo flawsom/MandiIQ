@@ -70,10 +70,17 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         path.parent.mkdir(parents=True, exist_ok=True)
         conn = duckdb.connect(str(path), read_only=read_only)
         return conn
-    except Exception:
+    except Exception as exc:
+        logger.warning("Read-write open failed, trying read-only: %%s", exc)
         # Read-only filesystem (deployed dashboards): retry in read-only mode.
+    try:
         conn = duckdb.connect(str(path), read_only=True)
         return conn
+    except Exception:
+        logger.exception(
+            "Cannot open DuckDB at %s (tried read-write and read-only)", path
+        )
+        raise
 
 
 def init_schema(conn) -> None:
