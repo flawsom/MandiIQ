@@ -69,6 +69,7 @@ superstore_dashboard.png
 
 # Scratch test and check scripts (one-off, not for deploy)
 test_*.py
+!mandi_rdd/tests/test_verification.py
 _check_*.py
 tmp_*.py
 resume_info.json
