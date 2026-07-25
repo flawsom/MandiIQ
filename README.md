@@ -31,39 +31,51 @@ Designed with a premium dark creative-studio aesthetic inspired by **Alche Studi
 
 ## Repository Structure
 
+```mermaid
+mindmap
+  root((MandiIQ))
+    diagrams
+      architecture.mmd[System Architecture]
+      pipeline-flow.mmd[Data Pipeline Flow]
+      repo-structure.mmd[Repository Structure]
+    mermaid.json[Mermaid Config]
+    render.yaml[Render Blueprint]
+    README.md[Project README]
+    technical-writeup.md[Technical Writeup]
+    .env.example[Environment Config]
+    requirements
+      api.txt[API Dependencies]
+      dashboard.txt[Dashboard Dependencies]
+      pipeline.txt[Pipeline Dependencies]
+    docs
+      index.html[Alche-style Landing + Docs]
+      writeup.md[Scientific Writeup]
+      system_design.md[Architecture Guidelines]
+    landing
+      index.html[Margin Intelligence Landing]
+      mandi-iq
+        index.html[MandiIQ Causal Landing]
+    mandi_rdd
+      data[DuckDB Analytical Stores]
+      styles
+        design.css[Alche Design Tokens]
+      dashboard
+        app.py[Streamlit Entrypoint]
+        theme.py[Theme Config + CSS]
+        icons.py[SVG Icon Library]
+        components.py[Custom UI Cards]
+        pages[11 Dashboard Pages]
+    models[ML Model Pickles]
+    sql[5 Analytical SQL Queries]
+    .github
+      workflows
+        ci.yml[CI Pipeline]
+        deploy-render.yml[Render Auto-Deploy]
+        nightly-ingest.yml[Hourly Ingestion]
+    tests[Test Suite]
 ```
-.
-├── diagrams/
-│   ├── architecture.mmd      # System architecture mermaid diagram
-│   └── pipeline-flow.mmd     # Data pipeline flow mermaid diagram
-├── mermaid.json              # Mermaid diagram config (dark theme)
-├── docs/
-│   ├── index.html            # Redesigned Alche-style GH-Pages Landing & Docs
-│   ├── writeup.md            # In-depth scientific/technical writeup
-│   └── system_design.md      # Platform architecture guidelines
-├── docs/
-│   ├── index.html            # Alche-style GH-Pages Landing & Docs (full parity: crosshair corners, lift, favicon)
-│   ├── writeup.md → technical-writeup.md  # Symlink to root-level canonical writeup
-│   └── system_design.md      # Platform architecture guidelines
-├── landing/
-│   ├── index.html            # Margin Intelligence landing (Alche parity: crosshair corners, lift, favicon)
-│   └── mandi-iq/
-│       └── index.html        # MandiIQ causal landing (favicon)
-├── mandi_rdd/
-│   ├── data/                 # Raw/processed DuckDB analytical stores
-│   ├── styles/
-│   │   └── design.css        # Alche design tokens, surface mode tokens, utility rules
-│   ├── dashboard/
-│   │   ├── app.py            # Streamlit dashboard entrypoint + theme toggle JS
-│   │   ├── theme.py          # Central theme configuration, CSS injection, atmosphere
-│   │   ├── icons.py          # SVG icon library (5 shared constants)
-│   │   ├── components.py     # Custom UI elements & cards
-│   │   └── pages/            # Multi-page layout files (all 11 pages use crosshair + glass)
-├── models/                   # Serialized fallback local pickles
-├── technical-writeup.md      # Canonical technical writeup (docs/writeup.md is a symlink)
-├── .env.example              # Fully commented environment configuration
-└── README.md                 # Project README
-```
+
+[View the interactive system architecture diagram](mandi_rdd/README.md#-architecture) — embedded as a Mermaid flowchart.
 
 ---
 

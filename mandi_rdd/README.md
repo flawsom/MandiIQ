@@ -53,47 +53,37 @@ Live services (auto-checks via shields.io — badges turn green when services re
 
 ## 🏗️ Architecture
 
-```
-data.gov.in (Mandi prices, paginated)  +  data.gov.in (IMD rainfall, monthly)
-                │                                    │
-                ▼                                    ▼
-        [Ingestion Service] ── daily cron ── retry/backoff ── idempotent upsert
-                │
-                ▼
-        [DuckDB Analytical Store] ── 5 analytical SQL queries (window fns, CTEs)
-                │
-     ┌──────────┼──────────────────┬─────────────────────┐
-     ▼          ▼                  ▼                      ▼
-[Causal Layer] [Forecast Layer] [Classifier Layer]  [SQL Analytical]
-  RDD engine    Prophet           XGBoost + SHAP      5 queries:
-  + robustness  vs LSTM           spike-risk          rolling trends,
-  + fixed-      (honest winner    probability          volatility,
-  effects       callout)                               deficiency rank,
-  cross-check                                          dispersion, YoY
-     │          │                  │                      │
-     └──────────┴──────────────────┴──────────────────────┘
-                            │
-                    [Prescriptive Layer]
-        combines causal effect + risk score + forecast
-        → procurement-timing recommendation
-                            │
-                            ▼
-                    [AI Orchestrator]
-         OpenRouter multi-model router (free tier) with
-         circuit-breaker fallback — answers free-text
-         questions, writes nightly narrative. Tool-call
-         grounding enforced in code, not by trusting any
-         single model. Shows "answered by [model]" per turn.
-                            │
-                            ▼
-                    [FastAPI — 10 endpoints]
-                            │
-                            ▼
-                [Streamlit Dashboard — 5 pages]
-                (chat-first UX on Executive Overview)
-                            │
-                            ▼
-              [CI/CD · Docker · Nightly cron]
+```mermaid
+flowchart TD
+    A["data.gov.in<br/>Mandi Prices (Paginated)"]
+    B["data.gov.in<br/>IMD Rainfall (Monthly)"]
+    C["Ingestion Service"]
+    D["DuckDB Analytical Store"]
+    E["Causal Layer<br/>RDD Engine + Robustness<br/>+ Fixed Effects Cross-check"]
+    F["Forecast Layer<br/>Prophet vs LSTM<br/>(Honest Winner Callout)"]
+    G["Classifier Layer<br/>XGBoost + SHAP<br/>Spike-risk Probability"]
+    H["SQL Analytical<br/>5 Window Queries"]
+    I["Prescriptive Layer<br/>Procurement-timing Recommendation"]
+    J["AI Orchestrator<br/>Multi-model Router (free tier)<br/>Circuit-breaker Fallback"]
+    K["FastAPI Gateway<br/>10 Endpoints"]
+    L["Streamlit Dashboard<br/>5 Pages (Chat-first UX)"]
+    M["CI/CD · Docker · Nightly Cron"]
+
+    A --> C
+    B --> C
+    C -->|daily cron, retry/backoff, idempotent upsert| D
+    D --> E
+    D --> F
+    D --> G
+    D --> H
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    L --> M
 ```
 
 ---
