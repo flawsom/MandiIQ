@@ -246,6 +246,8 @@ def call_llm(
         timeout = model_cfg.get("timeout_seconds", 30)
         cool_min = model_cfg.get("cool_down_minutes", 5)
         max_retries = model_cfg.get("max_retries", 1)
+        extra_body = model_cfg.get("extra_body")
+        model_max_tokens = model_cfg.get("max_tokens", 2048)
 
         if _is_cooling_down(model_id):
             logger.debug(f"Skipping {model_id} — cooling down")
@@ -267,15 +269,18 @@ def call_llm(
                     default_headers=default_headers,
                 )
 
-                response = client.chat.completions.create(
+                kwargs = dict(
                     model=model_id,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message},
                     ],
                     temperature=temperature,
-                    max_tokens=1024,
+                    max_tokens=model_max_tokens,
                 )
+                if extra_body:
+                    kwargs["extra_body"] = extra_body
+                response = client.chat.completions.create(**kwargs)
 
                 content = response.choices[0].message.content.strip()
 

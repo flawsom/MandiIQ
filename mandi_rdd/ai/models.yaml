@@ -1,29 +1,37 @@
 nvidia:
   models:
+  - id: deepseek-ai/deepseek-v4-pro
+    name: DeepSeek V4 Pro
+    description: 1M-token context MoE for coding and reasoning. Disables thinking
+      mode for cleaner output.
+    max_retries: 1
+    timeout_seconds: 60
+    cool_down_minutes: 3
+    extra_body:
+      chat_template_kwargs:
+        thinking: false
+    max_tokens: 8192
   - id: nvidia/nemotron-3-ultra-550b-a55b
     name: Nemotron 3 Ultra 550B
     description: 550B MoE with 1M context, agentic reasoning, coding, planning
     max_retries: 1
     timeout_seconds: 60
     cool_down_minutes: 3
-  - id: deepseek-ai/deepseek-v4-pro
-    name: DeepSeek V4 Pro
-    description: 1M-token context MoE for coding and reasoning
-    max_retries: 1
-    timeout_seconds: 60
-    cool_down_minutes: 3
+    max_tokens: 4096
   - id: moonshotai/kimi-k2.6
     name: Kimi K2.6
     description: 1T multimodal MoE for coding, agentic tool use, reasoning
     max_retries: 1
     timeout_seconds: 60
     cool_down_minutes: 3
+    max_tokens: 4096
   - id: z-ai/glm-5.2
     name: GLM-5.2
     description: Flagship LLM for agentic workflows, coding, reasoning
     max_retries: 1
     timeout_seconds: 60
     cool_down_minutes: 3
+    max_tokens: 4096
 gemini:
   models:
   - id: gemini-2.5-flash
