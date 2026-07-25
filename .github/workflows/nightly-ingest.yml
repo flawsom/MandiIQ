@@ -58,6 +58,11 @@ jobs:
         run: |
           python -m mandi_rdd.ingestion.scheduler
 
+      - name: Enrich district->state mappings via Ashoka API
+        continue-on-error: true
+        run: |
+          python -m mandi_rdd.ingestion.backfill_state --with-ashoka
+
       - name: Commit refreshed database
         run: |
           git config user.name "github-actions[bot]"
