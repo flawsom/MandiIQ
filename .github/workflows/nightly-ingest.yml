@@ -67,6 +67,9 @@ jobs:
         run: |
           python -m mandi_rdd.ingestion.backfill_state --with-ashoka
 
+      - name: Validate DuckDB LFS object
+        uses: ./.github/actions/validate-duckdb
+
       - id: commit
         name: Commit refreshed database
         run: |
@@ -143,6 +146,9 @@ jobs:
           else
             echo "No Ashoka CSV found; skipping."
           fi
+
+      - name: Validate DuckDB LFS object
+        uses: ./.github/actions/validate-duckdb
 
       - id: commit-ashoka
         name: Commit enriched DuckDB
