@@ -34,6 +34,9 @@ git push origin HEAD
 | `RENDER_DEPLOY_HOOK_URL` | (create in Render Dashboard → Settings → Deploy Hooks) |
 | `ALL_INDIA_RAINFALL_API_KEY` | (same as DATA_GOV_IN_API_KEY) |
 | `ALL_INDIA_RAINFALL_RESOURCE_ID` | (rainfall resource ID) |
+| `GRAFANA_CLOUD_PROM_URL` | `https://prometheus-prod-43-prod-ap-south-1.grafana.net` |
+| `GRAFANA_CLOUD_PROM_USER` | `3400476` |
+| `GRAFANA_CLOUD_PROM_PASS` | Grafana Cloud API token (set as GitHub secret) |
 
 ### Step 3: Deploy Dashboard to Streamlit Cloud
 1. Go to https://share.streamlit.io
