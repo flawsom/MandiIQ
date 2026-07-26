@@ -1,10 +1,14 @@
-"""Push API metrics to Grafana Cloud Prometheus via remote write.
+"""Push API metrics to Grafana Cloud Prometheus via Pushgateway.
 
 Reads in-memory state from main.py, formats it as Prometheus metrics,
 and pushes to Grafana Cloud every 60 seconds via a daemon thread.
 
 Environment variables:
-  GRAFANA_CLOUD_PROM_URL   - Prometheus base URL (e.g. https://prometheus-prod-XX.grafana.net)
+  GRAFANA_CLOUD_PROM_URL   - Prometheus base URL
+                             Use the **Pushgateway** endpoint, e.g.
+                             https://prometheus-prod-XX-prod-YY.grafana.net/api/v1/push
+                             If you have the remote-write endpoint
+                             (/api/prom/push) the code auto-converts it.
   GRAFANA_CLOUD_PROM_USER  - Username / Instance ID (numeric)
   GRAFANA_CLOUD_PROM_PASS  - Grafana Cloud API token (glsa_...)
 """
@@ -30,6 +34,10 @@ logger = logging.getLogger(__name__)
 # Config from environment
 # ---------------------------------------------------------------------------
 _PROM_URL = os.environ.get("GRAFANA_CLOUD_PROM_URL", "").rstrip("/")
+# If user provided the remote-write URL (/api/prom/push), auto-convert
+# to the pushgateway URL (/api/v1/push) which pushadd_to_gateway expects.
+if "/api/prom/push" in _PROM_URL:
+    _PROM_URL = _PROM_URL.replace("/api/prom/push", "/api/v1/push")
 _PROM_USER = os.environ.get("GRAFANA_CLOUD_PROM_USER", "")
 _PROM_PASS = os.environ.get("GRAFANA_CLOUD_PROM_PASSWORD", "")
 
@@ -124,12 +132,8 @@ def _refresh_and_push() -> None:
     _cache_loaded.set(1 if dashboard_json is not None else 0)
     _cache_refresh.set(_dashboard_last_refresh)
     _cache_mtime.set(_dashboard_file_mtime)
-    stale = 0
-    if dashboard_json is not None and _dashboard_file_mtime > 0:
-        import os as _os
-        if _os.path.getmtime("/etc/hosts"):  # just a check pattern
-            pass
-    _cache_stale.set(stale)
+    # Dashboard cache staleness
+    _cache_stale.set(0)
 
     try:
         pushadd_to_gateway(
