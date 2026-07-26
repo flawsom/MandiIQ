@@ -110,18 +110,18 @@ async function gs(){let r=await fetch(A+'/admin/dashboard-status');if(!r.ok)thro
 async function gr(){try{let r=await fetch(G+'/actions/workflows/'+W+'/runs?per_page=20',{headers:{Accept:'application/vnd.github.v3+json'}});if(!r.ok)return[];let d=await r.json();return d.workflow_runs||[];}catch(e){return[];}}
 function render(d){
  let cs=document.getElementById('cacheStatus'),csu=document.getElementById('cacheSub');
- if(d.cache_info&&d.cache_info.size!==void 0){cs.textContent='Fresh';cs.style.color='var(--color-success)';csu.textContent=d.cache_info.size+'/'+d.cache_info.maxsize;}
+ if(d.cache_size!==void 0&&d.cache_size!==null){cs.textContent=d.cache_size>0?'Fresh':'Empty';cs.style.color=d.cache_size>0?'var(--color-success)':'var(--color-warning)';csu.textContent=d.cache_size+' entries';}
  else if(d.error){cs.textContent='Error';cs.style.color='var(--color-danger)';csu.textContent=d.error;}
  else{cs.textContent='Unknown';cs.style.color='var(--color-text-med)';csu.textContent='No cache info';}
  let he=document.getElementById('hashDisplay'),hs=document.getElementById('hashSub');
  if(d.md5_hash){he.textContent=d.md5_hash;hs.textContent=d.md5_hash==='00000000000000000000000000000000'?'empty':'hash';let n=new Date().toISOString();if(!hist.length||hist[hist.length-1].hash!==d.md5_hash)hist.push({hash:d.md5_hash,time:n});if(hist.length>100)hist.shift();}
  else{he.textContent='\u2014';hs.textContent='No hash';}
  let re=document.getElementById('lastRefresh'),rs=document.getElementById('refreshSub');
- if(d.last_refresh){re.textContent=fmt(d.last_refresh);rs.textContent=ago(d.last_refresh);}else{re.textContent='\u2014';rs.textContent='Never';}
+ if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}else{re.textContent='\u2014';rs.textContent='Never';}
  let ae=document.getElementById('fileAge'),as_=document.getElementById('ageSub');
- if(d.file_mtime){ae.textContent=fmt(d.file_mtime);as_.textContent=ago(d.file_mtime);}else{ae.textContent='\u2014';as_.textContent='No info';}
+ if(d.file_mtime_utc){ae.textContent=fmt(d.file_mtime_utc);as_.textContent=ago(d.file_mtime_utc);}else{ae.textContent='\u2014';as_.textContent='No info';}
  let badge=document.getElementById('liveBadge'),dot=badge.querySelector('.dot'),label=document.getElementById('liveLabel');
- if(d.last_refresh){let df=(Date.now()-new Date(d.last_refresh))/6e4;if(df<=STALE){dot.className='dot green';label.textContent='Live \u00b7 '+Math.floor(df)+'m ago';}else if(df<=STALE*2){dot.className='dot yellow';label.textContent='Warning \u00b7 '+Math.floor(df)+'m';}else{dot.className='dot red';label.textContent='Stale \u00b7 '+Math.floor(df)+'m';}}
+ if(d.last_refresh_utc){let df=(Date.now()-new Date(d.last_refresh_utc))/6e4;if(df<=STALE){dot.className='dot green';label.textContent='Live \u00b7 '+Math.floor(df)+'m ago';}else if(df<=STALE*2){dot.className='dot yellow';label.textContent='Warning \u00b7 '+Math.floor(df)+'m';}else{dot.className='dot red';label.textContent='Stale \u00b7 '+Math.floor(df)+'m';}}
  else{dot.className='dot gray';label.textContent='No data';}
  let tc=document.getElementById('hashTimeline'),hc=document.getElementById('hashCount');hc.textContent='('+hist.length+' snapshots)';
  if(!hist.length){tc.innerHTML='<div class="empty">&#9203; Waiting...</div>';}else{let h='<div class="hash-list">',r2=hist.slice(-20).reverse();for(let i=0;i<r2.length;i++){let e=r2[i],ch=i<r2.length-1&&e.hash!==r2[i+1].hash,sh=e.hash.length>16?e.hash.slice(0,8)+'\u2026'+e.hash.slice(-8):e.hash;h+='<div class="hash-row"><span class="ht">'+ago(e.time)+'</span><span class="hd '+(ch?'diff':'same')+'" title="'+(ch?'Changed':'Same')+'"></span><span class="hv" title="'+e.hash+'">'+sh+'</span></div>';}h+='</div>';tc.innerHTML=h;}
