@@ -18,6 +18,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Validate DuckDB LFS object
+        run: |
+          DB="mandi_rdd/data/mandi_iq.duckdb"
+          if [ ! -f "$DB" ]; then
+            echo "::warning::DuckDB not found at $DB -- skipping validation"
+            exit 0
+          fi
+          SIZE=$(stat --format=%s "$DB" 2>/dev/null || stat -f%z "$DB" 2>/dev/null)
+          if [ "$SIZE" -lt 200 ] 2>/dev/null; then
+            echo "::error::DuckDB file at $DB is only ${SIZE} bytes -- this is a Git LFS pointer!"
+            echo "::error::Run 'git lfs pull' locally or check LFS config."
+            echo "::error::File content: $(head -c 200 "$DB")"
+            exit 1
+          fi
+          echo "DuckDB validated: ${SIZE} bytes -- looks like a real database."
+
       - name: Trigger Render deploy hook
         env:
           RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
