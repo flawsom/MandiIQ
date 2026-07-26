@@ -94,6 +94,47 @@ def get_curated_commodities(limit: int = 12) -> list[str]:
 
     return ["Onion", "Tomato", "Wheat", "Potato"]
 
+LFS_POINTER_MAX_BYTES = 200  # LFS pointer files are ~100 bytes; real DuckDB is 50MB+
+
+
+def _is_lfs_pointer(path: Path) -> bool:
+    """Check if a file is a Git LFS pointer (not the real database).
+
+    LFS pointer files are small text files (~100 bytes). A real DuckDB
+    database is always a binary file larger than 200 bytes.
+    """
+    if not path.exists():
+        return False
+    try:
+        return path.stat().st_size < LFS_POINTER_MAX_BYTES
+    except OSError:
+        return False
+
+
+def _try_fix_lfs_pointer(path: Path) -> bool:
+    """Remove a stale LFS pointer file so a fresh DuckDB can be created.
+
+    The real database is committed via Git LFS and should be pulled at build
+    time by `git lfs pull`. If LFS fails (e.g. Render free tier without
+    git-lfs), this fallback deletes the pointer and init_schema() creates an
+    empty database that gets populated on the next successful ingestion run.
+    """
+    if not _is_lfs_pointer(path):
+        return False
+    try:
+        size = path.stat().st_size
+        path.unlink(missing_ok=True)
+        logger.warning(
+            "Removed stale LFS pointer at %s (size=%s bytes). "
+            "A fresh DuckDB will be initialized.",
+            path, size,
+        )
+        return True
+    except OSError as e:
+        logger.warning("Could not remove LFS pointer %s: %s", path, e)
+        return False
+
+
 def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "duckdb.DuckDBPyConnection":
 
     """Get a DuckDB connection.
@@ -105,10 +146,15 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
     from an immutable layer). This keeps read-only dashboard queries working
 
     without changing call sites.
+    If the file is a stale Git LFS pointer (~100 bytes text file), removes it
+    so a fresh database can be created by init_schema().
 
     """
 
     path = db_path or DB_PATH
+
+    # Detect and clean up stale LFS pointer before DuckDB tries to open it
+    _try_fix_lfs_pointer(path)
 
     try:
 
