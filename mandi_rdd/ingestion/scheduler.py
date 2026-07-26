@@ -188,6 +188,8 @@ def run_ingestion(
             _t0 = time.monotonic()
             rainfall_records = fetch_and_store_all_rainfall()
             pipeline_metrics.record_api_call("rainfall_api", time.monotonic() - _t0, True)
+            n_rain = 0
+            n_rain_new = 0
             if rainfall_records:
                 n_rain = len(rainfall_records)
                 n_rain_new = upsert_rainfall(conn, rainfall_records)
