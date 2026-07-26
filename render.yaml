@@ -1,36 +1,40 @@
 # Render Blueprints config for the MandiIQ FastAPI server.
-# Deploy: https://dashboard.render.com/blueprints  →  "New Blueprint Instance"
+# Deploy: https://dashboard.render.com/blueprints → "New Blueprint Instance"
 # Connect the flawsom/MandiIQ repo. Render reads this file automatically.
+#
+# REQUIRED dashboard env vars (set manually in Render dashboard, not in this file):
+#   DATA_GOV_IN_API_KEY   — free key from https://api.data.gov.in/
+#   GEMINI_API_KEY        — Google Gemini API key
+#   NVIDIA_API_KEY        — NVIDIA NIM API key (for DeepSeek V4 Pro)
+#   OPENROUTER_API_KEY    — OpenRouter API key (optional alternative)
 
 services:
   - type: web
     name: mandiiq-api
     runtime: python
-    # Use the full ML dependency set (mandi_rdd/requirements.txt) so forecast/risk-score
-    # tools (prophet, xgboost) work in the /ask chat. The root requirements.txt is
-    # dashboard-only and lacks these.
     plan: free
-    region: oregon          # closest free-tier region to India-friendly latency; change if preferred
+    region: oregon
     branch: master
     buildCommand: |
-      apt-get update -qq && apt-get install -y -qq git-lfs
+      # Fetch the DuckDB from Git LFS before the app starts
       git lfs install
-      git lfs pull
+      git lfs pull --include 'mandi_rdd/data/mandi_iq.duckdb' --exclude=''
       pip install -r requirements/api.txt
     startCommand: uvicorn mandi_rdd.api.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
-    # The API reads the committed DuckDB inside the repo. Default path already
-    # resolves to mandi_rdd/data/mandi_iq.duckdb, but we set it explicitly.
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
       - key: MANDIIQ_DB_PATH
         value: mandi_rdd/data/mandi_iq.duckdb
-      - key: GEMINI_API_KEY
-        sync: false          # you paste this in the Render dashboard (or use OPENROUTER_API_KEY)
-      - key: OPENROUTER_API_KEY
-        sync: false          # optional alternative provider
-      - key: DATA_GOV_IN_API_KEY
-        sync: false          # paste from data.gov.in — required to populate mandi prices
       - key: PORT
-        value: "8000"        # Render overrides this at runtime via $PORT
+        value: "8000"
+      - key: DATA_GOV_IN_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
