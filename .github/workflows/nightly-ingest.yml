@@ -133,6 +133,15 @@ jobs:
             # Write backup metrics for the /metrics endpoint
             python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
+            # Verify the backup is readable (read-after-write)
+            if aws s3 cp "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" /dev/null \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --region auto \
+              --only-show-errors; then
+              echo "::notice::R2 backup verification passed — object is readable"
+            else
+              echo "::warning::R2 backup verification FAILED — uploaded object is not readable!"
+            fi
           fi
           rm -f "$BACKUP_FILE"
 
@@ -241,5 +250,14 @@ jobs:
             # Write backup metrics for the /metrics endpoint
             python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
+            # Verify the backup is readable (read-after-write)
+            if aws s3 cp "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" /dev/null \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --region auto \
+              --only-show-errors; then
+              echo "::notice::R2 backup verification passed — object is readable"
+            else
+              echo "::warning::R2 backup verification FAILED — uploaded object is not readable!"
+            fi
           fi
           rm -f "$BACKUP_FILE"
