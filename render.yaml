@@ -49,6 +49,10 @@ services:
     plan: starter
     region: oregon
     branch: master
+    disk:
+      name: grafana-data
+      mountPath: /var/lib/grafana
+      sizeGB: 1
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
