@@ -1,0 +1,33 @@
+name: Full deploy (validate + trigger)
+description: >
+  Runs validate-all (render.yaml schema + DuckDB LFS check), then triggers
+  a Render deploy via the deploy hook URL. A single uses: line that
+  replaces the common validate-all + trigger-render-deploy pattern found
+  in deploy workflows.
+
+inputs:
+  hook-url:
+    description: >
+      Render deploy hook URL (from dashboard.render.com → Settings →
+      Deploy Hooks). If not set, a warning is logged and the deploy step
+      is skipped.
+    required: false
+    default: ""
+
+  db-path:
+    description: "Path to the DuckDB file (passed to validate-all)."
+    required: false
+    default: "mandi_rdd/data/mandi_iq.duckdb"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate all (render.yaml + DuckDB)
+      uses: ./.github/actions/validate-all
+      with:
+        db-path: ${{ inputs.db-path }}
+
+    - name: Trigger Render deploy
+      uses: ./.github/actions/trigger-render-deploy
+      with:
+        hook-url: ${{ inputs.hook-url }}
