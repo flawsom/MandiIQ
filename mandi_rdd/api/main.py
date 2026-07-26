@@ -51,6 +51,7 @@ import time
 import functools
 
 import hashlib
+import shutil
 
 import urllib.error
 import urllib.request
@@ -1853,6 +1854,27 @@ async def metrics():
     lines.append("# HELP mandiiq_dashboard_cache_size Number of entries in the LRU dashboard cache.")
     lines.append("# TYPE mandiiq_dashboard_cache_size gauge")
     lines.append(f"mandiiq_dashboard_cache_size {_get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0}")
+
+    # ---- Disk usage metrics ----
+    lines.append("")
+    lines.append("# HELP mandiiq_disk_bytes Disk space usage for the mandiiq-api service filesystem.")
+    lines.append("# TYPE mandiiq_disk_bytes gauge")
+    try:
+        _usage = shutil.disk_usage(".")
+        lines.append(f'mandiiq_disk_bytes{{kind="total"}} {_usage.total}')
+        lines.append(f'mandiiq_disk_bytes{{kind="used"}} {_usage.used}')
+        lines.append(f'mandiiq_disk_bytes{{kind="free"}} {_usage.free}')
+        _pct = round(_usage.used / _usage.total * 100, 2) if _usage.total > 0 else 0
+        lines.append("# HELP mandiiq_disk_usage_percent Disk usage percentage for the mandiiq-api service.")
+        lines.append("# TYPE mandiiq_disk_usage_percent gauge")
+        lines.append(f"mandiiq_disk_usage_percent {_pct}")
+    except Exception:
+        lines.append('mandiiq_disk_bytes{kind="total"} -1')
+        lines.append('mandiiq_disk_bytes{kind="used"} -1')
+        lines.append('mandiiq_disk_bytes{kind="free"} -1')
+        lines.append("# HELP mandiiq_disk_usage_percent Disk usage percentage for the mandiiq-api service.")
+        lines.append("# TYPE mandiiq_disk_usage_percent gauge")
+        lines.append("mandiiq_disk_usage_percent -1")
 
 
     body = "\n".join(lines) + "\n"

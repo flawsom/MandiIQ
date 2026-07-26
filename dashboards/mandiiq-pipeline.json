@@ -1897,6 +1897,320 @@
             "refId": "B"
           }
         ]
+      },
+      {
+        "id": 37,
+        "title": "mandiiq-api Disk Usage",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 64
+        },
+        "description": "Disk usage for the mandiiq-api service filesystem (reported via shutil.disk_usage on /metrics). Note: this measures the API container's storage, not the Grafana persistent disk."
+      },
+      {
+        "id": 32,
+        "title": "Disk Total",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 0,
+          "y": 64
+        },
+        "description": "Total filesystem capacity for the mandiiq-api service",
+        "datasource": "DS_PROMETHEUS",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "decimals": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "expr": "mandiiq_disk_bytes{kind=\"total\"}",
+            "legendFormat": "Total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "title": "Disk Used",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 4,
+          "y": 64
+        },
+        "description": "Filesystem space currently used by mandiiq-api service",
+        "datasource": "DS_PROMETHEUS",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "decimals": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 75
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "expr": "mandiiq_disk_bytes{kind=\"used\"}",
+            "legendFormat": "Used",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "title": "Disk Free",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 8,
+          "y": 64
+        },
+        "description": "Free filesystem space remaining on mandiiq-api",
+        "datasource": "DS_PROMETHEUS",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "decimals": 1,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "expr": "mandiiq_disk_bytes{kind=\"free\"}",
+            "legendFormat": "Free",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "title": "Disk Usage %",
+        "type": "gauge",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 12,
+          "y": 64
+        },
+        "description": "Filesystem usage percentage for mandiiq-api service",
+        "datasource": "DS_PROMETHEUS",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "min": 0,
+            "max": 100,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 75
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "targets": [
+          {
+            "expr": "mandiiq_disk_usage_percent",
+            "legendFormat": "Usage %",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "title": "Disk Usage Over Time",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 68
+        },
+        "description": "Filesystem usage over time for mandiiq-api service (total/used/free in bytes)",
+        "datasource": "DS_PROMETHEUS",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "decimals": 1,
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "showPoints": "never",
+              "axisBorderShow": false,
+              "axisLabel": "",
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              }
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Usage %"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "min",
+              "max"
+            ],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "expr": "mandiiq_disk_bytes",
+            "legendFormat": "{{kind}}",
+            "refId": "A"
+          }
+        ]
       }
     ],
     "templating": {
