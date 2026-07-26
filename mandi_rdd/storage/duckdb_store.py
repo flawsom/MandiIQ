@@ -120,7 +120,7 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
 
     except Exception as exc:
 
-        logger.warning("Read-write open failed, trying read-only: %%s", exc)
+        logger.warning("Read-write open failed, trying read-only: %s", exc)
 
         # Read-only filesystem (deployed dashboards): retry in read-only mode.
 
