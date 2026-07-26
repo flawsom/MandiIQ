@@ -1,17 +1,17 @@
 """
-MandiRDD — FastAPI serving layer.
+MandiRDD â€” FastAPI serving layer.
 
 Endpoints:
-- GET /health — liveness check
-- GET /prices — query stored prices with filters
-- GET /rdd-result/{commodity} — latest RDD estimate
-- GET /rdd-plot/{commodity} — binned scatter plot data
-- GET /robustness/{commodity} — robustness check bundle
-- GET /forecast/{commodity} — Prophet forecast
-- GET /risk-score/{commodity} — XGBoost risk score
-- GET /recommendation/{commodity} — procurement recommendation
-- POST /ask — AI orchestrator (OpenRouter multi-model routing)
-- POST /refresh — manual pipeline re-run
+- GET /health â€” liveness check
+- GET /prices â€” query stored prices with filters
+- GET /rdd-result/{commodity} â€” latest RDD estimate
+- GET /rdd-plot/{commodity} â€” binned scatter plot data
+- GET /robustness/{commodity} â€” robustness check bundle
+- GET /forecast/{commodity} â€” Prophet forecast
+- GET /risk-score/{commodity} â€” XGBoost risk score
+- GET /recommendation/{commodity} â€” procurement recommendation
+- POST /ask â€” AI orchestrator (OpenRouter multi-model routing)
+- POST /refresh â€” manual pipeline re-run
 """
 
 import sys
@@ -55,7 +55,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ── Pydantic schemas ──
+# â”€â”€ Pydantic schemas â”€â”€
 
 class HealthResponse(BaseModel):
     status: str
@@ -125,7 +125,7 @@ class RefreshResponse(BaseModel):
     duration_seconds: Optional[float] = None
 
 
-# ── Phase 11: AI Orchestrator schemas ──
+# â”€â”€ Phase 11: AI Orchestrator schemas â”€â”€
 
 class AskRequest(BaseModel):
     query: str
@@ -143,7 +143,7 @@ class AskResponse(BaseModel):
     error: Optional[str] = None
 
 
-# ── App state ──
+# â”€â”€ App state â”€â”€
 
 class HealthStats:
     """Simple state for /metrics endpoint tracking."""
@@ -152,7 +152,7 @@ class HealthStats:
         self.health_count = 0
         self.cold_start = 1  # resets on each server start
 health_stats = HealthStats()
-# ── Deploy endpoint state ──
+# â”€â”€ Deploy endpoint state â”€â”€
 _last_deploy_ts: float = 0.0
 _DEPLOY_COOLDOWN_S: float = 60.0
 # Load Grafana dashboard template
@@ -188,6 +188,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         state.commodities = []
     conn.close()
+    metrics_push.start_push_thread()
 
     yield
 
@@ -202,16 +203,16 @@ app = FastAPI(
     to detect price jumps around the -19% rainfall deficiency threshold.
     
     **Endpoints:**
-    * `/health` — Liveness check + data counts
-    * `/prices` — Query stored prices by state/district/commodity
-    * `/rdd-result/{commodity}` — Latest RDD estimate for a commodity
-    * `/rdd-plot/{commodity}` — Binned scatter data for the discontinuity plot
-    * `/robustness/{commodity}` — Full robustness check bundle
-    * `/forecast/{commodity}` — Prophet forecast with optional LSTM comparison
-    * `/risk-score/{commodity}` — XGBoost price-spike risk probability
-    * `/recommendation/{commodity}` — Procurement recommendation
-    * `/ask` — AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
-    * `/refresh` — Manual re-run of the full pipeline
+    * `/health` â€” Liveness check + data counts
+    * `/prices` â€” Query stored prices by state/district/commodity
+    * `/rdd-result/{commodity}` â€” Latest RDD estimate for a commodity
+    * `/rdd-plot/{commodity}` â€” Binned scatter data for the discontinuity plot
+    * `/robustness/{commodity}` â€” Full robustness check bundle
+    * `/forecast/{commodity}` â€” Prophet forecast with optional LSTM comparison
+    * `/risk-score/{commodity}` â€” XGBoost price-spike risk probability
+    * `/recommendation/{commodity}` â€” Procurement recommendation
+    * `/ask` â€” AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
+    * `/refresh` â€” Manual re-run of the full pipeline
     """,
     version="2.0.0",
     lifespan=lifespan,
@@ -226,7 +227,7 @@ app.add_middleware(
 )
 
 
-# ── Endpoints ──
+# â”€â”€ Endpoints â”€â”€
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health():
@@ -513,7 +514,7 @@ async def recommendation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Phase 11: AI Orchestrator Endpoint ──
+# â”€â”€ Phase 11: AI Orchestrator Endpoint â”€â”€
 
 @app.post("/ask", response_model=AskResponse, tags=["AI Orchestrator"])
 async def ask_question(request: AskRequest):
@@ -632,7 +633,7 @@ async def refresh(background_tasks: BackgroundTasks, commodity: Optional[str] = 
         )
 
 
-# ── R2 restore helpers ──────────────────────────────────────────────
+# â”€â”€ R2 restore helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _r2_download() -> bytes:
     """Download the latest DuckDB backup from Cloudflare R2.
@@ -920,7 +921,7 @@ async def trigger_backfill():
 
 
 
-# ── Prometheus /metrics endpoint ──
+# â”€â”€ Prometheus /metrics endpoint â”€â”€
 # Exposes lightweight service metrics in Prometheus text exposition format.
 # No prometheus_client dependency required.
 

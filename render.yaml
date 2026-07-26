@@ -38,3 +38,9 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: GRAFANA_CLOUD_PROM_URL
+        sync: false
+      - key: GRAFANA_CLOUD_PROM_USER
+        sync: false
+      - key: GRAFANA_CLOUD_PROM_PASSWORD
+        sync: false
