@@ -8,6 +8,7 @@ on:
       - "mandi_rdd/dashboard/seo_sitemap.py"
       - "static/**"
       - "docs/**"
+      - "landing/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -30,10 +31,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps (for og-image build if needed)
+      - name: Install deps
         run: pip install --quiet pillow
 
       - name: Generate sitemaps
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: python -c "from mandi_rdd.dashboard.seo_sitemap import write_sitemaps; write_sitemaps('static')"
 
       - name: Build og-image if missing
