@@ -1861,6 +1861,31 @@ async def metrics():
         lines.append("mandiiq_disk_usage_percent -1")
 
 
+    # ---- R2 backup metrics ----
+    lines.append("")
+    lines.append("# HELP mandiiq_r2_backup_raw_bytes Size of the DuckDB before gzip compression.")
+    lines.append("# TYPE mandiiq_r2_backup_raw_bytes gauge")
+    lines.append("# HELP mandiiq_r2_backup_compressed_bytes Size of the gzip-compressed DuckDB backup in R2.")
+    lines.append("# TYPE mandiiq_r2_backup_compressed_bytes gauge")
+    lines.append("# HELP mandiiq_r2_backup_compression_pct Percentage size reduction from gzip compression.")
+    lines.append("# TYPE mandiiq_r2_backup_compression_pct gauge")
+    try:
+        _r2_path = Path(__file__).resolve().parent.parent / "data" / "r2_backup_metrics.json"
+        if _r2_path.exists():
+            with open(_r2_path) as _f:
+                _r2_meta = json.load(_f)
+            lines.append(f"mandiiq_r2_backup_raw_bytes {_r2_meta.get('raw_bytes', -1)}")
+            lines.append(f"mandiiq_r2_backup_compressed_bytes {_r2_meta.get('compressed_bytes', -1)}")
+            lines.append(f"mandiiq_r2_backup_compression_pct {_r2_meta.get('compression_pct', -1)}")
+        else:
+            lines.append("mandiiq_r2_backup_raw_bytes -1")
+            lines.append("mandiiq_r2_backup_compressed_bytes -1")
+            lines.append("mandiiq_r2_backup_compression_pct -1")
+    except Exception:
+        lines.append("mandiiq_r2_backup_raw_bytes -1")
+        lines.append("mandiiq_r2_backup_compressed_bytes -1")
+        lines.append("mandiiq_r2_backup_compression_pct -1")
+
     body = "\n".join(lines) + "\n"
 
     return Response(content=body, media_type=PROMETHEUS_METRICS_HEADER["Content-Type"])

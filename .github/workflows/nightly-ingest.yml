@@ -76,7 +76,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git lfs install --local 2>/dev/null || true
-          git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/last_ingest_status.json
+          git add mandi_rdd/data/mandi_iq.duckdb \
+            mandi_rdd/data/last_ingest_status.json \
+            mandi_rdd/data/r2_backup_metrics.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No database changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
@@ -109,6 +111,7 @@ jobs:
             exit 0
           fi
           BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
+          METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
           gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
           if [ ! -s "$BACKUP_FILE" ]; then
             echo "::warning::gzip compression failed — skipping backup"
@@ -127,6 +130,9 @@ jobs:
             GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
             PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
             echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
+            # Write backup metrics for the /metrics endpoint
+            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'}, open('${METRICS_FILE}', 'w'))"
+            echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
           fi
           rm -f "$BACKUP_FILE"
 
@@ -159,7 +165,10 @@ jobs:
         run: |
           echo "Fetching multi-year monthly history for ALL 453 commodities..."
           echo "Partial results saved incrementally."
-          python -m mandi_rdd.ingestion.fetch_historical_ashoka             --commodities ""             --workers 16             --out mandi_rdd/data/historical/agmarknet_ashoka.csv 2>&1
+          python -m mandi_rdd.ingestion.fetch_historical_ashoka \
+            --commodities "" \
+            --workers 16 \
+            --out mandi_rdd/data/historical/agmarknet_ashoka.csv 2>&1
           echo "Ashoka fetch completed or timed out."
           wc -l mandi_rdd/data/historical/agmarknet_ashoka.csv
 
@@ -167,7 +176,8 @@ jobs:
         continue-on-error: true
         run: |
           if [ -f mandi_rdd/data/historical/agmarknet_ashoka.csv ]; then
-            python -m mandi_rdd.ingestion.ashoka_background_import --backfill-only 2>&1 ||               echo "Backfill may have failed"
+            python -m mandi_rdd.ingestion.ashoka_background_import --backfill-only 2>&1 || \
+              echo "Backfill may have failed"
           else
             echo "No Ashoka CSV found; skipping."
           fi
@@ -182,7 +192,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git lfs install --local 2>/dev/null || true
-          git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/historical/agmarknet_ashoka.csv
+          git add mandi_rdd/data/mandi_iq.duckdb \
+            mandi_rdd/data/historical/agmarknet_ashoka.csv \
+            mandi_rdd/data/r2_backup_metrics.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No database changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
@@ -207,6 +219,7 @@ jobs:
             exit 0
           fi
           BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
+          METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
           gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
           if [ ! -s "$BACKUP_FILE" ]; then
             echo "::warning::gzip compression failed — skipping backup"
@@ -225,5 +238,8 @@ jobs:
             GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
             PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
             echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
+            # Write backup metrics for the /metrics endpoint
+            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'}, open('${METRICS_FILE}', 'w'))"
+            echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
           fi
           rm -f "$BACKUP_FILE"
