@@ -133,7 +133,12 @@ jobs:
             # Compute SHA256 of the source DuckDB for content integrity verification
             DB_SHA256=$(sha256sum mandi_rdd/data/mandi_iq.duckdb | cut -d' ' -f1)
             # Write backup metrics for the /metrics endpoint
-            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            if [ -n "$DB_SHA256" ]; then
+              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            else
+              echo "::warning::sha256sum returned empty — writing metrics without integrity hash"
+              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            fi
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
 
           fi
@@ -255,7 +260,12 @@ jobs:
             # Compute SHA256 of the source DuckDB for content integrity verification
             DB_SHA256=$(sha256sum mandi_rdd/data/mandi_iq.duckdb | cut -d' ' -f1)
             # Write backup metrics for the /metrics endpoint
-            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            if [ -n "$DB_SHA256" ]; then
+              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            else
+              echo "::warning::sha256sum returned empty — writing metrics without integrity hash"
+              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
+            fi
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
 
           fi

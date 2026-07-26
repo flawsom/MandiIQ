@@ -54,7 +54,7 @@ runs:
         # Read expected SHA256 from metrics
         EXPECTED_SHA=$(python3 -c "import json; print(json.load(open('${METRICS_FILE}')).get('sha256', ''))")
         if [ -z "$EXPECTED_SHA" ]; then
-          echo "::warning::R2 backup verification skipped — no sha256 in metrics file (old version)"
+          echo "::warning::R2 backup verification skipped — failed to read sha256 from metrics file (may be empty, corrupt, or old format)"
           exit 0
         fi
 
