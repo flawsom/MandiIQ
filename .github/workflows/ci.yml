@@ -25,6 +25,9 @@ jobs:
       - name: Validate render.yaml
         uses: ./.github/actions/validate-render
 
+      - name: Validate DuckDB LFS object
+        uses: ./.github/actions/validate-duckdb
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
