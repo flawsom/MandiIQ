@@ -1,12 +1,12 @@
 # Render Blueprints config for the MandiIQ FastAPI server.
-# Deploy: https://dashboard.render.com/blueprints → "New Blueprint Instance"
+# Deploy: https://dashboard.render.com/blueprints â†’ "New Blueprint Instance"
 # Connect the flawsom/MandiIQ repo. Render reads this file automatically.
 #
 # REQUIRED dashboard env vars (set manually in Render dashboard, not in this file):
-#   DATA_GOV_IN_API_KEY   — free key from https://api.data.gov.in/
-#   GEMINI_API_KEY        — Google Gemini API key
-#   NVIDIA_API_KEY        — NVIDIA NIM API key (for DeepSeek V4 Pro)
-#   OPENROUTER_API_KEY    — OpenRouter API key (optional alternative)
+#   DATA_GOV_IN_API_KEY   â€” free key from https://api.data.gov.in/
+#   GEMINI_API_KEY        â€” Google Gemini API key
+#   NVIDIA_API_KEY        â€” NVIDIA NIM API key (for DeepSeek V4 Pro)
+#   OPENROUTER_API_KEY    â€” OpenRouter API key (optional alternative)
 
 services:
   - type: web
@@ -38,3 +38,24 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+
+  # Grafana -- self-hosted observability sidecar
+  # Scrapes /metrics from mandiiq-api via internal DNS.
+  # Requires Render plan with Docker support (Starter $7/mo+).
+  - type: web
+    name: grafana
+    runtime: docker
+    dockerfilePath: ./grafana/Dockerfile
+    plan: starter
+    region: oregon
+    branch: master
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: GF_SECURITY_ADMIN_PASSWORD
+        generateValue: true
+      # GF_SERVER_ROOT_URL is auto-detected by Render via RENDER_EXTERNAL_URL
+      - key: GF_AUTH_ANONYMOUS_ENABLED
+        value: 'true'
+      - key: GF_AUTH_ANONYMOUS_ORG_ROLE
+        value: Viewer

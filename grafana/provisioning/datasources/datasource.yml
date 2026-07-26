@@ -1,0 +1,17 @@
+# ── Grafana Prometheus Datasource ──
+# Auto-provisioned on startup. Points at the mandiiq-api service's
+# /metrics endpoint via Render's internal service DNS.
+#
+# The datasource name must match the dashboard JSON's __inputs[0].name
+# ("DS_PROMETHEUS") or the ?datasource= query parameter used when
+# fetching the dashboard from the API.
+
+apiVersion: 1
+
+datasources:
+  - name: DS_PROMETHEUS
+    type: prometheus
+    access: proxy
+    url: http://mandiiq-api:8000
+    isDefault: true
+    editable: true

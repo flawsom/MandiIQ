@@ -1,0 +1,13 @@
+# ── Grafana Dashboard Provider ──
+# Loads the MandiIQ pipeline dashboard from the local JSON file
+# that was copied into the container by the Dockerfile.
+
+apiVersion: 1
+
+providers:
+  - name: MandiIQ Pipeline
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
