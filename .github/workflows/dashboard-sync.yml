@@ -125,7 +125,7 @@ jobs:
           fi
 
   trigger-render-deploy:
-    if: needs.check-hash.outputs.changed == 'true' && secrets.RENDER_DEPLOY_HOOK_URL != ''
+    if: needs.check-hash.outputs.changed == 'true'
     runs-on: ubuntu-latest
     needs: notify-api
     steps:
