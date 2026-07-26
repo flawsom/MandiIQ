@@ -95,6 +95,25 @@ jobs:
         with:
           hook-url: https://mandiiq-api.onrender.com/deploy
 
+      - name: Backup DuckDB to Cloudflare R2
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
+            echo "::warning::R2 secrets not configured — skipping backup"
+            exit 0
+          fi
+          aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
+            "s3://${R2_BUCKET}/mandi_iq.duckdb" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --region auto \
+            --only-show-errors
+          echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+
   ashoka-import:
     needs: ingest
     runs-on: ubuntu-latest
@@ -150,8 +169,29 @@ jobs:
           git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/historical/agmarknet_ashoka.csv
           if git diff --cached --quiet; then
             echo "No database changes to commit."
+            echo "committed=true" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: ashoka historical ingest update"
             git push --force-with-lease origin master 2>&1
             git lfs push origin master 2>&1 || echo "LFS push skipped"
+            echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Backup DuckDB to Cloudflare R2
+        if: steps.commit-ashoka.outputs.committed == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
+            echo "::warning::R2 secrets not configured — skipping backup"
+            exit 0
+          fi
+          aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
+            "s3://${R2_BUCKET}/mandi_iq.duckdb" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --region auto \
+            --only-show-errors
+          echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
