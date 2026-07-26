@@ -69,13 +69,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git lfs install --local 2>/dev/null || true
           git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/last_ingest_status.json
           if git diff --cached --quiet; then
             echo "No database changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: nightly ingestion update"
-            git push
+            git pull --rebase origin master 2>&1 || echo "Pull skipped (no changes needed)"
+            git push origin master 2>&1
+            git lfs push origin master 2>&1 || echo "LFS push skipped (may not be needed)"
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
