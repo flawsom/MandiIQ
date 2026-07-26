@@ -97,6 +97,7 @@ jobs:
 
       - name: Backup DuckDB to Cloudflare R2
         if: steps.commit.outputs.committed == 'true'
+        continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -107,12 +108,15 @@ jobs:
             echo "::warning::R2 secrets not configured — skipping backup"
             exit 0
           fi
-          aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
+          if ! aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
             "s3://${R2_BUCKET}/mandi_iq.duckdb" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --region auto \
-            --only-show-errors
-          echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+            --only-show-errors; then
+            echo "::warning::DuckDB R2 backup failed (transient error)"
+          else
+            echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+          fi
 
   ashoka-import:
     needs: ingest
@@ -169,7 +173,7 @@ jobs:
           git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/historical/agmarknet_ashoka.csv
           if git diff --cached --quiet; then
             echo "No database changes to commit."
-            echo "committed=true" >> "$GITHUB_OUTPUT"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: ashoka historical ingest update"
             git push --force-with-lease origin master 2>&1
@@ -179,6 +183,7 @@ jobs:
 
       - name: Backup DuckDB to Cloudflare R2
         if: steps.commit-ashoka.outputs.committed == 'true'
+        continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -189,9 +194,12 @@ jobs:
             echo "::warning::R2 secrets not configured — skipping backup"
             exit 0
           fi
-          aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
+          if ! aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
             "s3://${R2_BUCKET}/mandi_iq.duckdb" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --region auto \
-            --only-show-errors
-          echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+            --only-show-errors; then
+            echo "::warning::DuckDB R2 backup failed (transient error)"
+          else
+            echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+          fi
