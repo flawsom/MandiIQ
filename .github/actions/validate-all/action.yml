@@ -1,0 +1,22 @@
+name: Validate all (render.yaml + DuckDB)
+description: >
+  Runs both validators in sequence — render.yaml schema validation first,
+  then DuckDB LFS integrity check. A single uses: line that replaces the
+  common validate-render + validate-duckdb pair found in most workflows.
+
+inputs:
+  db-path:
+    description: "Path to the DuckDB file (passed to validate-duckdb)."
+    required: false
+    default: "mandi_rdd/data/mandi_iq.duckdb"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate render.yaml
+      uses: ./.github/actions/validate-render
+
+    - name: Validate DuckDB LFS object
+      uses: ./.github/actions/validate-duckdb
+      with:
+        db-path: ${{ inputs.db-path }}
