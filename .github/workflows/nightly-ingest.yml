@@ -108,15 +108,27 @@ jobs:
             echo "::warning::R2 secrets not configured — skipping backup"
             exit 0
           fi
-          if ! aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
-            "s3://${R2_BUCKET}/mandi_iq.duckdb" \
+          BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
+          gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "::warning::gzip compression failed — skipping backup"
+            rm -f "$BACKUP_FILE"
+            exit 0
+          fi
+          if ! aws s3 cp "$BACKUP_FILE" \
+            "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --region auto \
+            --content-encoding gzip \
             --only-show-errors; then
             echo "::warning::DuckDB R2 backup failed (transient error)"
           else
-            echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+            ORIG_SIZE=$(stat -c%s mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || stat -f%z mandi_rdd/data/mandi_iq.duckdb 2>/dev/null)
+            GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
+            PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
+            echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
           fi
+          rm -f "$BACKUP_FILE"
 
   ashoka-import:
     needs: ingest
@@ -194,12 +206,24 @@ jobs:
             echo "::warning::R2 secrets not configured — skipping backup"
             exit 0
           fi
-          if ! aws s3 cp mandi_rdd/data/mandi_iq.duckdb \
-            "s3://${R2_BUCKET}/mandi_iq.duckdb" \
+          BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
+          gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "::warning::gzip compression failed — skipping backup"
+            rm -f "$BACKUP_FILE"
+            exit 0
+          fi
+          if ! aws s3 cp "$BACKUP_FILE" \
+            "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --region auto \
+            --content-encoding gzip \
             --only-show-errors; then
             echo "::warning::DuckDB R2 backup failed (transient error)"
           else
-            echo "::notice::DuckDB backed up to Cloudflare R2 (s3://${R2_BUCKET}/mandi_iq.duckdb)"
+            ORIG_SIZE=$(stat -c%s mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || stat -f%z mandi_rdd/data/mandi_iq.duckdb 2>/dev/null)
+            GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
+            PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
+            echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
           fi
+          rm -f "$BACKUP_FILE"
