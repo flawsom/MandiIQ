@@ -142,6 +142,9 @@ def run_ingestion(
                     "fetched": len(variety_records), "new": n_var_new
                 }
                 logger.info(f"Variety-wise prices: {len(variety_records)} fetched, {n_var_new} new")
+            else:
+                n_var_new = 0
+                summary["steps"]["prices_varietywise"] = {"fetched": 0, "new": 0}
             # Record lineage for variety-wise supplement
             try:
                 src_info = None
@@ -162,11 +165,9 @@ def run_ingestion(
                     )
             except Exception as lve:
                 logger.warning(f"Failed to record lineage for variety-wise: {lve}")
-        else:
-            summary["steps"]["prices_varietywise"] = {"fetched": 0, "new": 0}
-    except Exception as e:
-        logger.warning(f"Variety-wise supplement skipped: {e}")
-        summary["steps"]["prices_varietywise"] = {"status": "error", "error": str(e)}
+        except Exception as e:
+            logger.warning(f"Variety-wise supplement skipped: {e}")
+            summary["steps"]["prices_varietywise"] = {"status": "error", "error": str(e)}
 
     summary["steps"]["prices"] = {"fetched": n_prices, "new": n_new}
     logger.info(f"Prices: {n_prices} fetched, {n_new} new")
@@ -208,8 +209,8 @@ def run_ingestion(
                 )
             except Exception as le:
                 logger.warning(f"Failed to record rainfall lineage: {le}")
-        else:
-            summary["steps"]["rainfall"] = {"status": "skipped", "reason": "no data source"}
+    else:
+        summary["steps"]["rainfall"] = {"status": "skipped", "reason": "no data source"}
 
     # 4b. Ingest satellite NDVI (if Sentinel Hub credentials are set)
     import os as _os
@@ -251,6 +252,9 @@ def run_ingestion(
             logger.info(f"Running RDD + FE for {commodity}...")
             try:
                 result = run_rdd(conn, commodity=commodity)
+            except Exception as e:
+                logger.error(f"  RDD failed for {commodity}: {e}")
+                result = None
             if result:
                 # Fixed-effects cross-check
                 try:
@@ -273,30 +277,28 @@ def run_ingestion(
                                  f"(need >=3 dates with both deficient and non-deficient rainfall)")
             else:
                 logger.info(f"  RDD skipped for {commodity}: run_rdd returned no result")
-        except Exception as e:
-            logger.error(f"  RDD failed for {commodity}: {e}")
         
         # Forecast
         with pipeline_metrics.step("forecast_training"):
             logger.info(f"Training forecast for {commodity}...")
             try:
                 from mandi_rdd.analysis.forecast import train_forecast
-            from mandi_rdd.storage.duckdb_store import save_forecast_metrics
-            fc_res = train_forecast(conn, commodity=commodity, state=None, periods=6)
-            m = fc_res.get("metrics") or {}
-            if m.get("mape") is not None:
-                save_forecast_metrics(
-                    conn, commodity,
-                    test_mape=m["mape"], test_mae=m.get("mae"),
-                    test_rmse=m.get("rmse"),
-                    n_training_months=fc_res.get("n_training_months"),
-                    n_test_months=fc_res.get("n_test_months"), model="prophet",
-                )
-                logger.info(f"  Forecast {commodity}: MAPE={m['mape']:.2f}%")
-            else:
-                logger.info(f"  Forecast skipped for {commodity}: {fc_res.get('error')}")
-        except Exception as e:
-            logger.error(f"  Forecast failed for {commodity}: {e}")
+                from mandi_rdd.storage.duckdb_store import save_forecast_metrics
+                fc_res = train_forecast(conn, commodity=commodity, state=None, periods=6)
+                m = fc_res.get("metrics") or {}
+                if m.get("mape") is not None:
+                    save_forecast_metrics(
+                        conn, commodity,
+                        test_mape=m["mape"], test_mae=m.get("mae"),
+                        test_rmse=m.get("rmse"),
+                        n_training_months=fc_res.get("n_training_months"),
+                        n_test_months=fc_res.get("n_test_months"), model="prophet",
+                    )
+                    logger.info(f"  Forecast {commodity}: MAPE={m['mape']:.2f}%")
+                else:
+                    logger.info(f"  Forecast skipped for {commodity}: {fc_res.get('error')}")
+            except Exception as e:
+                logger.error(f"  Forecast failed for {commodity}: {e}")
 
         # Classifier
         with pipeline_metrics.step("classifier_training"):
