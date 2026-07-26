@@ -1,5 +1,6 @@
-# MandiIQ API - lightweight requirements (no prophet/xgboost/shap)
-# Heavy ML libs are only needed by the analysis engine, not the API serving layer
+# MandiIQ API - lightweight requirements
+# Prophet excluded (too heavy for free tier 512 MB - enable on larger instance)
+xgboost>=2.0.0
 pandas>=2.0.0
 numpy>=1.24.0
 duckdb>=0.8.0

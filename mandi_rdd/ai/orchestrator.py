@@ -322,12 +322,24 @@ def generate_nightly_narrative(
 
 def _detect_commodity(query: str) -> str:
     """Detect commodity from query text. Falls back to 'Onion'."""
-    known = ["onion", "tomato", "potato", "cabbage", "cauliflower",
-             "brinjal", "ladyfinger", "chilli", "garlic", "ginger"]
+    # Comprehensive list of commodities from actual market data
+    known = [
+        "paddy", "wheat", "rice", "maize", "bajra", "jowar", "ragi",
+        "onion", "tomato", "potato", "cabbage", "cauliflower",
+        "brinjal", "ladyfinger", "chilli", "garlic", "ginger",
+        "turmeric", "coriander", "cumin", "mustard", "pepper",
+        "chana", "arhar", "moong", "urad", "masoor", "gram",
+        "groundnut", "sesame", "sunflower", "soybean", "coconut",
+        "cotton", "sugarcane", "banana", "mango", "apple", "orange",
+        "grapes", "guava", "papaya", "lemon", "pomegranate",
+        "almond", "cashewnut", "walnut", "raisin",
+        "pea", "beans", "carrot", "radish", "beetroot", "spinach",
+        "milk", "egg", "fish", "mutton", "chicken",
+    ]
     q_lower = query.lower()
     for k in known:
         if k in q_lower:
-            return k.capitalize()
+            return k.upper() if k in ["arhar", "urad"] else k.capitalize()
     return "Onion"
 
 
