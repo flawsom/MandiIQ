@@ -22,11 +22,8 @@ jobs:
         with:
           lfs: true
 
-      - name: Validate render.yaml
-        uses: ./.github/actions/validate-render
-
-      - name: Validate DuckDB LFS object
-        uses: ./.github/actions/validate-duckdb
+      - name: Validate render.yaml + DuckDB
+        uses: ./.github/actions/validate-all
 
       - name: Trigger Render deploy
         uses: ./.github/actions/trigger-render-deploy

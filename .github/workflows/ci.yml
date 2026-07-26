@@ -22,11 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate render.yaml
-        uses: ./.github/actions/validate-render
-
-      - name: Validate DuckDB LFS object
-        uses: ./.github/actions/validate-duckdb
+      - name: Validate render.yaml + DuckDB
+        uses: ./.github/actions/validate-all
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
