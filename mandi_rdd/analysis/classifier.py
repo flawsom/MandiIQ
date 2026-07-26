@@ -21,12 +21,17 @@ logger = logging.getLogger(__name__)
 
 try:
     import xgboost as xgb
-    import shap
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import roc_auc_score, classification_report
     XGB_AVAILABLE = True
 except ImportError:
     XGB_AVAILABLE = False
+
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
 
 MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "models"
 
