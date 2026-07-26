@@ -245,9 +245,7 @@ def run_ingestion(
 
     rdd_results = []
     fe_results = []
-    classifier_results = []
-    
-    # Wrap analysis loop in a step timer
+    classifier_results = []        # Wrap analysis loop in a step timer
     with pipeline_metrics.step("rdd_analysis"):
         for commodity in target_commodities:
             # RDD + Fixed-effects
@@ -279,75 +277,75 @@ def run_ingestion(
                                  f"(need >=3 dates with both deficient and non-deficient rainfall)")
             else:
                 logger.info(f"  RDD skipped for {commodity}: run_rdd returned no result")
-        
-        # Forecast
-        with pipeline_metrics.step("forecast_training"):
-            logger.info(f"Training forecast for {commodity}...")
-            try:
-                from mandi_rdd.analysis.forecast import train_forecast
-                from mandi_rdd.storage.duckdb_store import save_forecast_metrics
-                fc_res = train_forecast(conn, commodity=commodity, state=None, periods=6)
-                m = fc_res.get("metrics") or {}
-                if m.get("mape") is not None:
-                    save_forecast_metrics(
-                        conn, commodity,
-                        test_mape=m["mape"], test_mae=m.get("mae"),
-                        test_rmse=m.get("rmse"),
-                        n_training_months=fc_res.get("n_training_months"),
-                        n_test_months=fc_res.get("n_test_months"), model="prophet",
-                    )
-                    logger.info(f"  Forecast {commodity}: MAPE={m['mape']:.2f}%")
-                else:
-                    logger.info(f"  Forecast skipped for {commodity}: {fc_res.get('error')}")
-            except Exception as e:
-                logger.error(f"  Forecast failed for {commodity}: {e}")
 
-        # Classifier
-        with pipeline_metrics.step("classifier_training"):
-            logger.info(f"Running spike classifier for {commodity}...")
-            try:
-                from mandi_rdd.analysis.classifier import train_spike_classifier
-                cls_result = train_spike_classifier(conn, commodity=commodity)
-                if "error" not in cls_result:
-                    from mandi_rdd.storage.duckdb_store import save_classification_result
-                    save_classification_result(conn, cls_result)
-                    classifier_results.append(cls_result)
-                    logger.info(f"  Classifier {commodity}: ROC-AUC={cls_result.get('roc_auc', '?'):.4f}")
-                else:
-                    err_msg = cls_result["error"]
-                    # "Insufficient feature rows" is expected early on -> info-level
-                    if "Insufficient feature rows" in err_msg or "Insufficient data points" in err_msg:
-                        logger.info(f"  Classifier skipped for {commodity}: {err_msg}")
+            # Forecast
+            with pipeline_metrics.step("forecast_training"):
+                logger.info(f"Training forecast for {commodity}...")
+                try:
+                    from mandi_rdd.analysis.forecast import train_forecast
+                    from mandi_rdd.storage.duckdb_store import save_forecast_metrics
+                    fc_res = train_forecast(conn, commodity=commodity, state=None, periods=6)
+                    m = fc_res.get("metrics") or {}
+                    if m.get("mape") is not None:
+                        save_forecast_metrics(
+                            conn, commodity,
+                            test_mape=m["mape"], test_mae=m.get("mae"),
+                            test_rmse=m.get("rmse"),
+                            n_training_months=fc_res.get("n_training_months"),
+                            n_test_months=fc_res.get("n_test_months"), model="prophet",
+                        )
+                        logger.info(f"  Forecast {commodity}: MAPE={m['mape']:.2f}%")
                     else:
-                        logger.warning(f"  Classifier skipped: {err_msg}")
-            except Exception as e:
-                logger.warning(f"  Classifier skipped: {e}")
+                        logger.info(f"  Forecast skipped for {commodity}: {fc_res.get('error')}")
+                except Exception as e:
+                    logger.error(f"  Forecast failed for {commodity}: {e}")
 
-        # Forecast (persist MAPE so the dashboard shows a live accuracy metric)
-        with pipeline_metrics.step("forecast_persist"):
-            logger.info(f"Training forecast + persisting MAPE for {commodity}...")
-            try:
-                from mandi_rdd.storage.duckdb_store import (
-                    save_forecast_metrics,
-                    get_avg_price_and_districts,
-                )
-                fc = train_forecast(conn, commodity=commodity, periods=12)
-                if fc and fc.get("metrics"):
-                    m = fc["metrics"]
-                    save_forecast_metrics(
-                        conn,
-                        commodity,
-                        test_mape=m.get("mape"),
-                        test_mae=m.get("mae"),
-                        test_rmse=m.get("rmse"),
-                        n_training_months=m.get("train_points"),
-                        n_test_months=m.get("test_points"),
+            # Classifier
+            with pipeline_metrics.step("classifier_training"):
+                logger.info(f"Running spike classifier for {commodity}...")
+                try:
+                    from mandi_rdd.analysis.classifier import train_spike_classifier
+                    cls_result = train_spike_classifier(conn, commodity=commodity)
+                    if "error" not in cls_result:
+                        from mandi_rdd.storage.duckdb_store import save_classification_result
+                        save_classification_result(conn, cls_result)
+                        classifier_results.append(cls_result)
+                        logger.info(f"  Classifier {commodity}: ROC-AUC={cls_result.get('roc_auc', '?'):.4f}")
+                    else:
+                        err_msg = cls_result["error"]
+                        # "Insufficient feature rows" is expected early on -> info-level
+                        if "Insufficient feature rows" in err_msg or "Insufficient data points" in err_msg:
+                            logger.info(f"  Classifier skipped for {commodity}: {err_msg}")
+                        else:
+                            logger.warning(f"  Classifier skipped: {err_msg}")
+                except Exception as e:
+                    logger.warning(f"  Classifier skipped: {e}")
+
+            # Forecast (persist MAPE so the dashboard shows a live accuracy metric)
+            with pipeline_metrics.step("forecast_persist"):
+                logger.info(f"Training forecast + persisting MAPE for {commodity}...")
+                try:
+                    from mandi_rdd.storage.duckdb_store import (
+                        save_forecast_metrics,
+                        get_avg_price_and_districts,
                     )
-                    logger.info(f"  Forecast {commodity}: MAPE={m.get('mape')}")
-                else:
-                    logger.info(f"  Forecast skipped for {commodity}: insufficient history")
-            except Exception as e:
-                logger.warning(f"  Forecast skipped: {e}")
+                    fc = train_forecast(conn, commodity=commodity, periods=12)
+                    if fc and fc.get("metrics"):
+                        m = fc["metrics"]
+                        save_forecast_metrics(
+                            conn,
+                            commodity,
+                            test_mape=m.get("mape"),
+                            test_mae=m.get("mae"),
+                            test_rmse=m.get("rmse"),
+                            n_training_months=m.get("train_points"),
+                            n_test_months=m.get("test_points"),
+                        )
+                        logger.info(f"  Forecast {commodity}: MAPE={m.get('mape')}")
+                    else:
+                        logger.info(f"  Forecast skipped for {commodity}: insufficient history")
+                except Exception as e:
+                    logger.warning(f"  Forecast skipped: {e}")
 
     summary["steps"]["rdd"] = {"commodities_run": len(rdd_results)}
     summary["steps"]["fe_crosscheck"] = {"commodities_run": len(fe_results)}
