@@ -38,28 +38,3 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
-
-  # Grafana -- self-hosted observability sidecar
-  # Scrapes /metrics from mandiiq-api via internal DNS.
-  # Requires Render plan with Docker support (Starter $7/mo+).
-  - type: web
-    name: grafana
-    runtime: docker
-    dockerfilePath: ./grafana/Dockerfile
-    plan: starter
-    region: oregon
-    branch: master
-    disk:
-      name: grafana-data
-      mountPath: /var/lib/grafana
-      sizeGB: 1
-    healthCheckPath: /api/health
-    autoDeploy: true
-    envVars:
-      - key: GF_SECURITY_ADMIN_PASSWORD
-        generateValue: true
-      # GF_SERVER_ROOT_URL is auto-detected by Render via RENDER_EXTERNAL_URL
-      - key: GF_AUTH_ANONYMOUS_ENABLED
-        value: 'true'
-      - key: GF_AUTH_ANONYMOUS_ORG_ROLE
-        value: Viewer
