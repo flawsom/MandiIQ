@@ -41,6 +41,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate render.yaml (syntax + schema)
+        run: |
+          pip install pyyaml jsonschema -q
+          python -m mandi_rdd.scripts.validate_render_yaml
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
