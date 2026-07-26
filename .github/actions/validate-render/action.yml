@@ -1,0 +1,13 @@
+name: Validate render.yaml
+description: >
+  Validates render.yaml against JSON Schema with actionable error messages.
+  Installs pyyaml and jsonschema, then runs the schema-based validator.
+  Fails the step if render.yaml is missing, malformed, or violates the schema.
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        pip install pyyaml jsonschema -q
+        python -m mandi_rdd.scripts.validate_render_yaml

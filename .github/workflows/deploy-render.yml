@@ -22,10 +22,8 @@ jobs:
         with:
           lfs: true
 
-      - name: Validate render.yaml (syntax + schema)
-        run: |
-          pip install pyyaml jsonschema -q
-          python -m mandi_rdd.scripts.validate_render_yaml
+      - name: Validate render.yaml
+        uses: ./.github/actions/validate-render
 
       - name: Validate DuckDB LFS object
         run: |
