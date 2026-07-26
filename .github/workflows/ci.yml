@@ -98,7 +98,7 @@ jobs:
           set -e
           for mmd in diagrams/*.mmd; do
             echo "=== Validating: $mmd ==="
-            mmdc -i "$mmd" -o /tmp/validate-$(basename "$mmd" .mmd).svg
+            mmdc -i "$mmd" -p puppeteer.json -o /tmp/validate-$(basename "$mmd" .mmd).svg
             echo "  OK"
           done
           echo "All Mermaid diagrams valid."
