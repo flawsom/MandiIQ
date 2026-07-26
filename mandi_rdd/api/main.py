@@ -50,6 +50,7 @@ from mandi_rdd.ai.router import (
     get_llm_fallback_count,
     reset_llm_fallback_count,
 )
+from mandi_rdd.api import metrics_push
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
