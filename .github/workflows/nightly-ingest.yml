@@ -89,21 +89,11 @@ jobs:
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger deploy via /deploy endpoint
+      - name: Trigger Render deploy
         if: steps.commit.outputs.committed == 'true'
-        run: |
-          echo "Triggering deploy via /deploy endpoint..."
-          RESPONSE=$(curl -s -X POST "https://mandiiq-api.onrender.com/deploy"             -H "Content-Type: application/json"             --max-time 30)
-          echo "Response: $RESPONSE"
-          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status','unknown'))")
-          if [ "$STATUS" = "ok" ]; then
-            echo "Deploy triggered successfully via /deploy endpoint."
-          elif [ "$STATUS" = "skipped" ]; then
-            echo "::warning::/deploy skipped: RENDER_DEPLOY_HOOK_URL not set on server"
-          else
-            echo "::error::/deploy returned status=$STATUS"
-            exit 1
-          fi
+        uses: ./.github/actions/trigger-render-deploy
+        with:
+          hook-url: https://mandiiq-api.onrender.com/deploy
 
   ashoka-import:
     needs: ingest

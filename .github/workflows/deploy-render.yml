@@ -28,24 +28,7 @@ jobs:
       - name: Validate DuckDB LFS object
         uses: ./.github/actions/validate-duckdb
 
-      - name: Trigger Render deploy hook
-        env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$RENDER_HOOK" ]; then
-            echo "::warning::RENDER_DEPLOY_HOOK_URL secret not set."
-            echo "::warning::Generate one at https://dashboard.render.com/web/srv-cudr9k5cupkc73d2e6p0/deploys/hooks"
-            exit 0
-          fi
-          echo "Triggering Render deploy hook..."
-          HTTP_CODE=$(curl -s -o /tmp/render_response.txt -w "%{http_code}" \
-            -X POST "$RENDER_HOOK" \
-            --max-time 30)
-          echo "Render responded with HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            echo "Deploy triggered successfully."
-          else
-            echo "::error::Render deploy hook returned HTTP $HTTP_CODE"
-            cat /tmp/render_response.txt
-            exit 1
-          fi
+      - name: Trigger Render deploy
+        uses: ./.github/actions/trigger-render-deploy
+        with:
+          hook-url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
