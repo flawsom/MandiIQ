@@ -58,7 +58,6 @@ coverage/
 htmlcov/
 
 # Worktree infrastructure
-.freebuff/
 
 # Screenshots and visual assets (generated, not for push)
 screenshots/
