@@ -38,6 +38,9 @@ _PROM_URL = os.environ.get("GRAFANA_CLOUD_PROM_URL", "").rstrip("/")
 # to the pushgateway URL (/api/v1/push) which pushadd_to_gateway expects.
 if "/api/prom/push" in _PROM_URL:
     _PROM_URL = _PROM_URL.replace("/api/prom/push", "/api/v1/push")
+# If URL is a bare hostname without an API path, append the pushgateway path.
+elif _PROM_URL and "/api/" not in _PROM_URL:
+    _PROM_URL = _PROM_URL + "/api/v1/push"
 _PROM_USER = os.environ.get("GRAFANA_CLOUD_PROM_USER", "")
 _PROM_PASS = os.environ.get("GRAFANA_CLOUD_PROM_PASSWORD", "")
 
