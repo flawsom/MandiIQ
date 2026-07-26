@@ -101,3 +101,58 @@ jobs:
             echo "::error::Render deploy hook returned HTTP \$HTTP_CODE"
             exit 1
           fi
+
+  ashoka-import:
+    needs: ingest
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run full Ashoka CEDA historical fetch (all 453 commodities)
+        continue-on-error: true
+        run: |
+          echo "Fetching multi-year monthly history for ALL 453 commodities..."
+          echo "Partial results saved incrementally."
+          python -m mandi_rdd.ingestion.fetch_historical_ashoka             --commodities ""             --workers 16             --out mandi_rdd/data/historical/agmarknet_ashoka.csv 2>&1
+          echo "Ashoka fetch completed or timed out."
+          wc -l mandi_rdd/data/historical/agmarknet_ashoka.csv
+
+      - name: Ingest Ashoka CSV into DuckDB
+        continue-on-error: true
+        run: |
+          if [ -f mandi_rdd/data/historical/agmarknet_ashoka.csv ]; then
+            python -m mandi_rdd.ingestion.ashoka_background_import --backfill-only 2>&1 ||               echo "Backfill may have failed"
+          else
+            echo "No Ashoka CSV found; skipping."
+          fi
+
+      - id: commit-ashoka
+        name: Commit enriched DuckDB
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git lfs install --local 2>/dev/null || true
+          git add mandi_rdd/data/mandi_iq.duckdb mandi_rdd/data/historical/agmarknet_ashoka.csv
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+          else
+            git commit -m "chore: ashoka historical ingest update"
+            git push --force-with-lease origin master 2>&1
+            git lfs push origin master 2>&1 || echo "LFS push skipped"
+          fi
