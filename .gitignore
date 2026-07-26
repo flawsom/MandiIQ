@@ -72,6 +72,7 @@ test_*.py
 !mandi_rdd/tests/test_verification.py
 _check_*.py
 tmp_*.py
+test_*.sh
 resume_info.json
 
 # Windows artifacts
