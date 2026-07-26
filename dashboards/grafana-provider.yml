@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: MandiIQ
+    type: url
+    disableDeletion: true
+    options:
+      # Grafana fetches the dashboard JSON from the API on every provisioning cycle.
+      # The ?datasource= query parameter pre-binds the Prometheus datasource name,
+      # so Grafana skips the import prompt entirely.
+      url: "http://mandiiq-api:8000/grafana-dashboard?datasource=MandiIQ+Prometheus"

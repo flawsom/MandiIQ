@@ -1,0 +1,129 @@
+# MandiIQ — Daily Data Freshness Check
+#
+# Runs every day at 06:00 UTC. Queries the production API for per-commodity
+# freshness. If any of the top 10 commodities haven't received new data in
+# 48 hours, it automatically files a GitHub Issue with the lineage trace
+# showing what source last updated each stale commodity.
+#
+# The issue body includes:
+#   - Per-commodity freshness stats (latest date, row count, districts)
+#   - Lineage trace (last 5 batches per commodity)
+#   - Suggested actions to resolve
+#
+# A new issue is filed only if:
+#   1. The previous freshness issue is already closed (no duplicates).
+#   2. At least one commodity is stale.
+
+name: Check Freshness
+
+on:
+  schedule:
+    # Daily at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      threshold_hours:
+        description: "Hours without data before flagging stale"
+        required: false
+        default: "48"
+        type: string
+
+env:
+  API_URL: https://mandiiq-api.onrender.com
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  check-freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Run freshness check
+        id: check
+        env:
+          MANDIIQ_API_URL: ${{ env.API_URL }}
+        run: |
+          THRESHOLD="${{ github.event.inputs.threshold_hours || '48' }}"
+          echo "Running freshness check (threshold=${THRESHOLD}h)..."
+          python -m mandi_rdd.scripts.check_freshness \
+            --api-url "$MANDIIQ_API_URL" \
+            --threshold-hours "$THRESHOLD" \
+            --output freshness_report.json 2>&1 | tee freshness_output.txt
+          # Read flat RESULT_* lines from script output
+          grep '^RESULT_' freshness_output.txt > /tmp/freshness_results.txt
+          while IFS='=' read -r key value; do
+            # Strip RESULT_ prefix and write to GITHUB_OUTPUT
+            out_key=$(echo "$key" | sed 's/^RESULT_//' | tr '[:upper:]' '[:lower:]')
+            echo "${out_key}=${value}" >> "$GITHUB_OUTPUT"
+          done < /tmp/freshness_results.txt
+
+      - name: Upload freshness report as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: freshness-report
+          path: |
+            freshness_report.json
+            freshness_report.md
+          retention-days: 7
+
+      - name: Upload freshness report as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: freshness-report
+          path: |
+            freshness_report.json
+            freshness_report.md
+          retention-days: 7
+
+      - name: File GitHub Issue if stale commodities found
+        if: steps.check.outputs.should_file_issue == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="${{ steps.check.outputs.issue_title }}"
+          BODY_PATH="${{ steps.check.outputs.issue_body_path }}"
+
+          # Check if there's already an open freshness issue (to avoid duplicates)
+          EXISTING=$(gh issue list \
+            --repo ${{ github.repository }} \
+            --label "freshness" \
+            --state open \
+            --json number \
+            --jq 'length')
+
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "Found $EXISTING open freshness issue(s). Skipping — duplicate prevention."
+            echo "Close the existing issue or re-run with different parameters."
+            exit 0
+          fi
+
+          echo "Filing GitHub issue..."
+          echo "Title: $TITLE"
+          echo "Body file: $BODY_PATH"
+
+          if [ -n "$BODY_PATH" ] && [ -f "$BODY_PATH" ]; then
+            gh issue create \
+              --repo ${{ github.repository }} \
+              --title "$TITLE" \
+              --body-file "$BODY_PATH" \
+              --label "freshness,automated"
+            echo "Issue filed successfully."
+          else
+            echo "::error::Issue body file not found at $BODY_PATH"
+            exit 1
+          fi

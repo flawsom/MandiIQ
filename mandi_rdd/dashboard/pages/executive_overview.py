@@ -17,7 +17,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from mandi_rdd.dashboard.theme import inject_theme, commodity_color, get_api_base
+from mandi_rdd.dashboard.theme import inject_theme, commodity_color, get_api_base, INK, SLATE, PAPER, MUTED, FAINT, TURMERIC, RUST, SAGE
 from mandi_rdd.dashboard.flip_board import flip_board
 from mandi_rdd.dashboard.plotly_theme import make_themed_figure
 from mandi_rdd.storage.duckdb_store import (
@@ -203,6 +203,9 @@ def render(**kwargs):
         with col4:
             st.metric("Forecast MAPE", _mape_s)
 
+    # ── Data Freshness Widget ──
+    _render_freshness_widget()
+
     # ── National Monsoon Context strip ──
     _render_national_monsoon_strip()
 
@@ -249,6 +252,250 @@ def render(**kwargs):
             '<div class="interpretation-box insig-box">Price trend unavailable — run ingestion first.</div>',
             unsafe_allow_html=True,
         )
+
+
+def _render_freshness_widget():
+    """Render a Data Freshness widget using GET /freshness API data.
+
+    Shows per-commodity last-updated dates, row counts, district/state coverage,
+    and data source (api/csv/ashoka/rainfall). Falls back gracefully if the API
+    is unreachable.
+    """
+    st.markdown(
+        """
+        <div style="margin-top:2.5rem;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:#d7ff00;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">
+            01 / Data Freshness
+          </div>
+          <h2 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:400;font-size:1.4rem;color:#ffffff;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">
+            Commodity Freshness <span style="font-size:1.2rem;">\u23f3</span>
+          </h2>
+          <p style="color:#7e7e7e;font-size:0.85rem;margin-bottom:1rem;">
+            Per-commodity data freshness: latest record date, row count, district coverage,
+            and ingestion source. Data flows from data.gov.in API, CSV backfill, Ashoka CEDA
+            archive, and rainfall feeds. Rows tagged with missing commodities are grouped under
+            "Other / Uncategorized".
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Fetch freshness data
+    freshness_data = _cached_freshness()
+
+    if not freshness_data or (isinstance(freshness_data, dict) and "error" in freshness_data):
+        st.markdown(
+            f'<div class="interpretation-box insig-box">\u26a0\ufe0f Freshness data unavailable. '
+            f'Run the ingestion pipeline to populate commodity freshness.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    if isinstance(freshness_data, list) and len(freshness_data) == 0:
+        st.markdown(
+            '<div class="interpretation-box insig-box">No freshness data yet. '
+            'The first ingestion run will populate these metrics.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Build a summary row at the top
+    total_rows = sum(r.get("row_count", 0) for r in freshness_data if isinstance(r, dict))
+    total_commodities = len([r for r in freshness_data if isinstance(r, dict) and r.get("commodity")])
+    # Count how many commodities have data in the last 7 days
+    import datetime
+    _seven_days_ago = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    recent_count = sum(
+        1 for r in freshness_data if isinstance(r, dict)
+        and r.get("latest_date", "") >= _seven_days_ago
+    )
+
+    # KPI micro-row
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("Commodities tracked", f"{total_commodities}")
+    with c2:
+        st.metric("Total price rows", f"{total_rows:,}")
+    with c3:
+        st.metric("Updated last 7d", f"{recent_count}")
+    with c4:
+        # Find the source types in use
+        source_types = set()
+        for r in freshness_data:
+            if isinstance(r, dict):
+                stype = r.get("source_type") or ""
+                if stype:
+                    source_types.add(stype)
+        st.metric("Data sources", ", ".join(sorted(source_types)) if source_types else "—")
+
+    # Render the freshness table as styled HTML
+    _FRESHNESS_TABLE_CSS = f"""
+    <style>
+    .freshness-table {{
+        width: 100%; border-collapse: collapse;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        font-size: 0.82rem;
+    }}
+    .freshness-table th {{
+        text-align: left; padding: 0.6rem 0.75rem;
+        color: #7e7e7e; font-weight: 500; font-size: 0.7rem;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        white-space: nowrap;
+    }}
+    .freshness-table td {{
+        padding: 0.55rem 0.75rem;
+        color: #ffffff;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        white-space: nowrap;
+    }}
+    .freshness-table tr:hover td {{
+        background: rgba(255,255,255,0.02);
+    }}
+    .freshness-table .mono {{
+        font-family: "IBM Plex Mono", monospace;
+        font-variant-numeric: tabular-nums;
+    }}
+    .freshness-table .num {{
+        font-family: "IBM Plex Mono", monospace;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }}
+    .freshness-table .source-badge {{
+        display: inline-block;
+        padding: 0.1rem 0.45rem;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        font-family: "IBM Plex Mono", monospace;
+        font-weight: 500;
+    }}
+    .source-badge-api {{
+        background: rgba(215, 255, 0, 0.12);
+        color: #d7ff00;
+    }}
+    .source-badge-csv {{
+        background: rgba(139, 107, 196, 0.12);
+        color: #8B6BC4;
+    }}
+    .source-badge-ashoka {{
+        background: rgba(217, 102, 59, 0.12);
+        color: #D9663B;
+    }}
+    .source-badge-rainfall {{
+        background: rgba(143, 174, 137, 0.12);
+        color: #8FAE89;
+    }}
+    .source-badge-varietywise {{
+        background: rgba(180, 131, 84, 0.12);
+        color: #B48354;
+    }}
+    .source-badge-other {{
+        background: rgba(186, 186, 186, 0.12);
+        color: #bababa;
+    }}
+    .freshness-table .fresh-dot {{
+        display: inline-block;
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        margin-right: 4px;
+    }}
+    .fresh-dot-recent {{ background: #6BBF8A; }}
+    .fresh-dot-stale {{ background: #E8B14D; }}
+    .fresh-dot-old   {{ background: #C84B4B; }}
+    </style>
+    """
+    st.markdown(_FRESHNESS_TABLE_CSS, unsafe_allow_html=True)
+
+    now = datetime.datetime.utcnow()
+    _cutoff_recent = (now - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    _cutoff_stale = (now - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+
+    rows_html = ""
+    for r in freshness_data:
+        if not isinstance(r, dict):
+            continue
+        commodity = (r.get("commodity") or "Other / Uncategorized").title()
+        latest = r.get("latest_date") or "—"
+        earliest = r.get("earliest_date") or "—"
+        row_count = r.get("row_count", 0)
+        n_districts = r.get("n_districts", 0)
+        n_states = r.get("n_states", 0)
+        source_type = (r.get("source_type") or "other").lower()
+        source_name = r.get("source_name") or ""
+
+        # Determine freshness status dot
+        if latest != "—" and latest >= _cutoff_recent:
+            dot_class = "fresh-dot-recent"
+            dot_title = "Updated in last 7 days"
+        elif latest != "—" and latest >= _cutoff_stale:
+            dot_class = "fresh-dot-stale"
+            dot_title = "7–30 days old"
+        else:
+            dot_class = "fresh-dot-old"
+            dot_title = "Over 30 days old"
+
+        # Source badge class
+        if source_type in ("api",):
+            badge_class = "source-badge-api"
+            badge_label = "API"
+        elif source_type == "csv":
+            badge_class = "source-badge-csv"
+            badge_label = "CSV"
+        elif source_type == "ashoka":
+            badge_class = "source-badge-ashoka"
+            badge_label = "Ashoka"
+        elif source_type == "rainfall":
+            badge_class = "source-badge-rainfall"
+            badge_label = "Rainfall"
+        elif source_type == "varietywise":
+            badge_class = "source-badge-varietywise"
+            badge_label = "Variety"
+        else:
+            badge_class = "source-badge-other"
+            badge_label = source_type[:8].upper()
+
+        # Tooltip for source
+        title_attr = f' title="{source_name}"' if source_name else ""
+
+        rows_html += (
+            f"<tr>"
+            f'<td><span class="fresh-dot {dot_class}" title="{dot_title}"></span>{commodity}</td>'
+            f'<td class="mono">{latest}</td>'
+            f'<td class="mono">{earliest}</td>'
+            f'<td class="num">{row_count:,}</td>'
+            f'<td class="num">{n_districts}</td>'
+            f'<td class="num">{n_states}</td>'
+            f'<td><span class="source-badge {badge_class}"{title_attr}>{badge_label}</span></td>'
+            f"</tr>"
+        )
+
+    table_html = (
+        '<div class="glass" style="padding:1rem;overflow-x:auto;">'
+        '<table class="freshness-table">'
+        "<thead><tr>"
+        "<th>Commodity</th>"
+        "<th>Latest Date</th>"
+        "<th>Earliest Date</th>"
+        "<th style=\"text-align:right;\">Rows</th>"
+        "<th style=\"text-align:right;\">Districts</th>"
+        "<th style=\"text-align:right;\">States</th>"
+        "<th>Source</th>"
+        "</tr></thead><tbody>"
+        f"{rows_html}"
+        "</tbody></table></div>"
+    )
+    st.markdown(table_html, unsafe_allow_html=True)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_freshness():
+    """Cached freshness data from the API. TTL=120s."""
+    try:
+        from mandi_rdd.dashboard.data_access import get_freshness
+        return get_freshness()
+    except Exception:
+        return []
 
 
 def _render_ask_panel(default_commodity: str):

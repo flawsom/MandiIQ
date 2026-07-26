@@ -1429,15 +1429,21 @@
 flowchart TB
     subgraph Sources["Data Sources"]
         A1["Agmarknet API<br/>Daily Mandi Prices"]
+        A6["Ashoka CEDA<br/>Historical Price CSV"]
         A2["IMD Weather Grids<br/>Rainfall Departure"]
     end
     subgraph Ingestion["Ingestion Pipeline"]
-        B1["Fetch Prices<br/>Pagination + Retry"]
-        B2["Fetch Rainfall<br/>Sub-division Parser"]
+        B1["fetch_prices.py<br/>Pagination + Retry"]
+        B5["fetch_prices.py<br/>Variety-Wise Archive"]
+        B6["ingest_historical_csv.py<br/>CSV Backfill"]
+        B2["fetch_rainfall.py<br/>Sub-division Parser"]
         B3["http_client.py<br/>Shared Retry + SSL"]
+        B4["scheduler.py<br/>Orchestration"]
     end
     subgraph Storage["Analytical Store"]
         C1["DuckDB<br/>mandi_iq.duckdb"]
+        C2["🔍 data_lineage<br/>Batch Provenance · Fingerprint<br/>Source Type · Commodity List"]
+        C3["📊 freshness_by_commodity<br/>Per-Commodity: Latest Date<br/>Row Count · District Coverage"]
     end
     subgraph Analysis["Analysis Engine"]
         D1["Causal RDD<br/>Local-linear + FE"]
@@ -1450,15 +1456,25 @@ flowchart TB
         E2["Nightly Narratives<br/>Commodity Reports"]
     end
     subgraph Serving["Serving Layer"]
-        F1["FastAPI Gateway<br/>10 Endpoints"]
-        F2["Streamlit Dashboard<br/>5 Pages"]
+        F1["FastAPI Gateway<br/>Endpoints: /health /prices<br/>/rdd-result /forecast<br/>/freshness /lineage"]
+        F2["Streamlit Dashboard<br/>mandiiq.streamlit.app<br/>Data Freshness Widget"]
     end
     A1 --> B1
+    A6 --> B6
     A2 --> B2
     B1 --> B3
+    B5 --> B3
     B2 --> B3
+    B4 --> B1
+    B4 --> B5
+    B4 --> B6
+    B4 --> B2
     B1 --> C1
+    B5 --> C1
+    B6 --> C1
     B2 --> C1
+    C1 --> C2
+    C2 --> C3
     C1 --> D1
     C1 --> D2
     C1 --> D3
@@ -1472,6 +1488,12 @@ flowchart TB
     F1 --> E1
     E1 --> E2
     F1 --> F2
+    %% Source-labeled edges to data_lineage
+    B1 -.->|API<br/>9ef84268| C2
+    B5 -.->|Variety<br/>35985678| C2
+    B6 -.->|CSV| C2
+    B2 -.->|Rainfall| C2
+    C3 -.->|Dashboard Feed| F2
 </pre>
 </div>
 
@@ -1584,7 +1606,13 @@ flowchart TB
                     <a href="https://github.com/flawsom/MandiIQ" target="_blank" class="footer-link" data-scramble>GitHub Source</a>
                     <a href="https://mandiiq.streamlit.app/" target="_blank" class="footer-link" data-scramble>Streamlit App</a>
                 </div>
-            </footer>
+            
+            <!-- Heartbeat Monitor Link -->
+            <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;text-align:center;">
+                <a href="heartbeat-dashboard.html" style="color:var(--color-primary);text-decoration:none;font-family:var(--font-mono);font-size:0.85rem;">♥ Heartbeat &amp; Dashboard Monitor &rarr;</a>
+                <p style="color:var(--color-text-low);font-size:0.75rem;margin-top:4px;">Live dashboard cache status, md5_hash stability, and workflow run history</p>
+            </div>
+        </footer>
 
         </main>
     </div>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MandiIQ &mdash; Heartbeat &amp; Dashboard Monitor</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@300;400;500;600&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Barlow:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+:root{--bg-base:#000;--bg-surface:#0a0a0a;--bg-surface-glass:rgba(255,255,255,0.03);--bg-surface-glass-hover:rgba(255,255,255,0.07);--font-display:"Space Grotesk",system-ui,-apple-system,sans-serif;--font-body:"IBM Plex Sans","Inter",system-ui,sans-serif;--font-mono:"IBM Plex Mono","JetBrains Mono",monospace;--font-numeric:"Barlow","IBM Plex Sans",sans-serif;--color-primary:#d7ff00;--color-paper:#fff;--color-text-high:#bababa;--color-text-med:#7e7e7e;--color-text-low:#555;--color-success:#2ecc71;--color-warning:#f39c12;--color-danger:#e74c3c;--hairline:rgba(255,255,255,0.07);--hairline-strong:rgba(255,255,255,0.14);--duration-base:350ms;--ease-out:cubic-bezier(0.16,1,0.3,1);--space-sm:.5rem;--space-md:1rem;--space-lg:2rem;--space-xl:4rem}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-base);color:var(--color-text-high);font-family:var(--font-body);font-size:15px;line-height:1.625;-webkit-font-smoothing:antialiased}
+.dot-grid{position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:radial-gradient(rgba(255,255,255,0.04) 1.5px,transparent 2px);background-size:38px 38px;z-index:0;pointer-events:none}
+.container{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:var(--space-xl) var(--space-lg)}
+.header{margin-bottom:var(--space-xl)}
+.header h1{font-family:var(--font-display);font-size:2.2rem;font-weight:600;color:var(--color-paper);letter-spacing:-0.02em;margin-bottom:var(--space-sm)}
+.header h1 .accent{color:var(--color-primary)}
+.header p{color:var(--color-text-med);font-size:.95rem}
+.back-link{display:inline-block;color:var(--color-text-med);text-decoration:none;font-size:.85rem;margin-bottom:var(--space-md);transition:color var(--duration-base) ease}
+.back-link:hover{color:var(--color-primary)}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:999px;font-size:.8rem;font-weight:500;font-family:var(--font-mono);border:1px solid var(--hairline);background:var(--bg-surface-glass)}
+.status-badge .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-badge .dot.green{background:var(--color-success);box-shadow:0 0 8px rgba(46,204,113,0.5)}
+.status-badge .dot.yellow{background:var(--color-warning);box-shadow:0 0 8px rgba(243,156,18,0.5)}
+.status-badge .dot.red{background:var(--color-danger);box-shadow:0 0 8px rgba(231,76,60,0.5)}
+.status-badge .dot.gray{background:var(--color-text-low)}
+.summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-md);margin-bottom:var(--space-xl)}
+.summary-card{background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);transition:all var(--duration-base) var(--ease-out)}
+.summary-card:hover{background:var(--bg-surface-glass-hover);border-color:var(--hairline-strong)}
+.summary-card .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--color-text-low);margin-bottom:var(--space-sm)}
+.summary-card .value{font-family:var(--font-numeric);font-size:1.6rem;font-weight:600;color:var(--color-paper);line-height:1.2}
+.summary-card .sub{font-size:.8rem;color:var(--color-text-med);margin-top:4px}
+.section{margin-bottom:var(--space-xl)}
+.section-title{font-family:var(--font-display);font-size:1.1rem;font-weight:500;color:var(--color-paper);margin-bottom:var(--space-md);display:flex;align-items:center;gap:var(--space-sm)}
+.section-title .count{font-size:.8rem;color:var(--color-text-low);font-family:var(--font-mono)}
+.table-wrap{background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:var(--space-md);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--color-text-low);border-bottom:1px solid var(--hairline);font-weight:500}
+td{padding:var(--space-md);font-size:.85rem;border-bottom:1px solid var(--hairline);font-family:var(--font-mono)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg-surface-glass-hover)}
+td .hash{color:var(--color-text-med);font-size:.75rem}
+td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending{color:var(--color-warning)}
+.hash-timeline{background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);min-height:200px}
+.hash-timeline .empty{text-align:center;color:var(--color-text-low);font-size:.9rem}
+.hash-row{display:flex;align-items:center;gap:var(--space-md);font-family:var(--font-mono);font-size:.8rem;padding:4px 0}
+.hash-row .ht{color:var(--color-text-low);min-width:80px;font-size:.75rem}
+.hash-row .hv{color:var(--color-text-med);word-break:break-all}
+.hash-row .hd{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.hash-row .hd.same{background:var(--color-text-low);opacity:.3}
+.hash-row .hd.diff{background:var(--color-primary);box-shadow:0 0 8px rgba(215,255,0,0.5)}
+.loading{text-align:center;padding:var(--space-xl);color:var(--color-text-low)}
+.loading .spinner{width:24px;height:24px;border:2px solid var(--hairline);border-top-color:var(--color-primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto var(--space-md)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:8px;padding:var(--space-md);color:var(--color-danger);font-size:.85rem;margin-bottom:var(--space-md);display:none}
+.error-banner .retry{display:inline-block;margin-left:var(--space-md);padding:2px 12px;border:1px solid rgba(231,76,60,0.4);border-radius:4px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:.8rem}
+.error-banner .retry:hover{background:rgba(231,76,60,0.15)}
+.last-updated{text-align:right;font-size:.75rem;color:var(--color-text-low);margin-top:var(--space-md);font-family:var(--font-mono)}
+.live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--color-success);animation:pulse 2s ease-in-out infinite;margin-right:6px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:768px){.container{padding:var(--space-lg) var(--space-md)}.header h1{font-size:1.6rem}.summary-bar{grid-template-columns:1fr 1fr}.summary-card .value{font-size:1.2rem}.summary-card{padding:var(--space-md)}}
+@media(max-width:480px){.summary-bar{grid-template-columns:1fr}th,td{padding:var(--space-sm)}}
+</style>
+</head>
+<body>
+<div class="dot-grid"></div>
+<div class="container">
+<div class="header">
+<a href="/" class="back-link">&larr; Back to MandiIQ</a>
+<h1><span class="accent">&hearts;</span> Heartbeat &amp; Dashboard Monitor</h1>
+<p>Live status from the hourly heartbeat workflow, dashboard cache freshness, and <code>md5_hash</code> stability tracking.</p>
+<span class="status-badge" id="liveBadge"><span class="dot gray"></span><span id="liveLabel">Checking...</span></span>
+</div>
+<div class="error-banner" id="errorBanner"><span id="errorMessage">Failed to fetch data.</span><button class="retry" onclick="refreshAll()">Retry</button></div>
+<div class="summary-bar" id="summaryBar">
+<div class="summary-card"><div class="label">Dashboard Cache</div><div class="value" id="cacheStatus">&mdash;</div><div class="sub" id="cacheSub">loading...</div></div>
+<div class="summary-card"><div class="label">md5 Hash</div><div class="value" id="hashDisplay" style="font-size:.9rem;font-family:var(--font-mono);word-break:break-all;">&mdash;</div><div class="sub" id="hashSub">loading...</div></div>
+<div class="summary-card"><div class="label">Last Refresh</div><div class="value" id="lastRefresh">&mdash;</div><div class="sub" id="refreshSub">loading...</div></div>
+<div class="summary-card"><div class="label">File Age</div><div class="value" id="fileAge">&mdash;</div><div class="sub" id="ageSub">loading...</div></div>
+</div>
+<div class="section"><div class="section-title"><span>&#128202; md5 Hash Stability</span><span class="count" id="hashCount"></span></div>
+<div class="hash-timeline" id="hashTimeline"><div class="empty">&#9203; Waiting for data...</div></div></div>
+<div class="section"><div class="section-title"><span>&#128203; Workflow Run History</span><span class="count" id="runCount"></span></div>
+<div class="table-wrap" id="workflowTable">
+<table><thead><tr><th>Run</th><th>Status</th><th>Event</th><th>Commit</th><th>Triggered</th></tr></thead>
+<tbody id="workflowBody"><tr><td colspan="5" style="text-align:center;color:var(--color-text-low);">Loading...</td></tr></tbody></table>
+</div></div>
+<div class="section" style="margin-top:var(--space-xl);">
+<div class="section-title">&#8505;&#65039; About This Monitor</div>
+<div style="background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);font-size:.85rem;color:var(--color-text-med);line-height:1.8;">
+<p>This page fetches live data from the MandiIQ API and GitHub Actions API every 60 seconds.</p>
+<ul style="margin-top:var(--space-sm);padding-left:var(--space-lg);">
+<li><strong>Dashboard Cache</strong> &mdash; Status of the in-memory Grafana dashboard JSON cache (fresh / stale / error).</li>
+<li><strong>md5 Hash</strong> &mdash; Hash of the loaded dashboard JSON. Changes when the file on disk is updated.</li>
+<li><strong>Last Refresh</strong> &mdash; When the cache was last cleared and reloaded via webhook or admin endpoint.</li>
+<li><strong>File Age</strong> &mdash; How long since the dashboard JSON file was last modified on disk.</li>
+</ul>
+<p style="margin-top:var(--space-sm);"><strong>Data sources:</strong> <code style="color:var(--color-text-high);">GET /admin/dashboard-status</code> and <code>GET /repos/flawsom/MandiIQ/actions/workflows/dashboard-heartbeat.yml/runs</code>.</p>
+<p style="margin-top:var(--space-sm);">&#8902; A green dot means the last heartbeat checked in within 70 minutes.<br>&#8902; The hash timeline shows stability: repeated identical hashes = no changes; a new hash = dashboard was updated.</p>
+<p style="margin-top:var(--space-sm);color:var(--color-warning);font-size:0.8rem;">⚠️ <strong>CORS note:</strong> If you see a persistent error banner, the Render API may not be sending <code>Access-Control-Allow-Origin</code> headers. The API must allow requests from your domain for this page to work.</p></div></div>
+<div class="last-updated"><span class="live-dot"></span>Last updated: <span id="lastUpdated">just now</span> &middot; <a href="#" onclick="refreshAll();return false;" style="color:var(--color-primary);text-decoration:none;">&#10227; Refresh</a></div>
+</div>
+<script>
+const A='https://mandiiq-api.onrender.com',G='https://api.github.com/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=6e4,STALE=70;let hist=[];
+function ago(d){if(!d)return'never';let t=new Date(d);if(isNaN(t))return'never';let s=Math.floor((Date.now()-t)/1e3);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';}
+function fmt(d){if(!d)return'\u2014';let t=new Date(d);return isNaN(t)?'\u2014':t.toLocaleString();}
+async function gs(){let r=await fetch(A+'/admin/dashboard-status');if(!r.ok)throw Error('Status '+r.status);return r.json();}
+async function gr(){try{let r=await fetch(G+'/actions/workflows/'+W+'/runs?per_page=20',{headers:{Accept:'application/vnd.github.v3+json'}});if(!r.ok)return[];let d=await r.json();return d.workflow_runs||[];}catch(e){return[];}}
+function render(d){
+ let cs=document.getElementById('cacheStatus'),csu=document.getElementById('cacheSub');
+ if(d.cache_info&&d.cache_info.size!==void 0){cs.textContent='Fresh';cs.style.color='var(--color-success)';csu.textContent=d.cache_info.size+'/'+d.cache_info.maxsize;}
+ else if(d.error){cs.textContent='Error';cs.style.color='var(--color-danger)';csu.textContent=d.error;}
+ else{cs.textContent='Unknown';cs.style.color='var(--color-text-med)';csu.textContent='No cache info';}
+ let he=document.getElementById('hashDisplay'),hs=document.getElementById('hashSub');
+ if(d.md5_hash){he.textContent=d.md5_hash;hs.textContent=d.md5_hash==='00000000000000000000000000000000'?'empty':'hash';let n=new Date().toISOString();if(!hist.length||hist[hist.length-1].hash!==d.md5_hash)hist.push({hash:d.md5_hash,time:n});if(hist.length>100)hist.shift();}
+ else{he.textContent='\u2014';hs.textContent='No hash';}
+ let re=document.getElementById('lastRefresh'),rs=document.getElementById('refreshSub');
+ if(d.last_refresh){re.textContent=fmt(d.last_refresh);rs.textContent=ago(d.last_refresh);}else{re.textContent='\u2014';rs.textContent='Never';}
+ let ae=document.getElementById('fileAge'),as_=document.getElementById('ageSub');
+ if(d.file_mtime){ae.textContent=fmt(d.file_mtime);as_.textContent=ago(d.file_mtime);}else{ae.textContent='\u2014';as_.textContent='No info';}
+ let badge=document.getElementById('liveBadge'),dot=badge.querySelector('.dot'),label=document.getElementById('liveLabel');
+ if(d.last_refresh){let df=(Date.now()-new Date(d.last_refresh))/6e4;if(df<=STALE){dot.className='dot green';label.textContent='Live \u00b7 '+Math.floor(df)+'m ago';}else if(df<=STALE*2){dot.className='dot yellow';label.textContent='Warning \u00b7 '+Math.floor(df)+'m';}else{dot.className='dot red';label.textContent='Stale \u00b7 '+Math.floor(df)+'m';}}
+ else{dot.className='dot gray';label.textContent='No data';}
+ let tc=document.getElementById('hashTimeline'),hc=document.getElementById('hashCount');hc.textContent='('+hist.length+' snapshots)';
+ if(!hist.length){tc.innerHTML='<div class="empty">&#9203; Waiting...</div>';}else{let h='<div class="hash-list">',r2=hist.slice(-20).reverse();for(let i=0;i<r2.length;i++){let e=r2[i],ch=i<r2.length-1&&e.hash!==r2[i+1].hash,sh=e.hash.length>16?e.hash.slice(0,8)+'\u2026'+e.hash.slice(-8):e.hash;h+='<div class="hash-row"><span class="ht">'+ago(e.time)+'</span><span class="hd '+(ch?'diff':'same')+'" title="'+(ch?'Changed':'Same')+'"></span><span class="hv" title="'+e.hash+'">'+sh+'</span></div>';}h+='</div>';tc.innerHTML=h;}
+ let body=document.getElementById('workflowBody'),rc=document.getElementById('runCount');
+ if(!d._runs||!d._runs.length){rc.textContent='(no data)';body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);">No workflow runs found.</td></tr>';return;}
+ rc.textContent='(last '+d._runs.length+')';let h2='';
+ for(let r of d._runs){let cls=r.conclusion==='success'?'ok':r.conclusion==='failure'?'fail':'pending',ic=r.conclusion==='success'?'\u2713':r.conclusion==='failure'?'\u2717':'\u25CC';h2+='<tr><td><a href="'+r.html_url+'" target="_blank" style="color:var(--color-primary);text-decoration:none;">#'+r.run_number+'</a></td><td class="'+cls+'">'+ic+' '+(r.conclusion||'running')+'</td><td>'+r.event+'</td><td class="hash">'+(r.head_commit?r.head_commit.id.slice(0,12):'\u2014')+'</td><td title="'+fmt(r.created_at)+'">'+ago(r.created_at)+'</td></tr>';}
+ body.innerHTML=h2;}
+async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;render(s);document.getElementById('lastUpdated').textContent=new Date().toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
+let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
+</script>
+</body>
+</html>

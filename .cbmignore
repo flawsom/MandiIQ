@@ -1,0 +1,8 @@
+.freebuff
+.git
+.venv_skylos
+node_modules
+__pycache__
+archive
+site
+*.duckdb

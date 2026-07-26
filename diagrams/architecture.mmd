@@ -4,11 +4,14 @@ title: MandiIQ System Architecture
 graph TB
     subgraph Sources["📡 Data Sources"]
         AGMARKNET["Agmarknet API<br/>Daily Mandi Prices"]
+        ASHOKA["Ashoka CEDA Archive<br/>Historical Price CSV"]
         IMD["IMD Weather Grids<br/>Rainfall Departure (%)"]
         SENTINEL["Sentinel Hub<br/>NDVI Satellite Data"]
     end
     subgraph Ingestion["📥 Ingestion Pipeline"]
         FETCH_PRICES["fetch_prices.py<br/>Pagination + Retry"]
+        FETCH_VARIETYWISE["fetch_prices.py<br/>(Variety-Wise Archive)<br/>80M-row Probe + Scan"]
+        INGEST_CSV["ingest_historical_csv.py<br/>CSV Backfill + Ashoka"]
         FETCH_RAINFALL["fetch_rainfall.py<br/>Sub-division Rainfall"]
         FETCH_NDVI["fetch_ndvi.py<br/>Vegetation Index"]
         SCHEDULER["scheduler.py<br/>Orchestration"]
@@ -16,8 +19,10 @@ graph TB
     end
     subgraph Storage["🗄️ Storage Layer"]
         DUCKDB["DuckDB Warehouse<br/>mandi_iq.duckdb"]
-        TABLES["Tables: prices, rainfall,<br/>ndvi, rdd_results,<br/>source_metadata"]
-        LAST_STATUS["last_ingest_status.json<br/>Freshness Tracking"]
+        TABLES["Analytical Tables:<br/>prices, rainfall,<br/>ndvi, rdd_results"]
+        LINEAGE["🔍 data_lineage<br/>Batch Provenance<br/>Source Fingerprint<br/>Commodity List<br/>Ingestion Timestamp"]
+        FRESHNESS_TABLE["📊 freshness_by_commodity<br/>Per-Commodity Stats:<br/>Latest Date · Row Count<br/>District Coverage · Source"]
+        LAST_STATUS["last_ingest_status.json<br/>Run Timestamp"]
     end
     subgraph Analysis["🧮 Analysis Engine"]
         RDD_ENGINE["rdd_engine.py<br/>RDD Specification<br/>Local Linear Regression"]
@@ -32,28 +37,38 @@ graph TB
     end
     subgraph Serving["🌐 Serving Layer"]
         FASTAPI["FastAPI Gateway<br/>(mandiiq-api.onrender.com)"]
-        ENDPOINTS["Endpoints:<br/>/health /prices /rdd-result<br/>/forecast /risk-score<br/>/ask /refresh /metrics"]
-        STREAMLIT["Streamlit Dashboard<br/>(mandiiq-dashboard.onrender.com)"]
+        ENDPOINTS["Endpoints:<br/>/health /prices /rdd-result<br/>/forecast /risk-score<br/>/ask /refresh /metrics<br/>/freshness /lineage"]
+        STREAMLIT["Streamlit Dashboard<br/>(mandiiq.streamlit.app)<br/>Data Freshness Widget"]
     end
     subgraph Monitoring["📈 Observability"]
-        PROMETHEUS["/metrics Endpoint<br/>Prometheus Exposition"]
-        FRESHNESS["/freshness<br/>Source Staleness Tracking"]
+        PROMETHEUS["/metrics Endpoint<br/>Pipeline Latency<br/>Step Durations<br/>API Call Counters"]
+        FRESHNESS_API["/freshness<br/>Per-Commodity Freshness"]
+        LINEAGE_API["/lineage<br/>Ingestion Batch Trace"]
         HEALTH["/health<br/>Liveness + Data Counts"]
         GRAFANA["Grafana / Prometheus<br/>(Optional Scraping)"]
+        CHECK_FRESHNESS["check-freshness.py<br/>Daily Cron → GitHub Issue<br/>48h Stale Detection"]
     end
     AGMARKNET --> FETCH_PRICES
+    ASHOKA --> INGEST_CSV
     IMD --> FETCH_RAINFALL
     SENTINEL --> FETCH_NDVI
     FETCH_PRICES --> HTTP_CLIENT
+    FETCH_VARIETYWISE --> HTTP_CLIENT
     FETCH_RAINFALL --> HTTP_CLIENT
     FETCH_NDVI --> HTTP_CLIENT
     SCHEDULER --> FETCH_PRICES
+    SCHEDULER --> FETCH_VARIETYWISE
+    SCHEDULER --> INGEST_CSV
     SCHEDULER --> FETCH_RAINFALL
     SCHEDULER --> FETCH_NDVI
     FETCH_PRICES --> DUCKDB
+    FETCH_VARIETYWISE --> DUCKDB
+    INGEST_CSV --> DUCKDB
     FETCH_RAINFALL --> DUCKDB
     FETCH_NDVI --> DUCKDB
     DUCKDB --> TABLES
+    DUCKDB --> LINEAGE
+    DUCKDB --> FRESHNESS_TABLE
     SCHEDULER --> LAST_STATUS
     DUCKDB --> RDD_ENGINE
     DUCKDB --> FORECAST
@@ -69,20 +84,34 @@ graph TB
     ROUTER --> ORCHESTRATOR
     ORCHESTRATOR --> NARRATIVE
     FASTAPI --> PROMETHEUS
-    FASTAPI --> FRESHNESS
+    FASTAPI --> FRESHNESS_API
+    FASTAPI --> LINEAGE_API
     FASTAPI --> HEALTH
     PROMETHEUS --> GRAFANA
+    LINEAGE_API --> CHECK_FRESHNESS
+    FRESHNESS_API --> CHECK_FRESHNESS
+    LINEAGE --> FRESHNESS_TABLE
+    %% Edges from ingestion to data_lineage (source labels)
+    FETCH_PRICES -.->|API Source<br/>resource_9ef84268| LINEAGE
+    FETCH_VARIETYWISE -.->|Variety Source<br/>resource_35985678| LINEAGE
+    INGEST_CSV -.->|CSV Backfill<br/>Ashoka CEDA| LINEAGE
+    FETCH_RAINFALL -.->|Rainfall Feed<br/>IMD Grids| LINEAGE
+    FRESHNESS_TABLE -.->|Dashboard Feed| STREAMLIT
     classDef source fill:#1a1a2e,stroke:#e94560,stroke-width:2px,color:#fff
     classDef ingestion fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#fff
     classDef storage fill:#0f3460,stroke:#533483,stroke-width:2px,color:#fff
+    classDef lineage fill:#0f3460,stroke:#d7ff00,stroke-width:3px,color:#fff
+    classDef freshness fill:#0f3460,stroke:#8FAE89,stroke-width:2px,color:#fff
     classDef analysis fill:#533483,stroke:#e94560,stroke-width:2px,color:#fff
     classDef ai fill:#2d1b69,stroke:#d7ff00,stroke-width:2px,color:#fff
     classDef serving fill:#1a1a2e,stroke:#d7ff00,stroke-width:2px,color:#fff
     classDef monitoring fill:#16213e,stroke:#e94560,stroke-width:2px,color:#fff
-    class AGMARKNET,IMD,SENTINEL source
-    class FETCH_PRICES,FETCH_RAINFALL,FETCH_NDVI,SCHEDULER,HTTP_CLIENT ingestion
+    class AGMARKNET,ASHOKA,IMD,SENTINEL source
+    class FETCH_PRICES,FETCH_VARIETYWISE,INGEST_CSV,FETCH_RAINFALL,FETCH_NDVI,SCHEDULER,HTTP_CLIENT ingestion
     class DUCKDB,TABLES,LAST_STATUS storage
+    class LINEAGE lineage
+    class FRESHNESS_TABLE freshness
     class RDD_ENGINE,FORECAST,CLASSIFIER,PRESCRIPTIVE analysis
     class ROUTER,ORCHESTRATOR,NARRATIVE ai
     class FASTAPI,ENDPOINTS,STREAMLIT serving
-    class PROMETHEUS,FRESHNESS,HEALTH,GRAFANA monitoring
+    class PROMETHEUS,FRESHNESS_API,LINEAGE_API,HEALTH,GRAFANA,CHECK_FRESHNESS monitoring

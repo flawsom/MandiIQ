@@ -131,12 +131,21 @@ def _normalize_row(row: dict) -> dict | None:
 
 
 def ingest_file(path: str, batch: int = 5000) -> int:
-    """Ingest a single CSV. Returns number of rows upserted."""
-    from mandi_rdd.storage.duckdb_store import get_connection, upsert_prices
+    """Ingest a single CSV. Returns number of rows upserted.
+
+    Each record is tagged with ``_source`` metadata for data-lineage tracking:
+        {
+            "source_type": "csv",
+            "source_name": os.path.basename(path),
+            "resource_id": path,
+        }
+    """
+    from mandi_rdd.storage.duckdb_store import get_connection, upsert_prices, record_lineage_batch
 
     conn = get_connection(read_only=False)
     try:
         total = 0
+        total_new = 0
         buffer = []
         with open(path, "r", encoding="utf-8-sig", newline="") as fh:
             # Ashoka CSV exports can have commodity/variety descriptions > 131 KB default limit
@@ -146,19 +155,56 @@ def ingest_file(path: str, batch: int = 5000) -> int:
                 rec = _normalize_row(raw)
                 if not rec or rec["arrival_date"] is None:
                     continue
+                # Tag with source metadata for lineage
+                rec["_source"] = {
+                    "source_type": "csv",
+                    "source_name": os.path.basename(path),
+                    "resource_id": path,
+                }
                 buffer.append(rec)
                 if len(buffer) >= batch:
-                    upsert_prices(conn, buffer)
+                    n_new = upsert_prices(conn, buffer)
+                    total_new += n_new
                     total += len(buffer)
+                    _record_lineage(conn, buffer, n_new, os.path.basename(path), path)
                     buffer.clear()
         if buffer:
-            upsert_prices(conn, buffer)
+            n_new = upsert_prices(conn, buffer)
+            total_new += n_new
             total += len(buffer)
+            _record_lineage(conn, buffer, n_new, os.path.basename(path), path)
         conn.commit()
-        logger.info(f"Ingested {total} rows from {os.path.basename(path)}")
+        logger.info(f"Ingested {total} rows ({total_new} new) from {os.path.basename(path)}")
         return total
     finally:
         conn.close()
+
+
+def _record_lineage(conn, records, n_new, source_name, resource_id):
+    """Record lineage for a batch of CSV-ingested records.
+
+    Detects Ashoka-origin CSVs by filename pattern and records
+    the upstream source in metadata for full provenance.
+    """
+    try:
+        metadata = {"file_path": resource_id}
+        # If the CSV was written by the Ashoka background import,
+        # tag the lineage so we know the origin, not just the medium.
+        if "ashoka" in source_name.lower():
+            metadata["origin"] = "ashoka_ceda_api"
+
+        record_lineage_batch(
+            conn,
+            source_type="csv",
+            source_name=source_name,
+            resource_id=resource_id,
+            row_count=len(records),
+            n_new=n_new,
+            records=records,
+            metadata=metadata,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record lineage for {source_name}: {e}")
 
 
 def run_auto(folder: str = "data/historical", batch: int = 5000) -> int:

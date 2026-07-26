@@ -1,0 +1,179 @@
+# MandiIQ — Dashboard Drift Detector
+#
+# Checks daily whether the production API's dashboard JSON matches
+# the committed version in the repo. If someone edits the dashboard
+# directly in Grafana and forgets to commit the JSON, the MD5 hashes
+# diverge and this workflow files a GitHub Issue.
+#
+# A new issue is filed only if:
+#   1. The previous drift issue is already closed (no duplicates).
+#   2. The hashes actually differ.
+#
+# SETUP: None required. Uses the built-in GITHUB_TOKEN for issue creation.
+
+name: Dashboard Drift Detector
+
+on:
+  schedule:
+    # Daily at 08:00 UTC
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API base URL to check"
+        required: false
+        default: "https://mandiiq-api.onrender.com"
+        type: string
+
+env:
+  API_URL: ${{ github.event.inputs.api_url || 'https://mandiiq-api.onrender.com' }}
+
+jobs:
+  detect-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      drifted: ${{ steps.check.outputs.drifted }}
+      local_hash: ${{ steps.check.outputs.local_hash }}
+      remote_hash: ${{ steps.check.outputs.remote_hash }}
+      remote_mtime: ${{ steps.check.outputs.remote_mtime }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute local MD5 hash
+        id: local
+        run: |
+          if [ -f dashboards/mandiiq-pipeline.json ]; then
+            HASH=$(md5sum dashboards/mandiiq-pipeline.json | cut -d' ' -f1)
+            echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
+            echo "Local dashboard JSON MD5: ${HASH}"
+          else
+            echo "::error::Local dashboard JSON not found at dashboards/mandiiq-pipeline.json"
+            exit 1
+          fi
+
+      - name: Fetch production /admin/dashboard-status
+        id: remote
+        run: |
+          echo "Fetching dashboard status from ${API_URL}/admin/dashboard-status..."
+          HTTP_CODE=$(curl -s -o /tmp/dashboard_status.json -w "%{http_code}" \
+            "${API_URL}/admin/dashboard-status" \
+            --max-time 15)
+          echo "API responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Failed to fetch dashboard status from production API (HTTP $HTTP_CODE)"
+            cat /tmp/dashboard_status.json
+            # Write a placeholder so downstream steps don't crash
+            echo "hash=ERROR" >> "$GITHUB_OUTPUT"
+            echo "mtime=ERROR" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          REMOTE_HASH=$(python -c "import json; print(json.load(open('/tmp/dashboard_status.json'))['md5_hash'])")
+          REMOTE_MTIME=$(python -c "import json; print(json.load(open('/tmp/dashboard_status.json')).get('file_mtime_utc', 'unknown'))")
+          echo "hash=${REMOTE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "mtime=${REMOTE_MTIME}" >> "$GITHUB_OUTPUT"
+          echo "Remote dashboard MD5: ${REMOTE_HASH}"
+          echo "Remote file mtime: ${REMOTE_MTIME}"
+
+      - name: Compare hashes
+        id: check
+        run: |
+          LOCAL="${{ steps.local.outputs.hash }}"
+          REMOTE="${{ steps.remote.outputs.hash }}"
+          echo "local_hash=${LOCAL}" >> "$GITHUB_OUTPUT"
+          echo "remote_hash=${REMOTE}" >> "$GITHUB_OUTPUT"
+          echo "remote_mtime=${{ steps.remote.outputs.mtime }}" >> "$GITHUB_OUTPUT"
+
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+            echo "Hashes match — no drift detected."
+          else
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+            echo "Hash MISMATCH detected!"
+            echo "  Local:  ${LOCAL}"
+            echo "  Remote: ${REMOTE}"
+          fi
+
+      - name: Upload dashboard status as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-status
+          path: /tmp/dashboard_status.json
+
+  file-issue:
+    if: ${{ needs.detect-drift.outputs.drifted == 'true' }}
+    runs-on: ubuntu-latest
+    needs: detect-drift
+    timeout-minutes: 5
+
+    steps:
+      - name: Check for existing open drift issues
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list \
+            --repo ${{ github.repository }} \
+            --label "dashboard-drift" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "count=${EXISTING}" >> "$GITHUB_OUTPUT"
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "Found ${EXISTING} open drift issue(s). Skipping — duplicate prevention."
+          else
+            echo "No open drift issues. Proceeding..."
+          fi
+
+      - name: File GitHub Issue for dashboard drift
+        if: steps.existing.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Dashboard drift detected: production JSON differs from repo"
+          BODY=$(cat << EOF
+## Dashboard Drift Detected
+
+The production API is serving a dashboard JSON file that differs from the
+committed version in this repository. This means someone edited the dashboard
+directly in Grafana and did **not** commit the updated JSON.
+
+### Details
+
+| Field | Local (repo) | Production (API) |
+|-------|-------------|------------------|
+| **MD5 Hash** | \`${{ needs.detect-drift.outputs.local_hash }}\` | \`${{ needs.detect-drift.outputs.remote_hash }}\` |
+| **File mtime** | — | ${{ needs.detect-drift.outputs.remote_mtime }} |
+
+### How to fix
+
+1. Export the current dashboard from Grafana:
+   - Open the dashboard in Grafana
+   - **Share** → **Export** → **Save to file**
+2. Replace \`dashboards/mandiiq-pipeline.json\` in this repo
+3. Commit and push to \`master\`
+4. The \`Dashboard Sync\` workflow will auto-refresh the API cache
+5. Close this issue when done
+
+### Why this matters
+
+The dashboard JSON in the repo is the source of truth. If the production
+instance diverges, the next deploy will overwrite the Grafana-edited version
+with the stale repo version, losing any changes made directly in Grafana.
+
+---
+
+_Automated by the Dashboard Drift Detector workflow._
+EOF
+)
+          echo "Filing GitHub issue..."
+          gh issue create \
+            --repo ${{ github.repository }} \
+            --title "$TITLE" \
+            --body "$BODY" \
+            --label "dashboard-drift,automated"
+          echo "Issue filed successfully."

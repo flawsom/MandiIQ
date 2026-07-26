@@ -1,0 +1,24 @@
+# Prometheus scrape configuration for MandiIQ.
+# Place at dashboards/prometheus.yml
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: "mandiiq-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["mandiiq-api:8000"]
+        labels:
+          service: "mandiiq"
+          environment: "docker"
+
+  # Uncomment to scrape the Render-hosted API instead of local:
+  # - job_name: "mandiiq-api-render"
+  #   metrics_path: /metrics
+  #   scheme: https
+  #   static_configs:
+  #     - targets: ["mandiiq-api.onrender.com"]
+  #       labels:
+  #         service: "mandiiq"
+  #         environment: "production"

@@ -5,6 +5,7 @@ Features:
 - Server-side filtering by state/commodity
 - Paginated fetch with offset/limit
 - Exponential backoff retry (3 attempts, cap ~30s)
+- Parallel-probe stale-detection for 80M-row variety-wise archive
 - Progress reporting
 """
 
@@ -22,17 +23,10 @@ from mandi_rdd.ingestion.http_client import SSL_CTX, get_api_key, http_get_json,
 
 logger = logging.getLogger(__name__)
 
-
 BASE_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
 
 # SSL context for Windows
 # SSL_CTX imported from http_client
-
-# Supplementary "variety-wise" price archive (data.gov.in resource 35985678-...).
-# 80M+ historical rows; used as a best-effort SUPPLEMENTARY feed for recent
-# variety-level prices. Paginating the full archive is infeasible, so we rely on
-# a server-side arrival-date filter + a hard record cap (see fetch_varietywise_recent).
-VARIETYWISE_RESOURCE_ID = "35985678-0d79-46b4-9ed6-6f13308a1d24"
 
 # Map PascalCase / snake_case source fields -> DuckDB `prices` columns.
 _PRICE_FIELD_SYNONYMS = {
@@ -98,71 +92,6 @@ def fetch_page_for_resource(resource_id: str, offset: int = 0, limit: int = 1000
                 logger.error(f"All {max_retries} attempts failed for {resource_id}: {e}")
                 raise
 
-def _iso_boundary_days_ago(days: int) -> str:
-    return (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime("%Y-%m-%d")
-
-def fetch_varietywise_recent(days: int = 60, max_records: int = 20000) -> list:
-    """Best-effort supplementary feed from the 80M-row variety-wise archive.
-
-    Uses a server-side Arrival_Date >= (today-days) filter, capped at
-    `max_records`. If the API ignores the filter (oldest-first ordering), we
-    detect out-of-window pages and stop early so we NEVER scan the full 80M rows.
-    Always returns a list of normalized `prices`-schema dicts (may be empty).
-    """
-    try:
-        _get_api_key()
-    except RuntimeError:
-        logger.info("DATA_GOV_IN_API_KEY not set — skipping variety-wise supplement.")
-        return []
-    since = _iso_boundary_days_ago(days)
-    since_date = datetime.datetime.strptime(since, "%Y-%m-%d").date()
-    extra = [f"filters[Arrival_Date][>=]={urllib.parse.quote(since)}"]
-    page_size = 1000
-    out, offset, seen_dates, window_ok = [], 0, 0, 0
-    while len(out) < max_records:
-        try:
-            data = fetch_page_for_resource(
-                VARIETYWISE_RESOURCE_ID, offset=offset, limit=page_size, extra_params=extra
-            )
-        except Exception as e:
-            logger.warning(f"Variety-wise fetch failed at offset {offset}: {e}")
-            break
-        records = data.get("records", [])
-        total = data.get("total", 0)
-        if not records:
-            break
-        window_ok = 0
-        for r in records:
-            rec = normalize_price_record(r)
-            ad = rec.get("arrival_date")
-            if ad:
-                ad_str = str(ad)[:10]
-                try:
-                    rec_date = datetime.datetime.strptime(ad_str, "%Y-%m-%d").date()
-                except ValueError:
-                    rec_date = None
-                if rec_date is not None:
-                    seen_dates += 1
-                    if rec_date >= since_date:
-                        window_ok += 1
-                        out.append(rec)
-                else:
-                    out.append(rec)
-            else:
-                out.append(rec)
-            if len(out) >= max_records:
-                break
-        if offset + page_size >= total:
-            break
-        if window_ok == 0 and seen_dates >= page_size:
-            logger.info("Variety-wise: date filter not honored (oldest-first) — stopping to avoid full 80M scan.")
-            break
-        offset += page_size
-        time.sleep(0.3)
-    logger.info("Variety-wise supplement: collected %d recent rows (since %s).", len(out), since)
-    return out
-
-
 def _get_api_key() -> str:
     """Get API key from env; fail loudly if missing/invalid (no fallback key).
 
@@ -181,8 +110,6 @@ def _get_api_key() -> str:
     if len(key) < 16 or key.strip() in ("changeme", "<your-key>"):
         raise RuntimeError(f"DATA_GOV API key looks invalid (len={len(key)}).")
     return key
-
-
 
 def fetch_page(
     offset: int = 0,
@@ -240,6 +167,7 @@ def fetch_page(
                 logger.error(f"All {max_retries} attempts failed for offset={offset}: {e}")
                 raise
 
+PRIMARY_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 
 def fetch_all_prices(
     filters: Optional[dict] = None,
@@ -253,6 +181,14 @@ def fetch_all_prices(
     If DATA_GOV_IN_API_KEY is not set, returns [] immediately so the
     pipeline can still run RDD analysis on existing data.
 
+    Returns a list of dicts; each dict includes a ``_source`` key with
+    metadata for data-lineage tracking:
+        {
+            "source_type": "api",
+            "source_name": "data.gov.in daily mandi prices",
+            "resource_id": "9ef84268-...",
+        }
+
     Args:
         filters: Server-side filters to narrow results
         max_records: Limit total records (None = all)
@@ -260,7 +196,7 @@ def fetch_all_prices(
         progress_callback: Optional fn(records_so_far, total)
 
     Returns:
-        List of all record dicts
+        List of record dicts, each with a ``_source`` metadata key.
     """
     # Graceful skip if no API key — allows pipeline to run RDD on existing data
     try:
@@ -277,6 +213,14 @@ def fetch_all_prices(
         data = fetch_page(offset=offset, limit=page_size, filters=filters)
         records = data.get("records", [])
         total = data.get("total", 0)
+
+        # Tag each record with source metadata
+        for r in records:
+            r["_source"] = {
+                "source_type": "api",
+                "source_name": "data.gov.in daily mandi prices",
+                "resource_id": PRIMARY_RESOURCE_ID,
+            }
 
         all_records.extend(records)
 
@@ -297,7 +241,6 @@ def fetch_all_prices(
 
     return all_records
 
-
 def fetch_commodities() -> list[str]:
     """Get unique commodity list from a small sample pull."""
     data = fetch_page(limit=100)
@@ -306,7 +249,6 @@ def fetch_commodities() -> list[str]:
     ))
     return commodities
 
-
 def fetch_states() -> list[str]:
     """Get unique state list."""
     data = fetch_page(limit=100)
@@ -314,7 +256,6 @@ def fetch_states() -> list[str]:
         r.get("state", "") for r in data.get("records", []) if r.get("state")
     ))
     return states
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

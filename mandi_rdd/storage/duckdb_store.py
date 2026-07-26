@@ -370,6 +370,38 @@ def init_schema(conn) -> None:
 
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS data_lineage (
+            id INTEGER PRIMARY KEY DEFAULT nextval('seq_prices'),
+            source_type VARCHAR NOT NULL,
+            source_name VARCHAR NOT NULL,
+            resource_id VARCHAR,
+            batch_fingerprint VARCHAR,
+            row_count INTEGER DEFAULT 0,
+            n_new INTEGER DEFAULT 0,
+            commodity_list VARCHAR,
+            state_list VARCHAR,
+            first_date DATE,
+            last_date DATE,
+            ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            metadata_json VARCHAR
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS freshness_by_commodity (
+            commodity VARCHAR PRIMARY KEY,
+            latest_date DATE,
+            earliest_date DATE,
+            row_count INTEGER DEFAULT 0,
+            n_districts INTEGER DEFAULT 0,
+            n_states INTEGER DEFAULT 0,
+            source_type VARCHAR,
+            source_name VARCHAR,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Create indexes
 
     for idx_sql in [
@@ -383,6 +415,11 @@ def init_schema(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_rainfall_subdiv ON rainfall(sub_division)",
 
         "CREATE INDEX IF NOT EXISTS idx_rainfall_year_month ON rainfall(year, month)",
+
+        "CREATE INDEX IF NOT EXISTS idx_lineage_type ON data_lineage(source_type)",
+        "CREATE INDEX IF NOT EXISTS idx_lineage_ingested ON data_lineage(ingested_at)",
+        "CREATE INDEX IF NOT EXISTS idx_lineage_resource ON data_lineage(resource_id)",
+        "CREATE INDEX IF NOT EXISTS idx_freshness_commodity ON freshness_by_commodity(commodity)",
 
     ]:
 
@@ -749,6 +786,191 @@ def _safe_float(val):
     except (ValueError, TypeError):
 
         return None
+
+
+# ── Data Lineage ──
+
+
+def record_lineage_batch(
+    conn,
+    source_type: str,
+    source_name: str,
+    resource_id: str = None,
+    row_count: int = 0,
+    n_new: int = 0,
+    records: list[dict] = None,
+    metadata: dict = None,
+) -> int:
+    """Record a data lineage entry for a batch of ingested records.
+
+    Args:
+        conn: DuckDB connection.
+        source_type: 'api', 'csv', 'ashoka', 'varietywise', 'historical_backfill'
+        source_name: Human-readable source description.
+        resource_id: data.gov.in resource UUID or CSV filename.
+        row_count: Total rows in the batch.
+        n_new: Rows that were actually inserted (post-dedup).
+        records: The actual record dicts (used to compute fingerprint + dates).
+        metadata: Optional extra JSON-serializable metadata.
+
+    Returns:
+        The id of the inserted lineage row.
+    """
+    import hashlib, json, datetime
+
+    # Compute batch fingerprint from a hash of the records
+    fingerprint = None
+    first_date = None
+    last_date = None
+    commodities = set()
+    states = set()
+
+    if records:
+        payload = json.dumps([{k: v for k, v in r.items() if k in (
+            "commodity", "state", "arrival_date")} for r in records[:100]],
+            sort_keys=True, default=str)
+        fingerprint = hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+        for r in records:
+            c = r.get("commodity")
+            s = r.get("state")
+            ad = r.get("arrival_date")
+            if c:
+                commodities.add(str(c).title())
+            if s:
+                states.add(str(s).title())
+            if ad:
+                try:
+                    d = pd.to_datetime(ad)
+                    if first_date is None or d < first_date:
+                        first_date = d
+                    if last_date is None or d > last_date:
+                        last_date = d
+                except Exception:
+                    pass
+
+    commodity_str = ", ".join(sorted(commodities)[:50])
+    state_str = ", ".join(sorted(states)[:20])
+    meta_str = json.dumps(metadata) if metadata else None
+
+    result = conn.execute("""
+        INSERT INTO data_lineage
+            (source_type, source_name, resource_id, batch_fingerprint,
+             row_count, n_new, commodity_list, state_list,
+             first_date, last_date, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+    """, [
+        source_type, source_name, resource_id, fingerprint,
+        row_count, n_new, commodity_str, state_str,
+        first_date, last_date, meta_str,
+    ])
+    row_id = result.fetchone()[0]
+
+    # Refresh freshness_by_commodity for each commodity in this batch
+    for comm in commodities:
+        _refresh_freshness(conn, comm)
+
+    logger.info(
+        "Lineage: %s/%s — %d rows (%d new), %d commodities, %s → %s",
+        source_type, source_name, row_count, n_new,
+        len(commodities), first_date, last_date,
+    )
+    return row_id
+
+
+def _refresh_freshness(conn, commodity: str):
+    """Update the freshness_by_commodity row for a single commodity."""
+    row = conn.execute("""
+        SELECT
+            MAX(arrival_date) AS latest_date,
+            MIN(arrival_date) AS earliest_date,
+            COUNT(*) AS row_count,
+            COUNT(DISTINCT district) AS n_districts,
+            COUNT(DISTINCT state) AS n_states
+        FROM prices
+        WHERE LOWER(commodity) = LOWER(?)
+    """, [commodity]).fetchone()
+
+    if not row or row[0] is None:
+        return
+
+    # Find the most recent source that contributed to this commodity
+    source_row = conn.execute("""
+        SELECT source_type, source_name
+        FROM data_lineage
+        WHERE commodity_list LIKE '%' || ? || '%'
+        ORDER BY ingested_at DESC LIMIT 1
+    """, [commodity]).fetchone()
+
+    source_type = source_row[0] if source_row else "unknown"
+    source_name = source_row[1] if source_row else ""
+
+    # DuckDB's ON CONFLICT DO UPDATE SET doesn't support
+    # CURRENT_TIMESTAMP as an expression in all versions.
+    # Use a two-step UPSERT: DELETE + INSERT.
+    conn.execute("DELETE FROM freshness_by_commodity WHERE commodity = ?", [commodity])
+    conn.execute("""
+        INSERT INTO freshness_by_commodity
+            (commodity, latest_date, earliest_date, row_count,
+             n_districts, n_states, source_type, source_name,
+             updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())
+    """, [
+        commodity, row[0], row[1], row[2], row[3], row[4],
+        source_type, source_name,
+    ])
+
+
+def get_freshness(conn, commodity: str = None) -> list[dict]:
+    """Get freshness stats per commodity. Optionally filter by commodity name."""
+    query = "SELECT * FROM freshness_by_commodity"
+    params = []
+    if commodity:
+        query += " WHERE LOWER(commodity) = LOWER(?)"
+        params.append(commodity)
+    query += " ORDER BY latest_date DESC NULLS LAST"
+    df = conn.execute(query, params).fetchdf()
+    if len(df) == 0:
+        return []
+    return df.to_dict("records")
+
+
+def get_lineage(
+    conn,
+    source_type: str = None,
+    limit: int = 50,
+    since_hours: int = None,
+) -> list[dict]:
+    """Get recent lineage entries.
+
+    Args:
+        conn: DuckDB connection.
+        source_type: Optional filter ('api', 'csv', 'ashoka', etc.).
+        limit: Max rows to return.
+        since_hours: Only return entries from the last N hours.
+    """
+    query = "SELECT * FROM data_lineage"
+    conditions = []
+    params = []
+
+    if source_type:
+        conditions.append("source_type = ?")
+        params.append(source_type)
+    # DuckDB supports INTERVAL with a bind parameter via CAST
+    if since_hours is not None:
+        conditions.append("ingested_at >= CURRENT_TIMESTAMP - (INTERVAL '1' HOUR) * ?")
+        params.append(since_hours)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY ingested_at DESC LIMIT ?"
+    params.append(limit)
+
+    df = conn.execute(query, params).fetchdf()
+    if len(df) == 0:
+        return []
+    return df.to_dict("records")
 
 def save_forecast_metrics(conn, commodity, test_mape=None, test_mae=None,
 

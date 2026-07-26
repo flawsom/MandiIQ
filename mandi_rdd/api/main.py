@@ -23,11 +23,13 @@ import os
 import json
 import logging
 import time
+import functools
+import hashlib
 from typing import Optional
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -148,6 +150,18 @@ class HealthStats:
 
 health_stats = HealthStats()
 
+# Load Grafana dashboard template
+_dashboard_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboards", "mandiiq-pipeline.json")
+_dashboard_path = os.path.abspath(_dashboard_path)
+if os.path.exists(_dashboard_path):
+    with open(_dashboard_path, "r") as f: _raw = json.load(f)
+    dashboard_json = _raw.get("dashboard", _raw)
+    _dashboard_export = _raw
+else:
+    dashboard_json = None
+    _dashboard_export = None
+_dashboard_last_refresh: float = 0.0
+_dashboard_file_mtime: float = 0.0
 
 class AppState:
     def __init__(self):
@@ -629,6 +643,182 @@ async def admin_reset_metrics():
     }
 
 
+
+# -- Cached dashboard patcher --
+@functools.lru_cache(maxsize=32)
+def _get_patched_dashboard(datasource_name: str, version: str = "") -> dict:
+    import copy as _copy
+    source = _dashboard_export if _dashboard_export is not None else dashboard_json
+    result = _copy.deepcopy(source)
+    for inp in result.get("__inputs", []):
+        if inp.get("type") == "datasource":
+            inp["name"] = datasource_name
+            inp["label"] = datasource_name
+    dash = result.get("dashboard", result)
+    for item in dash.get("templating", {}).get("list", []):
+        if item.get("type") == "datasource":
+            item["current"] = {"value": datasource_name, "text": datasource_name}
+            item["query"] = datasource_name
+    return result
+
+
+@app.get("/grafana-dashboard", tags=["System"])
+async def grafana_dashboard(
+    datasource: str = Query("DS_PROMETHEUS", description="Pre-bind the datasource name."),
+    v: str = Query("", description="Cache-busting version string."),
+):
+    if dashboard_json is None:
+        raise HTTPException(status_code=404, detail="Dashboard template not found")
+    if datasource != "DS_PROMETHEUS" or v:
+        return _get_patched_dashboard(datasource, v)
+    return dashboard_json
+
+
+@app.post("/admin/refresh-dashboard-cache", tags=["Admin"])
+async def admin_refresh_dashboard_cache():
+    global dashboard_json, _dashboard_export, _dashboard_last_refresh, _dashboard_file_mtime
+    _get_patched_dashboard.cache_clear()
+    if os.path.exists(_dashboard_path):
+        with open(_dashboard_path, "r") as f:
+            _raw = json.load(f)
+        dashboard_json = _raw.get("dashboard", _raw)
+        _dashboard_export = _raw
+        _dashboard_last_refresh = time.time()
+        _dashboard_file_mtime = os.path.getmtime(_dashboard_path)
+        return {"status": "ok", "message": "Dashboard cache cleared and JSON reloaded from disk."}
+    return {"status": "error", "message": f"Dashboard file not found at {_dashboard_path}"}
+
+
+@app.get("/admin/dashboard-status", tags=["Admin"])
+async def admin_dashboard_status():
+    result = {"path": _dashboard_path, "file_exists": os.path.exists(_dashboard_path), "json_loaded": dashboard_json is not None}
+    result["cache_size"] = _get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0
+    if os.path.exists(_dashboard_path):
+        try:
+            s = os.stat(_dashboard_path)
+            from datetime import datetime, timezone
+            result["file_mtime_utc"] = datetime.fromtimestamp(s.st_mtime, tz=timezone.utc).isoformat()
+            result["file_size_bytes"] = s.st_size
+            with open(_dashboard_path, "rb") as f:
+                result["md5_hash"] = hashlib.md5(f.read()).hexdigest()
+        except OSError as e:
+            result["stat_error"] = str(e)
+    if _dashboard_last_refresh > 0:
+        from datetime import datetime, timezone
+        result["last_refresh_utc"] = datetime.fromtimestamp(_dashboard_last_refresh, tz=timezone.utc).isoformat()
+    if _dashboard_file_mtime > 0:
+        from datetime import datetime, timezone
+        result["last_refresh_file_mtime_utc"] = datetime.fromtimestamp(_dashboard_file_mtime, tz=timezone.utc).isoformat()
+        result["stale"] = os.path.getmtime(_dashboard_path) > _dashboard_file_mtime
+    return result
+
+
+@app.post("/webhook/grafana-dashboard-update", tags=["Webhook"])
+async def webhook_grafana_dashboard_update(
+    payload: dict = {},
+    x_webhook_secret: str = Header(None, alias="X-Webhook-Secret"),
+):
+    _secret = os.environ.get("WEBHOOK_SECRET", "")
+    if _secret:
+        if not x_webhook_secret or x_webhook_secret != _secret:
+            logger.warning("Webhook auth failed: header=%s", "***present***" if x_webhook_secret else "***missing***")
+            raise HTTPException(status_code=403, detail="Forbidden: invalid or missing X-Webhook-Secret header.")
+    event_name = payload.get("event", "unknown")
+    logger.info("Webhook received: event=%(event)s", {"event": event_name})
+    result = await admin_refresh_dashboard_cache()
+    if isinstance(result, dict):
+        result["event"] = event_name
+    return result
+
+
+
+# -- Cached dashboard patcher --
+@functools.lru_cache(maxsize=32)
+def _get_patched_dashboard(datasource_name: str, version: str = "") -> dict:
+    import copy as _copy
+    source = _dashboard_export if _dashboard_export is not None else dashboard_json
+    result = _copy.deepcopy(source)
+    for inp in result.get("__inputs", []):
+        if inp.get("type") == "datasource":
+            inp["name"] = datasource_name
+            inp["label"] = datasource_name
+    dash = result.get("dashboard", result)
+    for item in dash.get("templating", {}).get("list", []):
+        if item.get("type") == "datasource":
+            item["current"] = {"value": datasource_name, "text": datasource_name}
+            item["query"] = datasource_name
+    return result
+
+
+@app.get("/grafana-dashboard", tags=["System"])
+async def grafana_dashboard(
+    datasource: str = Query("DS_PROMETHEUS", description="Pre-bind the datasource name."),
+    v: str = Query("", description="Cache-busting version string."),
+):
+    if dashboard_json is None:
+        raise HTTPException(status_code=404, detail="Dashboard template not found")
+    if datasource != "DS_PROMETHEUS" or v:
+        return _get_patched_dashboard(datasource, v)
+    return dashboard_json
+
+
+@app.post("/admin/refresh-dashboard-cache", tags=["Admin"])
+async def admin_refresh_dashboard_cache():
+    global dashboard_json, _dashboard_export, _dashboard_last_refresh, _dashboard_file_mtime
+    _get_patched_dashboard.cache_clear()
+    if os.path.exists(_dashboard_path):
+        with open(_dashboard_path, "r") as f:
+            _raw = json.load(f)
+        dashboard_json = _raw.get("dashboard", _raw)
+        _dashboard_export = _raw
+        _dashboard_last_refresh = time.time()
+        _dashboard_file_mtime = os.path.getmtime(_dashboard_path)
+        return {"status": "ok", "message": "Dashboard cache cleared and JSON reloaded from disk."}
+    return {"status": "error", "message": f'Dashboard file not found at {_dashboard_path}'}
+
+
+@app.get("/admin/dashboard-status", tags=["Admin"])
+async def admin_dashboard_status():
+    result = {"path": _dashboard_path, "file_exists": os.path.exists(_dashboard_path), "json_loaded": dashboard_json is not None}
+    result["cache_size"] = _get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0
+    if os.path.exists(_dashboard_path):
+        try:
+            s = os.stat(_dashboard_path)
+            from datetime import datetime, timezone
+            result["file_mtime_utc"] = datetime.fromtimestamp(s.st_mtime, tz=timezone.utc).isoformat()
+            result["file_size_bytes"] = s.st_size
+            with open(_dashboard_path, "rb") as f:
+                result["md5_hash"] = hashlib.md5(f.read()).hexdigest()
+        except OSError as e:
+            result["stat_error"] = str(e)
+    if _dashboard_last_refresh > 0:
+        from datetime import datetime, timezone
+        result["last_refresh_utc"] = datetime.fromtimestamp(_dashboard_last_refresh, tz=timezone.utc).isoformat()
+    if _dashboard_file_mtime > 0:
+        from datetime import datetime, timezone
+        result["last_refresh_file_mtime_utc"] = datetime.fromtimestamp(_dashboard_file_mtime, tz=timezone.utc).isoformat()
+        result["stale"] = os.path.getmtime(_dashboard_path) > _dashboard_file_mtime
+    return result
+
+
+@app.post("/webhook/grafana-dashboard-update", tags=["Webhook"])
+async def webhook_grafana_dashboard_update(
+    payload: dict = {},
+    x_webhook_secret: str = Header(None, alias="X-Webhook-Secret"),
+):
+    _secret = os.environ.get("WEBHOOK_SECRET", "")
+    if _secret:
+        if not x_webhook_secret or x_webhook_secret != _secret:
+            logger.warning("Webhook auth failed: header=%s", "***present***" if x_webhook_secret else "***missing***")
+            raise HTTPException(status_code=403, detail="Forbidden: invalid or missing X-Webhook-Secret header.")
+    event_name = payload.get("event", "unknown")
+    logger.info("Webhook received: event=%(event)s", {"event": event_name})
+    result = await admin_refresh_dashboard_cache()
+    if isinstance(result, dict):
+        result["event"] = event_name
+    return result
+
+
 @app.get("/historical-import-status", tags=["Data"])
 async def historical_import_status():
     """Get the current status of the background Ashoka CEDA historical import."""
@@ -724,6 +914,27 @@ async def metrics():
         lines.append(f"mandiiq_prices_count {n}")
     except Exception:
         lines.append("mandiiq_prices_count -1")
+
+    # ---- Dashboard cache metrics ----
+    lines.append("")
+    lines.append("# HELP mandiiq_dashboard_cache_loaded Whether dashboard JSON is loaded (1=yes, 0=no).")
+    lines.append("# TYPE mandiiq_dashboard_cache_loaded gauge")
+    lines.append(f"mandiiq_dashboard_cache_loaded {1 if dashboard_json is not None else 0}")
+    lines.append("# HELP mandiiq_dashboard_cache_last_refresh_timestamp_seconds Unix timestamp of last cache refresh.")
+    lines.append("# TYPE mandiiq_dashboard_cache_last_refresh_timestamp_seconds gauge")
+    lines.append(f"mandiiq_dashboard_cache_last_refresh_timestamp_seconds {_dashboard_last_refresh}")
+    lines.append("# HELP mandiiq_dashboard_cache_file_mtime_timestamp_seconds Unix timestamp of dashboard file modification.")
+    lines.append("# TYPE mandiiq_dashboard_cache_file_mtime_timestamp_seconds gauge")
+    lines.append(f"mandiiq_dashboard_cache_file_mtime_timestamp_seconds {_dashboard_file_mtime}")
+    lines.append("# HELP mandiiq_dashboard_cache_stale Whether file on disk is newer than loaded cache (1=stale, 0=fresh).")
+    lines.append("# TYPE mandiiq_dashboard_cache_stale gauge")
+    _stale = 0
+    if dashboard_json is not None and _dashboard_file_mtime > 0 and os.path.exists(_dashboard_path):
+        _stale = 1 if os.path.getmtime(_dashboard_path) > _dashboard_file_mtime else 0
+    lines.append(f"mandiiq_dashboard_cache_stale {_stale}")
+    lines.append("# HELP mandiiq_dashboard_cache_size Number of entries in the LRU dashboard cache.")
+    lines.append("# TYPE mandiiq_dashboard_cache_size gauge")
+    lines.append(f"mandiiq_dashboard_cache_size {_get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0}")
 
     body = "\n".join(lines) + "\n"
     return Response(content=body, media_type=PROMETHEUS_METRICS_HEADER["Content-Type"])

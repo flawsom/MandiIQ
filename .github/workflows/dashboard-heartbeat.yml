@@ -1,0 +1,160 @@
+# Smart heartbeat that only refreshes the dashboard cache when the file changed.
+#
+# Every hour:
+#   1. Fetches /admin/dashboard-status from the production API
+#   2. Compares the md5_hash against the last known hash
+#      (stored in a GitHub Actions Variable via `gh variable set/get`)
+#   3. Only POSTs to /webhook/grafana-dashboard-update if the hash differs
+#
+# Uses `gh variable` (not actions/cache) so the previous hash is:
+#   - Visible in repo Settings > Secrets and variables > Actions
+#   - Never evicted (unlike actions/cache which expires after 7 days)
+#   - Accessible from any workflow run without key management
+#
+# Complements dashboard-sync.yml (reactive: fires on git push) and
+# dashboard-drift-detector.yml (daily audit: alerts on drift).
+#
+# SETUP (optional):
+#   To also trigger a Render deploy after the webhook, set the
+#   RENDER_DEPLOY_HOOK_URL secret:
+#   https://github.com/flawsom/MandiIQ/settings/secrets/actions
+#
+#   The HASH_PREVIOUS variable is auto-created on first run.
+
+name: Dashboard Heartbeat
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual trigger"
+        required: false
+        default: "Manual heartbeat dashboard cache refresh"
+
+env:
+  API_BASE: "https://mandiiq-api.onrender.com"
+  VAR_NAME: "HASH_PREVIOUS"
+
+jobs:
+  check-hash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      current_hash: ${{ steps.compare.outputs.current_hash }}
+
+    steps:
+      - name: Fetch current /admin/dashboard-status
+        id: fetch
+        run: |
+          echo "Fetching dashboard status from ${API_BASE}/admin/dashboard-status..."
+          HTTP_CODE=$(curl -s -o /tmp/dashboard_status.json -w "%{http_code}" \
+            "${API_BASE}/admin/dashboard-status" \
+            --max-time 15)
+          echo "API responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Failed to fetch dashboard status (HTTP $HTTP_CODE)"
+            cat /tmp/dashboard_status.json
+            echo "hash=UNKNOWN" >> "$GITHUB_OUTPUT"
+            echo "mtime=UNKNOWN" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CURRENT_HASH=$(python3 -c "import json; print(json.load(open('/tmp/dashboard_status.json'))['md5_hash'])")
+          CURRENT_MTIME=$(python3 -c "import json; print(json.load(open('/tmp/dashboard_status.json')).get('file_mtime_utc', 'unknown'))")
+          echo "hash=${CURRENT_HASH}" >> "$GITHUB_OUTPUT"
+          echo "mtime=${CURRENT_MTIME}" >> "$GITHUB_OUTPUT"
+          echo "Current dashboard MD5: ${CURRENT_HASH}"
+          echo "Current dashboard mtime: ${CURRENT_MTIME}"
+
+      - name: Retrieve previous hash from repo variable
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV_HASH=$(gh variable get "${{ env.VAR_NAME }}" --repo "${{ github.repository }}" 2>/dev/null || echo "")
+          if [ -n "$PREV_HASH" ]; then
+            echo "hash=${PREV_HASH}" >> "$GITHUB_OUTPUT"
+            echo "Previous hash from variable: ${PREV_HASH}"
+          else
+            echo "hash=" >> "$GITHUB_OUTPUT"
+            echo "No previous hash found (first run or variable not set)."
+          fi
+
+      - name: Compare hashes
+        id: compare
+        run: |
+          CURRENT="${{ steps.fetch.outputs.hash }}"
+          PREVIOUS="${{ steps.previous.outputs.hash }}"
+          echo "current_hash=${CURRENT}" >> "$GITHUB_OUTPUT"
+          if [ "$CURRENT" = "UNKNOWN" ]; then
+            echo "changed=skip" >> "$GITHUB_OUTPUT"
+            echo "Skipping: API call failed."
+          elif [ -z "$PREVIOUS" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "First run (no previous hash). Refreshing."
+          elif [ "$CURRENT" = "$PREVIOUS" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Hashes match — dashboard unchanged. Skipping webhook call."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Hash MISMATCH: previous=${PREVIOUS} current=${CURRENT}. Refreshing."
+          fi
+
+      - name: Save current hash to repo variable
+        if: steps.fetch.outputs.hash != 'UNKNOWN'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh variable set "${{ env.VAR_NAME }}" \
+            --body "${{ steps.fetch.outputs.hash }}" \
+            --repo "${{ github.repository }}"
+          echo "Saved hash to variable ${{ env.VAR_NAME }}"
+
+  refresh-if-changed:
+    if: needs.check-hash.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    needs: check-hash
+    timeout-minutes: 5
+    steps:
+      - name: Trigger dashboard cache webhook
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          echo "Dashboard hash changed — triggering cache refresh..."
+          HTTP_CODE=$(curl -s -o /tmp/webhook_response.txt -w "%{http_code}" \
+            -X POST "${API_BASE}/webhook/grafana-dashboard-update" \
+            -H "Content-Type: application/json" \
+            $(if [ -n "$WEBHOOK_SECRET" ]; then echo "-H 'X-Webhook-Secret: $WEBHOOK_SECRET'"; fi) \
+            -d '{"event":"dashboard_heartbeat","title":"Smart heartbeat refresh (hash changed)","source":"github-actions","trigger":"dashboard-heartbeat-workflow"}' \
+            --max-time 15)
+          echo "API responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Heartbeat: dashboard cache refresh succeeded."
+            cat /tmp/webhook_response.txt
+          else
+            echo "::warning::Heartbeat webhook returned HTTP $HTTP_CODE — the API may be down or unreachable."
+            cat /tmp/webhook_response.txt
+          fi
+
+  trigger-render-deploy:
+    if: needs.check-hash.outputs.changed == 'true' && secrets.RENDER_DEPLOY_HOOK_URL != ''
+    runs-on: ubuntu-latest
+    needs: refresh-if-changed
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "Heartbeat: triggering Render deploy hook..."
+          HTTP_CODE=$(curl -s -o /tmp/render_response.txt -w "%{http_code}" \
+            -X POST "$RENDER_HOOK" \
+            --max-time 30)
+          echo "Render responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "Heartbeat: Render deploy triggered successfully."
+          else
+            echo "::warning::Heartbeat: Render deploy hook returned HTTP $HTTP_CODE"
+            cat /tmp/render_response.txt
+          fi

@@ -100,7 +100,64 @@ def get_risk_score(commodity: str, district: Optional[str] = None) -> dict:
         return {"error": f"Risk score unavailable: {e}"}
 
 
-def get_recommendation(commodity: str, district: Optional[str] = None) -> dict:
+def get_freshness(commodity: Optional[str] = None) -> list:
+    """Fetch per-commodity data freshness from the API.
+
+    Calls GET /freshness on the API server. Returns a list of dicts
+    with keys: commodity, latest_date, earliest_date, row_count,
+    n_districts, n_states, source_type, source_name, updated_at.
+
+    Falls back to querying DuckDB directly if the API is unreachable.
+    """
+    import requests
+    api_base = _get_api_base()
+    params = {}
+    if commodity:
+        params["commodity"] = commodity
+    try:
+        resp = requests.get(f"{api_base}/freshness", params=params, timeout=5)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        _warn_stale_fallback("/freshness", str(e))
+        try:
+            from mandi_rdd.storage.duckdb_store import get_connection, get_freshness as _get_freshness_db
+            conn = get_connection()
+            records = _get_freshness_db(conn, commodity=commodity)
+            conn.close()
+            if records:
+                return records
+        except Exception:
+            pass
+        # Fallback: build freshness from prices table
+        try:
+            from mandi_rdd.storage.duckdb_store import get_connection
+            conn = get_connection()
+            rows = conn.execute("""
+                SELECT
+                    commodity,
+                    MAX(arrival_date) AS latest_date,
+                    MIN(arrival_date) AS earliest_date,
+                    COUNT(*) AS row_count,
+                    COUNT(DISTINCT district) AS n_districts,
+                    COUNT(DISTINCT state) AS n_states
+                FROM prices
+                GROUP BY commodity
+                ORDER BY latest_date DESC
+                LIMIT 200
+            """).fetchall()
+            conn.close()
+            records = []
+            cols = ["commodity", "latest_date", "earliest_date", "row_count", "n_districts", "n_states"]
+            for r in rows:
+                rec = dict(zip(cols, r))
+                rec["source_type"] = "prices_table"
+                rec["source_name"] = ""
+                rec["updated_at"] = None
+                records.append(rec)
+            return records
+        except Exception:
+            return []
     import requests
     api_base = _get_api_base()
     params = {}
