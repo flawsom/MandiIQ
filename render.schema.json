@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Render Blueprints Config",
+  "description": "JSON Schema for Render Blueprints render.yaml files. Validates service definitions, required fields, and common config errors.",
+  "type": "object",
+  "required": ["services"],
+  "properties": {
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of Render services defined in this Blueprint.",
+      "items": {
+        "type": "object",
+        "required": ["type", "name", "runtime", "plan"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["web", "worker", "cron", "pserv", "static_site", "private_service"],
+            "description": "Render service type."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable service name (also used for internal DNS)."
+          },
+          "runtime": {
+            "type": "string",
+            "enum": ["python", "node", "go", "rust", "ruby", "elixir", "docker", "image"],
+            "description": "Runtime environment. 'docker' requires a Dockerfile and a Starter+ plan."
+          },
+          "plan": {
+            "type": "string",
+            "enum": ["free", "starter", "pro", "pro_plus", "pro_max", "pro_ultra"],
+            "description": "Render instance plan. 'free' has limited features (no Docker, no persistent disk)."
+          },
+          "region": {
+            "type": "string",
+            "enum": ["oregon", "frankfurt", "ohio", "singapore", "virginia", "sao_paulo"],
+            "description": "Deployment region."
+          },
+          "branch": {
+            "type": "string",
+            "description": "Git branch to deploy from."
+          },
+          "healthCheckPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path for Render's health check pings. Strongly recommended for web services."
+          },
+          "autoDeploy": {
+            "type": "boolean",
+            "description": "Whether to auto-deploy on git push."
+          },
+          "buildCommand": {
+            "type": "string",
+            "description": "Shell command(s) run during build. Required for python/node/go/rust/ruby runtimes."
+          },
+          "startCommand": {
+            "type": "string",
+            "description": "Shell command to start the service. Required for web/worker services."
+          },
+          "dockerfilePath": {
+            "type": "string",
+            "description": "Path to Dockerfile (relative to repo root). Required when runtime is 'docker'."
+          },
+          "disk": {
+            "type": "object",
+            "description": "Persistent disk attachment. Only available on Starter+ plans.",
+            "required": ["name", "mountPath", "sizeGB"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Disk name for Render dashboard identification."
+              },
+              "mountPath": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Filesystem path to mount the disk at."
+              },
+              "sizeGB": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Disk size in gigabytes."
+              }
+            }
+          },
+          "envVars": {
+            "type": "array",
+            "description": "Environment variables for the service.",
+            "items": {
+              "type": "object",
+              "required": ["key"],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Static value. Mutually exclusive with generateValue and sync."
+                },
+                "generateValue": {
+                  "type": "boolean",
+                  "description": "Auto-generate a secure random value on first deploy."
+                },
+                "sync": {
+                  "type": "boolean",
+                  "description": "False marks as a manual dashboard-only env var (not in config)."
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "description": "web services must have a healthCheckPath.",
+            "if": { "properties": { "type": { "const": "web" } } },
+            "then": { "required": ["healthCheckPath"] }
+          },
+          {
+            "description": "python runtime must have buildCommand and startCommand.",
+            "if": { "properties": { "runtime": { "const": "python" } } },
+            "then": {
+              "required": ["buildCommand", "startCommand"]
+            }
+          },
+          {
+            "description": "docker runtime must have dockerfilePath.",
+            "if": { "properties": { "runtime": { "const": "docker" } } },
+            "then": {
+              "required": ["dockerfilePath"]
+            }
+          },
+          {
+            "description": "docker runtime with non-free plan requires a disk config for persistence.",
+            "if": {
+              "properties": {
+                "runtime": { "const": "docker" },
+                "plan": { "not": { "const": "free" } }
+              }
+            },
+            "then": {
+              "required": ["disk"]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

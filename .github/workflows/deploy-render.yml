@@ -22,10 +22,10 @@ jobs:
         with:
           lfs: true
 
-      - name: Validate render.yaml syntax
+      - name: Validate render.yaml (syntax + schema)
         run: |
-          pip install pyyaml -q
-          python3 -c "import yaml,sys; c=yaml.safe_load(open('render.yaml')); svcs=c.get('services',[]) if c else []; print(f'render.yaml: valid with {len(svcs)} service(s)'); [print(f'  - {s.get(\"name\",\"?\")} ({s.get(\"type\",\"?\")}, {s.get(\"runtime\",\"?\")})') for s in svcs]"
+          pip install pyyaml jsonschema -q
+          python -m mandi_rdd.scripts.validate_render_yaml
 
       - name: Validate DuckDB LFS object
         run: |
