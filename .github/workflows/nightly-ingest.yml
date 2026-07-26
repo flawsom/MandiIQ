@@ -83,22 +83,19 @@ jobs:
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger Render deploy hook
+      - name: Trigger deploy via /deploy endpoint
         if: steps.commit.outputs.committed == 'true'
-        env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "$RENDER_HOOK" ]; then
-            echo "::warning::RENDER_DEPLOY_HOOK_URL not set -- skipping Render deploy"
-            exit 0
-          fi
-          echo "Triggering Render deploy..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}"             -X POST "$RENDER_HOOK" --max-time 30)
-          echo "Render responded HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            echo "Render deploy triggered successfully."
+          echo "Triggering deploy via /deploy endpoint..."
+          RESPONSE=$(curl -s -X POST "https://mandiiq-api.onrender.com/deploy"             -H "Content-Type: application/json"             --max-time 30)
+          echo "Response: $RESPONSE"
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status','unknown'))")
+          if [ "$STATUS" = "ok" ]; then
+            echo "Deploy triggered successfully via /deploy endpoint."
+          elif [ "$STATUS" = "skipped" ]; then
+            echo "::warning::/deploy skipped: RENDER_DEPLOY_HOOK_URL not set on server"
           else
-            echo "::error::Render deploy hook returned HTTP $HTTP_CODE"
+            echo "::error::/deploy returned status=$STATUS"
             exit 1
           fi
 
