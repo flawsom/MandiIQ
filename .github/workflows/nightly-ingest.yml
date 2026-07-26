@@ -131,7 +131,7 @@ jobs:
             PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
             echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
             # Write backup metrics for the /metrics endpoint
-            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'}, open('${METRICS_FILE}', 'w'))"
+            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
           fi
           rm -f "$BACKUP_FILE"
@@ -239,7 +239,7 @@ jobs:
             PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
             echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
             # Write backup metrics for the /metrics endpoint
-            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'}, open('${METRICS_FILE}', 'w'))"
+            python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
           fi
           rm -f "$BACKUP_FILE"
