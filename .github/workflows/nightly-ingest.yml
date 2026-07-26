@@ -76,8 +76,9 @@ jobs:
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: nightly ingestion update"
-            git pull --rebase origin master 2>&1 || echo "Pull skipped (no changes needed)"
-            git push origin master 2>&1
+            # Force-with-lease: safe for bot-only repo. Rebasing binary DuckDB
+            # files causes merge conflicts between concurrent workflow runs.
+            git push --force-with-lease origin master 2>&1
             git lfs push origin master 2>&1 || echo "LFS push skipped (may not be needed)"
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
