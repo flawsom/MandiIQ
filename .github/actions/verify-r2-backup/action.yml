@@ -1,7 +1,10 @@
 name: Verify R2 backup
 description: >
-  Downloads an R2 object back to /dev/null to verify it is readable
-  after an upload. Emits ::notice:: on success or ::warning:: on failure.
+  Downloads an R2 gzip-compressed DuckDB backup, decompresses it, and
+  verifies its SHA256 matches the original via r2_backup_metrics.json.
+  Catches silent corruption, partial uploads, wrong-routing, and gzip
+  corruption that a simple existence check misses.
+  Emits ::notice:: on integrity verified or ::warning:: on mismatch.
   Does NOT fail the pipeline — the step is always best-effort.
 
 inputs:
@@ -39,20 +42,72 @@ runs:
         KEY="${{ inputs.key }}"
         REGION="${{ inputs.region }}"
         ENDPOINT="https://${ACCOUNT_ID}.r2.cloudflarestorage.com"
+        DUCKDB_PATH="mandi_rdd/data/mandi_iq.duckdb"
+        METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
 
         # Only verify if the backup actually completed (metrics file written on success)
-        METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
         if [ ! -f "$METRICS_FILE" ]; then
-          echo "::notice::R2 backup verification skipped — no metrics file found (upload may have failed)"
+          echo "::notice::R2 backup verification skipped — no metrics file found"
           exit 0
         fi
 
-        echo "Verifying s3://${BUCKET}/${KEY} at ${ENDPOINT} (region=${REGION}) ..."
-        if aws s3 cp "s3://${BUCKET}/${KEY}" /dev/null \
+        # Read expected SHA256 from metrics
+        EXPECTED_SHA=$(python3 -c "import json; print(json.load(open('${METRICS_FILE}')).get('sha256', ''))")
+        if [ -z "$EXPECTED_SHA" ]; then
+          echo "::warning::R2 backup verification skipped — no sha256 in metrics file (old version)"
+          exit 0
+        fi
+
+        # Check metrics file freshness — don't verify against a stale metrics file
+        NOW_EPOCH=$(date +%s)
+        TS_EPOCH=$(python3 -c "import json; print(json.load(open('${METRICS_FILE}')).get('timestamp_epoch', 0))")
+        STALE_CUTOFF=$((NOW_EPOCH - 7200))  # 2 hours
+        if [ "$TS_EPOCH" -lt "$STALE_CUTOFF" ] 2>/dev/null; then
+          echo "::warning::R2 backup verification skipped — metrics file is stale (>2h old), upload may not have completed"
+          exit 0
+        fi
+
+        echo "Verifying content integrity of s3://${BUCKET}/${KEY} ..."
+
+        # Step 1: Download the gzip backup
+        DL_FILE="/tmp/verify_mandi_iq.duckdb.gz"
+        if ! aws s3 cp "s3://${BUCKET}/${KEY}" "$DL_FILE" \
           --endpoint-url "${ENDPOINT}" \
           --region "${REGION}" \
           --only-show-errors; then
-          echo "::notice::R2 backup verification passed — ${KEY} is readable"
-        else
-          echo "::warning::R2 backup verification FAILED — ${KEY} is not readable!"
+          echo "::warning::R2 backup verification FAILED — download failed (object may not exist)"
+          rm -f "$DL_FILE"
+          exit 0
         fi
+
+        # Step 2: Decompress
+        DECOMPRESSED_FILE="/tmp/verify_mandi_iq.duckdb"
+        if ! gunzip -c "$DL_FILE" > "$DECOMPRESSED_FILE" 2>/dev/null; then
+          echo "::warning::R2 backup verification FAILED — gzip corruption (decompress failed)"
+          rm -f "$DL_FILE" "$DECOMPRESSED_FILE"
+          exit 0
+        fi
+
+        # Step 3: Decompressed size sanity check
+        DECOMPRESSED_SIZE=$(stat -c%s "$DECOMPRESSED_FILE" 2>/dev/null || stat -f%z "$DECOMPRESSED_FILE" 2>/dev/null)
+        if [ -z "$DECOMPRESSED_SIZE" ] || [ "$DECOMPRESSED_SIZE" -lt 1000 ]; then
+          echo "::warning::R2 backup verification FAILED — decompressed file too small (${DECOMPRESSED_SIZE:-0} bytes)"
+          rm -f "$DL_FILE" "$DECOMPRESSED_FILE"
+          exit 0
+        fi
+
+        # Step 4: Compute SHA256 of downloaded content
+        ACTUAL_SHA=$(sha256sum "$DECOMPRESSED_FILE" | cut -d' ' -f1)
+
+        # Step 5: Compare
+        if [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ]; then
+          echo "::notice::R2 backup integrity VERIFIED — SHA256(${ACTUAL_SHA:0:12}...) matches — ${DECOMPRESSED_SIZE} bytes"
+        else
+          echo "::warning::R2 backup verification FAILED — SHA256 MISMATCH"
+          echo "::warning::  Expected: ${EXPECTED_SHA}"
+          echo "::warning::  Actual:   ${ACTUAL_SHA}"
+          echo "::warning::  The backup may be corrupted, from a different upload, or a partial write."
+        fi
+
+        # Cleanup
+        rm -f "$DL_FILE" "$DECOMPRESSED_FILE"
