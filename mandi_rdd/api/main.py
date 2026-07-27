@@ -77,6 +77,7 @@ class HealthResponse(BaseModel):
     last_run_utc: Optional[str] = None
     last_outcome: Optional[str] = None
     commodities_analyzed: list[str]
+    api_key_set: bool = False
 
 
 class PriceRecord(BaseModel):
@@ -286,6 +287,15 @@ async def health():
 
     conn.close()
 
+    # Check if API key is set
+    api_key_set = False
+    try:
+        from mandi_rdd.ingestion.fetch_prices import _get_api_key
+        _get_api_key()
+        api_key_set = True
+    except Exception:
+        pass
+
     return HealthResponse(
         status="healthy",
         llm_fallback_count=get_llm_fallback_count(),
@@ -303,6 +313,7 @@ async def health():
         last_run_utc=last_run_utc,
         last_outcome=last_outcome,
         commodities_analyzed=state.commodities[:20],
+        api_key_set=api_key_set,
     )
 @app.get("/prices", response_model=list[PriceRecord], tags=["Data"])
 async def prices(
