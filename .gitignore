@@ -108,3 +108,6 @@ verify_dashboard.mjs
 # DuckDB artifacts
 *.duckdb.wal
 *.duckdb.backup
+
+# IDE/agent directories
+.qoder/
