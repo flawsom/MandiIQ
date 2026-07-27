@@ -13,7 +13,7 @@ the workflow can detect and file an issue).
 
 Usage:
     python -m mandi_rdd.scripts.check_freshness \\
-        --api-url https://mandiiq-api.onrender.com \\
+        --api-url https://p01--mandiiq--x4n8x4gkmzht.code.run \
         --output freshness_report.json
 """
 
@@ -164,8 +164,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--api-url",
-        default=os.environ.get("MANDIIQ_API_URL", "https://mandiiq-api.onrender.com"),
-        help="Base URL of the MandiIQ API (default: https://mandiiq-api.onrender.com)",
+        default=os.environ.get("MANDIIQ_API_URL", "https://p01--mandiiq--x4n8x4gkmzht.code.run"),
+        help="Base URL of the MandiIQ API (default: https://p01--mandiiq--x4n8x4gkmzht.code.run)",
     )
     parser.add_argument(
         "--output",

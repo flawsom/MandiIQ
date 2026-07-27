@@ -21,7 +21,7 @@ from mandi_rdd.dashboard.theme import inject_theme, commodity_color, get_api_bas
 from mandi_rdd.dashboard.flip_board import flip_board
 from mandi_rdd.dashboard.plotly_theme import make_themed_figure
 from mandi_rdd.storage.duckdb_store import (
-    get_latest_rdd, get_prices, get_distinct_commodities,
+    get_connection, get_latest_rdd, get_prices, get_distinct_commodities,
     get_avg_price_and_districts, get_latest_forecast_metrics,
 )
 from mandi_rdd.analysis.forecast import train_forecast
@@ -34,7 +34,14 @@ API_BASE = get_api_base()
 # ── Cached data loaders ──
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_prices(limit: int = 5):
-    return get_prices(limit=limit)
+    try:
+        conn = get_connection(read_only=True)
+        try:
+            return get_prices(conn, limit=limit)
+        finally:
+            conn.close()
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=300, show_spinner=False)

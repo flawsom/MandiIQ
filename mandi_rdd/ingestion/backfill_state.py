@@ -144,6 +144,26 @@ def _fetch_ashoka_mapping() -> dict[str, str]:
     return mapping
 
 
+# Canonical state names for known aliases coming from external sources
+# (e.g. the Ashoka API returns "Jammu and Kashmir").
+STATE_ALIASES: dict[str, str] = {
+    "jammu and kashmir": "Jammu & Kashmir",
+    "jammu & kashmir ": "Jammu & Kashmir",
+    "orissa": "Odisha",
+    "uttaranchal": "Uttarakhand",
+    "nct of delhi": "NCT of Delhi",
+    "delhi": "NCT of Delhi",
+    "pondicherry": "Puducherry",
+    "andaman and nicobar": "Andaman & Nicobar",
+    "andaman & nicobar islands": "Andaman & Nicobar",
+}
+
+
+def canonical_state(name: str) -> str:
+    """Return the canonical state name for a given alias, else the input."""
+    return STATE_ALIASES.get(name.lower().strip(), name)
+
+
 def build_lookup(use_ashoka: bool = False) -> dict[str, str]:
     lookup: dict[str, str] = {}
     lookup.update(_load_coord_mapping())
@@ -151,6 +171,9 @@ def build_lookup(use_ashoka: bool = False) -> dict[str, str]:
         lookup.update(_fetch_ashoka_mapping())
     for district, state in MANUAL_OVERRIDES.items():
         lookup[district.lower()] = state
+    # Normalize any alias state names coming from external mappings
+    for district, state in list(lookup.items()):
+        lookup[district] = canonical_state(state)
     log.info("Unified lookup has %d entries", len(lookup))
     return lookup
 
@@ -180,6 +203,14 @@ def backfill(lookup: dict[str, str], dry_run: bool = False) -> int:
                 matched += 1
             else:
                 unmatched.append(district)
+
+        # Canonicalize alias state names already stored in prices
+        if not dry_run:
+            for alias, canon in STATE_ALIASES.items():
+                conn.execute(
+                    "UPDATE prices SET state = ? WHERE LOWER(TRIM(state)) = ?",
+                    [canon, alias],
+                )
 
         conn.commit()
         updated_rows = conn.execute(

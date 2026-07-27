@@ -838,32 +838,21 @@ async def admin_backup_to_r2():
         content_sha256 = hashlib.sha256(compressed).hexdigest()
 
         canonical_request = (
-            "PUT
-"
-            f"/{bucket}/{key}
-"
-            "
-"
-            f"host:{account_id}.r2.cloudflarestorage.com
-"
-            f"x-amz-content-sha256:{content_sha256}
-"
-            f"x-amz-date:{amz_date}
-"
-            "
-"
-            f"{signed_headers}
-"
+            "PUT\n"
+            f"/{bucket}/{key}\n"
+            "\n"
+            f"host:{account_id}.r2.cloudflarestorage.com\n"
+            f"x-amz-content-sha256:{content_sha256}\n"
+            f"x-amz-date:{amz_date}\n"
+            "\n"
+            f"{signed_headers}\n"
             f"{content_sha256}"
         )
 
         string_to_sign = (
-            f"{algorithm}
-"
-            f"{amz_date}
-"
-            f"{credential_scope}
-"
+            f"{algorithm}\n"
+            f"{amz_date}\n"
+            f"{credential_scope}\n"
             f"{hashlib.sha256(canonical_request.encode()).hexdigest()}"
         )
 

@@ -22,7 +22,7 @@ import urllib.error
 import urllib.request
 
 SITES = [
-    {"name": "API (mandiiq-api.onrender.com)", "url": "https://mandiiq-api.onrender.com/health", "expected_status": 200, "is_api": True, "stale_threshold_hours": 48},
+    {"name": "API (Northflank)", "url": "https://p01--mandiiq--x4n8x4gkmzht.code.run/health", "expected_status": 200, "is_api": True, "stale_threshold_hours": 48},
     {"name": "Landing Page (mandiiq.unifies.codes)", "url": "https://mandiiq.unifies.codes", "expected_status": 200, "is_api": False},
     {"name": "Streamlit Dashboard (mandiiq.streamlit.app)", "url": "https://mandiiq.streamlit.app", "expected_status": [200, 302, 303], "is_api": False},
     {"name": "GitHub Repo (github.com/flawsom/MandiIQ)", "url": "https://github.com/flawsom/MandiIQ", "expected_status": [200, 301, 302], "is_api": False},
