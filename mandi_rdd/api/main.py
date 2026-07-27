@@ -1,17 +1,17 @@
 """
-MandiRDD â€” FastAPI serving layer.
+MandiRDD — FastAPI serving layer.
 
 Endpoints:
-- GET /health â€” liveness check
-- GET /prices â€” query stored prices with filters
-- GET /rdd-result/{commodity} â€” latest RDD estimate
-- GET /rdd-plot/{commodity} â€” binned scatter plot data
-- GET /robustness/{commodity} â€” robustness check bundle
-- GET /forecast/{commodity} â€” Prophet forecast
-- GET /risk-score/{commodity} â€” XGBoost risk score
-- GET /recommendation/{commodity} â€” procurement recommendation
-- POST /ask â€” AI orchestrator (OpenRouter multi-model routing)
-- POST /refresh â€” manual pipeline re-run
+- GET /health — liveness check
+- GET /prices — query stored prices with filters
+- GET /rdd-result/{commodity} — latest RDD estimate
+- GET /rdd-plot/{commodity} — binned scatter plot data
+- GET /robustness/{commodity} — robustness check bundle
+- GET /forecast/{commodity} — Prophet forecast
+- GET /risk-score/{commodity} — XGBoost risk score
+- GET /recommendation/{commodity} — procurement recommendation
+- POST /ask — AI orchestrator (OpenRouter multi-model routing)
+- POST /refresh — manual pipeline re-run
 """
 
 import sys
@@ -34,8 +34,9 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Response
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from mandi_rdd.storage.duckdb_store import (
@@ -56,7 +57,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# â”€â”€ Pydantic schemas â”€â”€
+# ── Pydantic schemas ──
 
 class HealthResponse(BaseModel):
     status: str
@@ -126,7 +127,7 @@ class RefreshResponse(BaseModel):
     duration_seconds: Optional[float] = None
 
 
-# â”€â”€ Phase 11: AI Orchestrator schemas â”€â”€
+# ── Phase 11: AI Orchestrator schemas ──
 
 class AskRequest(BaseModel):
     query: str
@@ -144,7 +145,7 @@ class AskResponse(BaseModel):
     error: Optional[str] = None
 
 
-# â”€â”€ App state â”€â”€
+# ── App state ──
 
 class HealthStats:
     """Simple state for /metrics endpoint tracking."""
@@ -153,7 +154,7 @@ class HealthStats:
         self.health_count = 0
         self.cold_start = 1  # resets on each server start
 health_stats = HealthStats()
-# â”€â”€ Deploy endpoint state â”€â”€
+# ── Deploy endpoint state ──
 _last_deploy_ts: float = 0.0
 _DEPLOY_COOLDOWN_S: float = 60.0
 # Load Grafana dashboard template
@@ -204,16 +205,16 @@ app = FastAPI(
     to detect price jumps around the -19% rainfall deficiency threshold.
     
     **Endpoints:**
-    * `/health` â€” Liveness check + data counts
-    * `/prices` â€” Query stored prices by state/district/commodity
-    * `/rdd-result/{commodity}` â€” Latest RDD estimate for a commodity
-    * `/rdd-plot/{commodity}` â€” Binned scatter data for the discontinuity plot
-    * `/robustness/{commodity}` â€” Full robustness check bundle
-    * `/forecast/{commodity}` â€” Prophet forecast with optional LSTM comparison
-    * `/risk-score/{commodity}` â€” XGBoost price-spike risk probability
-    * `/recommendation/{commodity}` â€” Procurement recommendation
-    * `/ask` â€” AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
-    * `/refresh` â€” Manual re-run of the full pipeline
+    * `/health` — Liveness check + data counts
+    * `/prices` — Query stored prices by state/district/commodity
+    * `/rdd-result/{commodity}` — Latest RDD estimate for a commodity
+    * `/rdd-plot/{commodity}` — Binned scatter data for the discontinuity plot
+    * `/robustness/{commodity}` — Full robustness check bundle
+    * `/forecast/{commodity}` — Prophet forecast with optional LSTM comparison
+    * `/risk-score/{commodity}` — XGBoost price-spike risk probability
+    * `/recommendation/{commodity}` — Procurement recommendation
+    * `/ask` — AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
+    * `/refresh` — Manual re-run of the full pipeline
     """,
     version="2.0.0",
     lifespan=lifespan,
@@ -228,7 +229,7 @@ app.add_middleware(
 )
 
 
-# â”€â”€ Endpoints â”€â”€
+# ── Endpoints ──
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health():
@@ -515,7 +516,7 @@ async def recommendation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# â”€â”€ Phase 11: AI Orchestrator Endpoint â”€â”€
+# ── Phase 11: AI Orchestrator Endpoint ──
 
 @app.post("/ask", response_model=AskResponse, tags=["AI Orchestrator"])
 async def ask_question(request: AskRequest):
@@ -634,7 +635,7 @@ async def refresh(background_tasks: BackgroundTasks, commodity: Optional[str] = 
         )
 
 
-# â”€â”€ R2 restore helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── R2 restore helpers ──────────────────────────────────────────────
 
 def _r2_download() -> bytes:
     """Download the latest DuckDB backup from Cloudflare R2.
@@ -922,7 +923,7 @@ async def trigger_backfill():
 
 
 
-# â”€â”€ Prometheus /metrics endpoint â”€â”€
+# ── Prometheus /metrics endpoint ──
 # Exposes lightweight service metrics in Prometheus text exposition format.
 # No prometheus_client dependency required.
 
@@ -1106,6 +1107,34 @@ async def deploy():
             "message": f"Failed to reach Render deploy hook: {e}",
         }
 
+
+@app.get('/proxy/github/{path:path}', tags=['Proxy'])
+def proxy_github(path: str, request: Request):
+    """Proxy requests to GitHub API to avoid CORS issues from browser."""
+    query = request.url.query
+    github_token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    headers = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'MandiIQ-API/1.0',
+    }
+    if github_token:
+        headers['Authorization'] = f'Bearer {github_token}'
+    url = f'https://api.github.com/{path}'
+    if query:
+        url += '?' + query
+    try:
+        req = urllib.request.Request(url, headers=headers, method='GET')
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode('utf-8')
+            return JSONResponse(content=json.loads(body))
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = json.loads(e.read().decode('utf-8'))
+        except Exception:
+            err_body = {'error': e.reason}
+        return JSONResponse(status_code=e.code, content=err_body)
+    except Exception as e:
+        return JSONResponse(status_code=502, content={'error': str(e)})
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("mandi_rdd.api.main:app", host="0.0.0.0", port=port, reload=True)
