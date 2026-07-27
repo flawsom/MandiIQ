@@ -873,38 +873,46 @@ async def run_rainfall_rdd():
 
 @app.post("/backfill-historical", tags=["System"])
 async def backfill_historical():
-    """Fetch historical monthly prices from Ashoka CEDA and store in DuckDB."""
+    """Fetch historical prices from data.gov.in datastore and store in DuckDB."""
     import threading
     
     def _do_backfill():
         import time as _t
         _start = _t.time()
         try:
-            from mandi_rdd.ingestion.fetch_historical_ashoka import main as ashoka_main
+            from mandi_rdd.ingestion.fetch_historical import fetch_resource
+            from mandi_rdd.ingestion.ingest_historical_csv import ingest_csv
+            from mandi_rdd.storage.duckdb_store import get_connection
             import os
             
             hist_dir = Path(__file__).resolve().parent.parent / "data" / "historical"
             hist_dir.mkdir(parents=True, exist_ok=True)
-            out_path = str(hist_dir / "agmarknet_ashoka.csv")
             
-            logger.info("Historical backfill: Starting Ashoka CEDA fetch...")
-            ashoka_main(["--out", out_path, "--workers", "8"])
+            # Use the primary resource ID with large limit to get historical data
+            resource_id = "9ef84268-d588-465a-a308-a864a43d0070"
+            logger.info(f"Historical backfill: Fetching from data.gov.in resource {resource_id}...")
             
-            if os.path.exists(out_path):
-                from mandi_rdd.ingestion.ingest_historical_csv import ingest_csv
-                from mandi_rdd.storage.duckdb_store import get_connection
+            files = fetch_resource(resource_id, str(hist_dir), limit=500000)
+            
+            if files:
                 conn = get_connection()
-                n = ingest_csv(conn, out_path)
+                total_ingested = 0
+                for f in files:
+                    n = ingest_csv(conn, f)
+                    total_ingested += n
+                    logger.info(f"Historical backfill: Ingested {n} rows from {f}")
                 conn.commit()
                 conn.close()
                 duration = round(_t.time() - _start, 1)
-                logger.info(f"Historical backfill: Done in {duration}s - {n} rows")
-                try:
-                    os.remove(out_path)
-                except Exception:
-                    pass
+                logger.info(f"Historical backfill: Done in {duration}s - {total_ingested} total rows")
+                # Clean up
+                for f in files:
+                    try:
+                        os.remove(f)
+                    except Exception:
+                        pass
             else:
-                logger.warning("Historical backfill: No CSV produced")
+                logger.warning("Historical backfill: No files fetched from data.gov.in")
         except Exception as e:
             logger.error(f"Historical backfill failed: {e}")
     
