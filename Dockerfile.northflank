@@ -1,0 +1,25 @@
+# Northflank optimized Dockerfile for MandiIQ API
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system deps for duckdb, scipy, xgboost
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps (lightweight - no prophet, no streamlit)
+COPY requirements/api.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY mandi_rdd/ /app/mandi_rdd/
+
+ENV PYTHONPATH=/app
+ENV PORT=8080
+ENV MANDIIQ_DB_PATH=/data/mandi_iq.duckdb
+
+EXPOSE 8080
+
+# Run the API server
+CMD ["uvicorn", "mandi_rdd.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
