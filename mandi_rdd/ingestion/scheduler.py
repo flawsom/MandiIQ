@@ -72,7 +72,7 @@ def run_ingestion(
     #    dashboard can build a real time-series (the live API is daily-only).
     with pipeline_metrics.step("historical_backfill"):
         try:
-            n_hist = run_historical_backfill(folder="data/historical")
+            n_hist = run_historical_backfill(folder="mandi_rdd/data/historical")
             if n_hist:
                 pipeline_metrics.record_rows("historical_backfill", n_hist, n_hist)
                 logger.info(f"Historical backfill ingested {n_hist} rows.")
