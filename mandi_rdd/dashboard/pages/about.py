@@ -237,7 +237,7 @@ def render():
                 <li><strong style="color:#ffffff;">Deploy:</strong> Render (3 services: dashboard, API, scheduler)</li>
             </ul>
             <p style="color:#7e7e7e;font-size:0.85rem;">
-                All code is open source. See the <a href="https://github.com/flawsom/MIS" style="color:#d7ff00;">GitHub repo</a> for details.
+                All code is open source. See the <a href="https://github.com/flawsom/MandiIQ" style="color:#d7ff00;">GitHub repo</a> for details.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -262,7 +262,7 @@ def render():
   title = {MandiIQ: Agricultural Market Intelligence Dashboard},
   author = {MandiIQ Team},
   year = {2026},
-  url = {https://github.com/flawsom/MIS}
+  url = {https://github.com/flawsom/MandiIQ}
 }
             </pre>
         </div>
