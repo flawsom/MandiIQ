@@ -73,7 +73,7 @@ def local_linear_rdd(
     x_bw = x_centered[in_bandwidth]
     y_bw = y[in_bandwidth]
     
-    if len(x_bw) < 10:
+    if len(x_bw) < 5:
         return {
             "effect": None,
             "std_error": None,
@@ -371,7 +371,7 @@ def run_rdd(
     else:
         price_df = get_monthly_avg_prices(conn, commodity=commodity, state=state)
     
-    if len(price_df) < 20:
+    if len(price_df) < 5:
         return {
             "commodity": commodity,
             "effect": None,
@@ -392,7 +392,7 @@ def run_rdd(
         # 4. Drop rows with no sub-division mapping
         price_df = price_df.dropna(subset=["sub_division"])
     
-    if len(price_df) < 20:
+    if len(price_df) < 5:
         return {
             "commodity": commodity,
             "effect": None,
@@ -424,7 +424,7 @@ def run_rdd(
             on="month", how="left",
         )
     
-    if len(rainfall_df) < 10:
+    if len(rainfall_df) < 5:
         return {
             "commodity": commodity,
             "effect": None,
@@ -443,7 +443,7 @@ def run_rdd(
             how="inner",
         )
     
-    if len(merged) < 20:
+    if len(merged) < 5:
         return {
             "commodity": commodity,
             "effect": None,
@@ -454,7 +454,7 @@ def run_rdd(
     # 6. Drop NaN departure values
     merged = merged.dropna(subset=["departure_pct", "avg_modal_price"])
     
-    if len(merged) < 20:
+    if len(merged) < 5:
         return {
             "commodity": commodity,
             "effect": None,
