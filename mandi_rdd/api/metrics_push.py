@@ -42,7 +42,7 @@ if "/api/prom/push" in _PROM_URL:
 elif _PROM_URL and "/api/" not in _PROM_URL:
     _PROM_URL = _PROM_URL + "/api/v1/push"
 _PROM_USER = os.environ.get("GRAFANA_CLOUD_PROM_USER", "")
-_PROM_PASS = os.environ.get("GRAFANA_CLOUD_PROM_PASSWORD", "")
+_PROM_PASS = os.environ.get("GRAFANA_CLOUD_PROM_PASS") or os.environ.get("GRAFANA_CLOUD_PROM_PASSWORD", "")
 
 _PUSH_ENABLED = bool(_PROM_URL and _PROM_USER and _PROM_PASS)
 _PUSH_INTERVAL = 60  # seconds

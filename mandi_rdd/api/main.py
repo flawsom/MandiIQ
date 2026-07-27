@@ -191,6 +191,13 @@ async def lifespan(app: FastAPI):
         state.commodities = []
     conn.close()
     metrics_push.start_push_thread()
+    # Warm the in-memory dashboard cache so heartbeat shows Fresh on boot
+    global _dashboard_last_refresh, _dashboard_file_mtime
+    if dashboard_json is not None:
+        _dashboard_last_refresh = time.time()
+        _dashboard_file_mtime = os.path.getmtime(_dashboard_path)
+        _get_patched_dashboard("Grafana")
+        logger.info("Dashboard cache warmed: %d entries", _dashboard_patch_count)
 
     yield
 
