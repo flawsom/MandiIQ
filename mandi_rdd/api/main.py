@@ -34,7 +34,8 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
+import threading
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -587,7 +588,7 @@ async def ask_question(request: AskRequest):
 
 
 @app.post("/refresh", response_model=RefreshResponse, tags=["System"])
-async def refresh(background_tasks: BackgroundTasks, commodity: Optional[str] = None):
+async def refresh(commodity: Optional[str] = None):
     """Kick off a full pipeline re-run in the background.
 
     Because the pipeline (fetching prices, rainfall, RDD, forecast) can take
@@ -627,7 +628,7 @@ async def refresh(background_tasks: BackgroundTasks, commodity: Optional[str] = 
             duration = round(_t.time() - _start, 1)
             logger.info(f"Background pipeline finished in {duration}s: {summary}")
 
-        background_tasks.add_task(_run_pipeline, commodity)
+        threading.Thread(target=_run_pipeline, args=(commodity,), daemon=True).start()
         return RefreshResponse(
             status="ok",
             message=f"Pipeline started in background (commodity={commodity or 'all'}). Check /health or /metrics for progress.",
