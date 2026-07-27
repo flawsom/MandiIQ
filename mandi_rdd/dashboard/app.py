@@ -174,13 +174,13 @@ try:
 
     from mandi_rdd.dashboard.seo import inject_page_seo
 
-    st.markdown(inject_page_seo(pg.url_path))
+    st.html(inject_page_seo(pg.url_path))
 
 except Exception:
 
     # Absolute fallback: a minimal canonical link only.
 
-    st.markdown(
+    st.html(
 
         '<link rel="canonical" href="https://mandiiq.unifies.codes/" />',
 
@@ -228,7 +228,7 @@ _surface_on = st.session_state.get("surface_mode", False)
 
 if _surface_on:
 
-    st.markdown(
+    st.html(
 
         f"""<style>
 
@@ -322,7 +322,7 @@ div[data-testid="stSidebar"] {{
 
 _js_val = "true" if _surface_on else "false"
 
-st.markdown(
+st.html(
 
     f"""<script>
 
@@ -500,7 +500,7 @@ COMMODITY_COLORS = {
 
 
 
-st.markdown(f"""
+st.html(f"""
 
 <style>
 
@@ -1302,7 +1302,7 @@ _TOPBAR_HTML = (
 
 
 
-st.markdown(_TOPBAR_HTML)
+st.html(_TOPBAR_HTML)
 
 
 
@@ -1330,7 +1330,7 @@ with st.sidebar:
 
     # Commodity legend
 
-    st.markdown(
+    st.html(
 
         f'<div class="sidebar-section-header">Commodities</div>',
 
@@ -1340,7 +1340,7 @@ with st.sidebar:
 
     for name, color in COMMODITY_COLORS.items():
 
-        st.markdown(
+        st.html(
 
             f'<div class="legend-item"><span class="legend-dot" style="background:{color};"></span>'
 
@@ -1354,7 +1354,7 @@ with st.sidebar:
 
     # ── Surface mode toggle ──
 
-    st.markdown(
+    st.html(
 
         f'<div style="padding:0.5rem 1rem 0.25rem;font-size:0.7rem;color:{FAINT};'
 
@@ -1366,7 +1366,7 @@ with st.sidebar:
 
     )
 
-    st.markdown(
+    st.html(
 
         '<div class="theme-toggle-visual" style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
 
@@ -1394,13 +1394,13 @@ with st.sidebar:
 
     # Spacer
 
-    st.markdown("<div style='min-height: 30px;'></div>")
+    st.html("<div style='min-height: 30px;'></div>")
 
 
 
     # Model-health dot at bottom
 
-    st.markdown(
+    st.html(
 
         f'<div style="display:flex;align-items:center;padding:0.5rem 1rem;'
 
