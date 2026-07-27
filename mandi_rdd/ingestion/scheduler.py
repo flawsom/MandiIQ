@@ -181,6 +181,14 @@ def run_ingestion(
     conn.commit()
     logger.info(f"District-subdivision mappings: {len(district_map)}")
 
+    # 3.5. Backfill state fields in prices using district map
+    with pipeline_metrics.step("backfill_state"):
+        logger.info("Backfilling state fields using district-to-state mapping...")
+        from mandi_rdd.ingestion.backfill_state import backfill
+        n_updated = backfill(conn)
+        summary["steps"]["backfill_state"] = {"updated": n_updated}
+        logger.info(f"State fields backfilled: {n_updated} records")
+
     # 4. Ingest rainfall
     if not skip_rainfall:
         with pipeline_metrics.step("fetch_rainfall"):
