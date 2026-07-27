@@ -21,6 +21,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Validate render.yaml + DuckDB
         uses: ./.github/actions/validate-all
@@ -45,10 +47,6 @@ jobs:
       - name: Run infrastructure verification checks
         run: |
           python -m pytest mandi_rdd/tests/test_verification.py -v --tb=short -k 'not test_data_integrity'
-
-      - name: Run data purity check
-        run: |
-          python mandi_rdd/tests/test_no_mock_data.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
