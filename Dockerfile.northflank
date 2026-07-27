@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY mandi_rdd/ /app/mandi_rdd/
 
+# Copy data files (district coordinates for rainfall fetch)
+COPY data/ /app/data/
+
 ENV PYTHONPATH=/app
 ENV PORT=8080
 ENV MANDIIQ_DB_PATH=/data/mandi_iq.duckdb
