@@ -745,7 +745,7 @@ def get_monthly_avg_prices(conn, commodity: str, state: str = None) -> pd.DataFr
 
         GROUP BY state, district, year, month
 
-        HAVING COUNT(*) >= 3
+        HAVING COUNT(*) >= 1
 
         ORDER BY year, month
 

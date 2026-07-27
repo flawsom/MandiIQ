@@ -361,7 +361,7 @@ def run_rdd(
             FROM prices
             WHERE commodity = ? AND modal_price IS NOT NULL
             GROUP BY 1, 2
-            HAVING COUNT(*) >= 10
+            HAVING COUNT(*) >= 1
             ORDER BY 1, 2
             """,
             [commodity],
@@ -371,7 +371,7 @@ def run_rdd(
     else:
         price_df = get_monthly_avg_prices(conn, commodity=commodity, state=state)
     
-    if len(price_df) < 5:
+    if len(price_df) < 1:
         return {
             "commodity": commodity,
             "effect": None,
@@ -392,7 +392,7 @@ def run_rdd(
         # 4. Drop rows with no sub-division mapping
         price_df = price_df.dropna(subset=["sub_division"])
     
-    if len(price_df) < 5:
+    if len(price_df) < 1:
         return {
             "commodity": commodity,
             "effect": None,
