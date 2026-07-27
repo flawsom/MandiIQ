@@ -42,7 +42,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          python -m pytest mandi_rdd/tests/test_ingestion.py mandi_rdd/tests/test_rdd_engine.py mandi_rdd/tests/test_no_mock_data.py -v --tb=short
+          python -m pytest mandi_rdd/tests/test_verification.py -v --tb=short
 
       - name: Integration tests (with database)
         env:
