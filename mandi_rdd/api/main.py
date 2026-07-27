@@ -827,7 +827,6 @@ async def grafana_dashboard(
 @app.post("/admin/refresh-dashboard-cache", tags=["Admin"])
 async def admin_refresh_dashboard_cache():
     global dashboard_json, _dashboard_export, _dashboard_last_refresh, _dashboard_file_mtime
-    _get_patched_dashboard.cache_clear()
     if os.path.exists(_dashboard_path):
         with open(_dashboard_path, "r") as f:
             _raw = json.load(f)
@@ -835,6 +834,8 @@ async def admin_refresh_dashboard_cache():
         _dashboard_export = _raw
         _dashboard_last_refresh = time.time()
         _dashboard_file_mtime = os.path.getmtime(_dashboard_path)
+        # Warm the dashboard patch counter
+        _get_patched_dashboard("Grafana")
         return {"status": "ok", "message": "Dashboard cache cleared and JSON reloaded from disk."}
     return {"status": "error", "message": f"Dashboard file not found at {_dashboard_path}"}
 
