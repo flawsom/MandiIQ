@@ -27,6 +27,7 @@ from prometheus_client import (
     Gauge,
     pushadd_to_gateway,
 )
+from prometheus_client.exposition import default_handler
 
 logger = logging.getLogger(__name__)
 
@@ -139,14 +140,31 @@ def _refresh_and_push() -> None:
     _cache_stale.set(0)
 
     try:
-        pushadd_to_gateway(
-            _PROM_URL,
-            job="mandiiq-api",
-            registry=_registry,
-            username=_PROM_USER,
-            password=_PROM_PASS,
-            timeout=30,
-        )
+        # Build handler with basic auth if credentials are set
+        import urllib3
+        if _PROM_USER and _PROM_PASS:
+            http = urllib3.PoolManager(
+                headers=urllib3.make_headers(
+                    basic_auth=f"{_PROM_USER}:{_PROM_PASS}"
+                )
+            )
+            def auth_handler(url, method, timeout, headers, body):
+                headers.update(http.headers)
+                return default_handler(url, method, timeout, headers, body)
+            pushadd_to_gateway(
+                _PROM_URL,
+                job="mandiiq-api",
+                registry=_registry,
+                handler=auth_handler,
+                timeout=30,
+            )
+        else:
+            pushadd_to_gateway(
+                _PROM_URL,
+                job="mandiiq-api",
+                registry=_registry,
+                timeout=30,
+            )
     except Exception:
         logger.warning("Grafana Cloud push failed", exc_info=True)
 
