@@ -185,11 +185,37 @@ async def lifespan(app: FastAPI):
     logger.info("Starting MandiRDD API...")
     conn = get_connection()
     init_schema(conn)
+    
+    # Check data freshness and auto-trigger pipeline if needed
     try:
         df = conn.execute("SELECT DISTINCT commodity FROM prices ORDER BY commodity").fetchdf()
         state.commodities = df["commodity"].tolist() if len(df) > 0 else []
+        n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
+        n_rainfall = conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]
+        n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
+        
+        logger.info(f"Startup data check: {n_prices} prices, {n_rainfall} rainfall, {n_rdd} RDD results")
+        
+        # Auto-trigger pipeline if data is missing or stale
+        if n_prices < 100 or n_rainfall < 10 or n_rdd < 1:
+            logger.warning("Data is stale or missing - triggering auto-pipeline in background...")
+            
+            def _auto_pipeline():
+                import time as _t
+                _start = _t.time()
+                try:
+                    from mandi_rdd.ingestion.scheduler import run_ingestion
+                    logger.info("Auto-pipeline starting...")
+                    summary = run_ingestion()
+                    duration = round(_t.time() - _start, 1)
+                    logger.info(f"Auto-pipeline finished in {duration}s: {summary.get('status')}")
+                except Exception as e:
+                    logger.error(f"Auto-pipeline failed: {e}")
+            
+            threading.Thread(target=_auto_pipeline, daemon=True).start()
     except Exception:
         state.commodities = []
+    
     conn.close()
     metrics_push.start_push_thread()
     # Warm the in-memory dashboard cache so heartbeat shows Fresh on boot
@@ -199,6 +225,23 @@ async def lifespan(app: FastAPI):
         _dashboard_file_mtime = os.path.getmtime(_dashboard_path)
         _get_patched_dashboard("Grafana")
         logger.info("Dashboard cache warmed: %d entries", _dashboard_patch_count)
+    
+    # Start hourly auto-refresh scheduler
+    def _hourly_refresh():
+        """Run pipeline every hour to keep data fresh."""
+        import time as _t
+        while True:
+            _t.sleep(3600)  # 1 hour
+            try:
+                from mandi_rdd.ingestion.scheduler import run_ingestion
+                logger.info("Hourly auto-refresh starting...")
+                summary = run_ingestion()
+                logger.info(f"Hourly auto-refresh finished: {summary.get('status')}")
+            except Exception as e:
+                logger.error(f"Hourly auto-refresh failed: {e}")
+    
+    threading.Thread(target=_hourly_refresh, daemon=True).start()
+    logger.info("Hourly auto-refresh scheduler started")
 
     yield
 
