@@ -1466,25 +1466,25 @@ ts_str = (
 
 
 
-st.markdown(f"""
+st.html(f"""
 
-<div class="mandiq-footer">
+<div style="font-size:0.75rem;color:#9e9e9e;padding:1rem 0;text-align:center;border-top:1px solid #333;">
 
     <div>
 
-        <a href="/methodology" target="_blank">Methodology</a>
+        <a href="/methodology" target="_blank" style="color:#9e9e9e;text-decoration:none;">Methodology</a>
 
-        <span class="mono" style="margin:0 8px;color:{FAINT};">·</span>
+        <span style="margin:0 8px;color:{FAINT};">·</span>
 
-        <a href="https://data.gov.in/" target="_blank">data.gov.in/Agmarknet</a>
+        <a href="https://data.gov.in/" target="_blank" style="color:#9e9e9e;text-decoration:none;">data.gov.in/Agmarknet</a>
 
-        <span class="mono" style="margin:0 8px;color:{FAINT};">·</span>
+        <span style="margin:0 8px;color:{FAINT};">·</span>
 
-        <a href="https://mausam.imd.gov.in/" target="_blank">IMD</a>
+        <a href="https://mausam.imd.gov.in/" target="_blank" style="color:#9e9e9e;text-decoration:none;">IMD</a>
 
-        <span class="mono" style="margin:0 8px;color:{FAINT};">·</span>
+        <span style="margin:0 8px;color:{FAINT};">·</span>
 
-        <a href="https://sentinel.esa.int/" target="_blank">Sentinel-2</a>
+        <a href="https://sentinel.esa.int/" target="_blank" style="color:#9e9e9e;text-decoration:none;">Sentinel-2</a>
 
     </div>
 
