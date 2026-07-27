@@ -133,5 +133,7 @@ function render(d){
 async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;lastFetch=new Date();render(s);document.getElementById('lastUpdated').textContent=lastFetch.toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
 let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
 </script>
+<!-- Canvas Cursor Effect -->
+<script src="../static/cursor-effect.js"></script>
 </body>
 </html>
