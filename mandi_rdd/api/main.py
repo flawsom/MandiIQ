@@ -347,6 +347,48 @@ async def health():
         last_outcome=last_outcome,
         commodities_analyzed=state.commodities[:20],
     )
+
+
+@app.get("/freshness", tags=["System"])
+async def freshness(commodity: Optional[str] = None):
+    """Per-commodity data freshness: latest date, row count, district coverage."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        where = ""
+        params = []
+        if commodity:
+            where = "WHERE LOWER(commodity) = LOWER(?)"
+            params = [commodity]
+        rows = conn.execute(f"""
+            SELECT
+                commodity,
+                MAX(arrival_date) AS latest_date,
+                MIN(arrival_date) AS earliest_date,
+                COUNT(*) AS row_count,
+                COUNT(DISTINCT district) AS n_districts,
+                COUNT(DISTINCT state) AS n_states
+            FROM prices
+            {where}
+            GROUP BY commodity
+            ORDER BY latest_date DESC
+            LIMIT 200
+        """, params).fetchall()
+        records = []
+        cols = ["commodity", "latest_date", "earliest_date", "row_count", "n_districts", "n_states"]
+        for r in rows:
+            rec = dict(zip(cols, r))
+            rec["source_type"] = "prices_table"
+            rec["source_name"] = ""
+            rec["updated_at"] = None
+            records.append(rec)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
 @app.get("/prices", response_model=list[PriceRecord], tags=["Data"])
 async def prices(
     state: Optional[str] = Query(None),
