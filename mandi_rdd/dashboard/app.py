@@ -174,7 +174,7 @@ try:
 
     from mandi_rdd.dashboard.seo import inject_page_seo
 
-    st.markdown(inject_page_seo(pg.url_path), unsafe_allow_html=True)
+    st.markdown(inject_page_seo(pg.url_path))
 
 except Exception:
 
@@ -1046,7 +1046,7 @@ section[data-testid="stSidebar"] > div:nth-child(1) {{
 
 </style>
 
-""", unsafe_allow_html=True)
+""")
 
 
 
@@ -1302,7 +1302,7 @@ _TOPBAR_HTML = (
 
 
 
-st.markdown(_TOPBAR_HTML, unsafe_allow_html=True)
+st.markdown(_TOPBAR_HTML)
 
 
 
@@ -1394,7 +1394,7 @@ with st.sidebar:
 
     # Spacer
 
-    st.markdown("<div style='min-height: 30px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='min-height: 30px;'></div>")
 
 
 

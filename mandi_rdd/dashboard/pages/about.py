@@ -242,32 +242,6 @@ def render():
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Citation ──
-    st.markdown("""
-        <div style="margin-top:2.5rem;">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:#d7ff00;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">
-            CITATION
-          </div>
-          <h2 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:400;font-size:1.3rem;color:#ffffff;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">
-            Academic Use
-          </h2>
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-        <div class="crosshair-panel glass" style="padding:1.2rem;">
-            <p style="color:#bababa;font-size:0.85rem;margin-bottom:0.5rem;">If you use MandiIQ in academic work, please cite:</p>
-            <pre style="background:rgba(0,0,0,0.4);padding:1rem;border-radius:6px;font-size:0.8rem;color:#bababa;">
-@software{mandiiq2026,
-  title = {MandiIQ: Agricultural Market Intelligence Dashboard},
-  author = {MandiIQ Team},
-  year = {2026},
-  url = {https://github.com/flawsom/MandiIQ}
-}
-            </pre>
-        </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("<hr style='border-color:rgba(255,255,255,0.07);margin:2rem 0;'>", unsafe_allow_html=True)
     st.markdown(
         '<p style="color:#7e7e7e;font-size:0.8rem;">'
