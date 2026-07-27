@@ -22,7 +22,7 @@ import os
 import json
 import logging
 import time
-import functools
+
 import hashlib
 import gzip
 import shutil
@@ -791,9 +791,12 @@ async def admin_reset_metrics():
 
 
 
-# -- Cached dashboard patcher --
-@functools.lru_cache(maxsize=32)
+# -- Dashboard patcher with manual hit counter --
+_dashboard_patch_count: int = 0
+
 def _get_patched_dashboard(datasource_name: str, version: str = "") -> dict:
+    global _dashboard_patch_count
+    _dashboard_patch_count += 1
     import copy as _copy
     source = _dashboard_export if _dashboard_export is not None else dashboard_json
     result = _copy.deepcopy(source)
@@ -839,7 +842,7 @@ async def admin_refresh_dashboard_cache():
 @app.get("/admin/dashboard-status", tags=["Admin"])
 async def admin_dashboard_status():
     result = {"path": _dashboard_path, "file_exists": os.path.exists(_dashboard_path), "json_loaded": dashboard_json is not None}
-    result["cache_size"] = _get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0
+    result["cache_size"] = _dashboard_patch_count if dashboard_json is not None else 0
     if os.path.exists(_dashboard_path):
         try:
             s = os.stat(_dashboard_path)
@@ -994,7 +997,7 @@ async def metrics():
     lines.append(f"mandiiq_dashboard_cache_stale {_stale}")
     lines.append("# HELP mandiiq_dashboard_cache_size Number of entries in the LRU dashboard cache.")
     lines.append("# TYPE mandiiq_dashboard_cache_size gauge")
-    lines.append(f"mandiiq_dashboard_cache_size {_get_patched_dashboard.cache_info().currsize if dashboard_json is not None else 0}")
+    lines.append(f"mandiiq_dashboard_cache_size {_dashboard_patch_count if dashboard_json is not None else 0}")
     # ---- Disk usage metrics ----
     lines.append("")
     lines.append("# HELP mandiiq_disk_bytes Disk space usage for the mandiiq-api service filesystem.")
