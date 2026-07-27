@@ -18,7 +18,7 @@ services:
     buildCommand: |
       # Fetch the DuckDB from Git LFS before the app starts
       git lfs install
-      git lfs pull --include 'mandi_rdd/data/mandi_iq.duckdb' --exclude=''
+      git lfs pull --include 'mandi_rdd/data/mandi_iq.duckdb,mandi_rdd/data/historical/*.csv' --exclude=''
       pip install -r requirements/api.txt
     startCommand: uvicorn mandi_rdd.api.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
