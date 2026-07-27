@@ -287,95 +287,31 @@ def fetch_varietywise_recent(days: int = 60, max_records: int = 20000) -> list:
     """
     Fetch recent variety-wise (80M-row) records from the data.gov.in archive.
 
-    The API resource does NOT support server-side date filtering, so we
-    scan *backward* from the end of the dataset (newest records first)
-    and keep only rows whose ``Arrival_Date`` falls within the requested
-    window.  This avoids the circuit-breaker problem caused by probing
-    offset 0 (which always returns Feb-2023 records).
+    NOTE 2026-07-27: The Elasticsearch backend for this resource limits
+    ``max_result_window`` to 10,000,000 - any pagination offset beyond
+    10M returns an empty error response.  Since the 80M records span
+    Feb 2023 - Jul 2026, the ONLY accessible offsets are the *oldest*
+    ~10M records (Feb-May 2023), which are well outside any reasonable
+    60-day freshness window.
+
+    This function therefore returns an empty list with a one-time warning,
+    so the pipeline proceeds without the variety-wise supplement.  Daily
+    price fetching (``fetch_all_prices()``) continues to work normally
+    and accumulates records over repeated pipeline runs.
+
+    If/when data.gov.in removes the 10M offset ceiling (or an
+    alternative historical source is added), this function can be
+    re-enabled.
     """
-    try:
-        _get_api_key()
-    except RuntimeError:
-        logger.info("DATA_GOV_IN_API_KEY not set. Skipping variety-wise supplement.")
-        return []
-
-    since = _iso_boundary_days_ago(days)
-    since_date = datetime.datetime.strptime(since, "%Y-%m-%d").date()
-    page_size = 1000
-
-    # -- 1.  Get total record count (single-record probe, no filter) --
-    try:
-        first_page = fetch_page_for_resource(
-            VARIETYWISE_RESOURCE_ID, offset=0, limit=1,
+    _WARN_SHOWN = getattr(fetch_varietywise_recent, "_warn_shown", False)
+    if not _WARN_SHOWN:
+        logger.warning(
+            "Variety-wise archive SKIPPED: Elasticsearch max_result_window=10M "
+            "prevents accessing records beyond offset 10,000,000. "
+            "Only the oldest ~10M records (Feb-May 2023) are accessible, which "
+            "are outside the %d-day freshness window. "
+            "Daily price fetching is unaffected.",
+            days,
         )
-    except Exception as e:
-        logger.warning(f"Variety-wise initial fetch failed: {e}")
-        return []
-
-    total = first_page.get("total", 0)
-    logger.info(
-        "Variety-wise archive: total=%d records, target window >= %s",
-        total, since,
-    )
-    if total <= 0:
-        return []
-
-    # -- 2.  Scan backward from the end (newest -> oldest) --
-    out: list[dict] = []
-    offset = max(0, total - page_size)
-    MAX_RETRIES = 3
-    retries = MAX_RETRIES
-
-    while len(out) < max_records and offset >= 0 and retries > 0:
-        try:
-            data = fetch_page_for_resource(
-                VARIETYWISE_RESOURCE_ID, offset=offset, limit=page_size,
-            )
-        except Exception as e:
-            logger.warning(f"Variety-wise fetch failed at offset {offset}: {e}")
-            retries -= 1
-            offset -= page_size
-            continue
-
-        records = data.get("records", [])
-        if not records:
-            retries -= 1
-            offset -= page_size
-            continue
-
-        all_too_old = True
-        for r in records:
-            rec = normalize_price_record(r)
-            rec["_source"] = {
-                "source_type": "varietywise",
-                "source_name": "data.gov.in variety-wise prices archive",
-                "resource_id": VARIETYWISE_RESOURCE_ID,
-            }
-            ad = rec.get("arrival_date")
-            if ad:
-                try:
-                    d = datetime.datetime.strptime(str(ad)[:10], "%Y-%m-%d").date()
-                except ValueError:
-                    d = None
-                if d is not None and d >= since_date:
-                    all_too_old = False
-                    out.append(rec)
-                    if len(out) >= max_records:
-                        break
-
-        if all_too_old:
-            logger.info(
-                "Variety-wise: stopped at offset %d (all %d records are before %s)",
-                offset, len(records), since,
-            )
-            break
-
-        retries = MAX_RETRIES  # reset on success
-        offset -= page_size
-        time.sleep(0.3)
-
-    logger.info(
-        "Variety-wise supplement: collected %d recent rows (since %s) from %d total.",
-        len(out), since, total,
-    )
-    return out
+        fetch_varietywise_recent._warn_shown = True
+    return []
