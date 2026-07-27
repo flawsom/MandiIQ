@@ -654,7 +654,7 @@ def _r2_download() -> bytes:
         ValueError: If R2 credentials are not configured.
         urllib.error.URLError: If the download fails.
     """
-    bucket = os.environ.get("R2_BUCKET") or ""
+    bucket = os.environ.get("R2_BUCKET") or os.environ.get("R2_BUCKET_NAME") or ""
     account_id = os.environ.get("R2_ACCOUNT_ID") or ""
     access_key = os.environ.get("R2_ACCESS_KEY_ID") or ""
     secret_key = os.environ.get("R2_SECRET_ACCESS_KEY") or ""
