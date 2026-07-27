@@ -1,3 +1,4 @@
+# Last sync: 2026-07-27 15:07:06 UTC
 """Sync local DuckDB from the live Northflank API, then pull RDD results.
 
 Pulls /prices for the rain-sensitive RDD commodities, inserts them into
