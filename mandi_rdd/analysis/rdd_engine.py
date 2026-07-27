@@ -540,6 +540,16 @@ def run_rdd(
     return result
 
 
+def _to_json_list(arr) -> list:
+    """Convert a numeric array to a JSON-safe list (non-finite -> None).
+
+    Empty bins and degenerate fits produce NaN/Inf, which crash FastAPI's
+    JSON serializer ("Out of range float values are not JSON compliant").
+    None serializes to null, which charts render as gaps.
+    """
+    return [float(v) if np.isfinite(v) else None for v in np.asarray(arr, dtype=float)]
+
+
 def rdd_plot_data(
     x: np.ndarray,
     y: np.ndarray,
@@ -589,16 +599,16 @@ def rdd_plot_data(
     right_y = right_intercept + right_slope * (right_x - cutoff)
     
     return {
-        "raw_x": x.tolist(),
-        "raw_y": y.tolist(),
-        "bin_centers": bin_centers.tolist(),
-        "bin_means": bin_means.tolist(),
+        "raw_x": _to_json_list(x),
+        "raw_y": _to_json_list(y),
+        "bin_centers": _to_json_list(bin_centers),
+        "bin_means": _to_json_list(bin_means),
         "bin_stds": [float(s) if not np.isnan(s) else 0 for s in bin_stds],
         "bin_counts": bin_counts.tolist(),
-        "left_x": left_x.tolist(),
-        "left_y": left_y.tolist(),
-        "right_x": right_x.tolist(),
-        "right_y": right_y.tolist(),
+        "left_x": _to_json_list(left_x),
+        "left_y": _to_json_list(left_y),
+        "right_x": _to_json_list(right_x),
+        "right_y": _to_json_list(right_y),
         "cutoff": float(cutoff),
         "bandwidth": float(bandwidth),
         "bandwidth_absolute": float(bw_absolute),
