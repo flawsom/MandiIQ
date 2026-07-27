@@ -103,7 +103,7 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <div class="last-updated"><span class="live-dot"></span>Last updated: <span id="lastUpdated">just now</span> &middot; <a href="#" onclick="refreshAll();return false;" style="color:var(--color-primary);text-decoration:none;">&#10227; Refresh</a></div>
 </div>
 <script>
-const A='https://p01--mandiiq--x4n8x4gkmzht.code.run',G=A+'/proxy/github/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=3e4,STALE=70;let hist=[];
+const A='https://p01--mandiiq--x4n8x4gkmzht.code.run',G=A+'/proxy/github/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=3e4,STALE=70;let hist=[],lastFetch=null;
 function ago(d){if(!d)return'never';let t=new Date(d);if(isNaN(t))return'never';let s=Math.floor((Date.now()-t)/1e3);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';}
 function fmt(d){if(!d)return'\u2014';let t=new Date(d);return isNaN(t)?'\u2014':t.toLocaleString();}
 async function gs(){let r=await fetch(A+'/admin/dashboard-status');if(!r.ok)throw Error('Status '+r.status);return r.json();}
@@ -117,7 +117,7 @@ function render(d){
  if(d.md5_hash){he.textContent=d.md5_hash;hs.textContent=d.md5_hash==='00000000000000000000000000000000'?'empty':'hash';let n=new Date().toISOString();if(!hist.length||hist[hist.length-1].hash!==d.md5_hash)hist.push({hash:d.md5_hash,time:n});if(hist.length>100)hist.shift();}
  else{he.textContent='\u2014';hs.textContent='No hash';}
  let re=document.getElementById('lastRefresh'),rs=document.getElementById('refreshSub');
- if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}else{re.textContent='\u2014';rs.textContent='Never';}
+ if(lastFetch){re.textContent=fmt(lastFetch.toISOString());rs.textContent=ago(lastFetch.toISOString());}else if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}else{re.textContent='\u2014';rs.textContent='Never';}
  let ae=document.getElementById('fileAge'),as_=document.getElementById('ageSub');
  if(d.file_mtime_utc){ae.textContent=fmt(d.file_mtime_utc);as_.textContent=ago(d.file_mtime_utc);}else{ae.textContent='\u2014';as_.textContent='No info';}
  let badge=document.getElementById('liveBadge'),dot=badge.querySelector('.dot'),label=document.getElementById('liveLabel');
@@ -130,7 +130,7 @@ function render(d){
  rc.textContent='(last '+d._runs.length+')';let h2='';
  for(let r of d._runs){let cls=r.conclusion==='success'?'ok':r.conclusion==='failure'?'fail':'pending',ic=r.conclusion==='success'?'\u2713':r.conclusion==='failure'?'\u2717':'\u25CC';h2+='<tr><td><a href="'+r.html_url+'" target="_blank" style="color:var(--color-primary);text-decoration:none;">#'+r.run_number+'</a></td><td class="'+cls+'">'+ic+' '+(r.conclusion||'running')+'</td><td>'+r.event+'</td><td class="hash">'+(r.head_commit?r.head_commit.id.slice(0,12):'\u2014')+'</td><td title="'+fmt(r.created_at)+'">'+ago(r.created_at)+'</td></tr>';}
  body.innerHTML=h2;}
-async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;render(s);document.getElementById('lastUpdated').textContent=new Date().toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
+async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;lastFetch=new Date();render(s);document.getElementById('lastUpdated').textContent=lastFetch.toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
 let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
 </script>
 </body>
