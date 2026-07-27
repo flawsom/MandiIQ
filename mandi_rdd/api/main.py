@@ -686,6 +686,95 @@ async def refresh(commodity: Optional[str] = None):
         )
 
 
+@app.get("/debug/rainfall-test", tags=["System"])
+async def debug_rainfall_test():
+    """Test Open-Meteo rainfall fetch connectivity and return diagnostic info.
+    
+    This endpoint helps debug rainfall fetch issues by testing Open-Meteo
+    connectivity from the server and returning detailed diagnostics.
+    """
+    import urllib.request
+    import json as _json
+    from pathlib import Path as _Path
+    
+    results = {
+        "coords_file_exists": False,
+        "coords_file_path": "",
+        "coords_count": 0,
+        "district_mapping_count": 0,
+        "open_meteo_test_url": "",
+        "open_meteo_response": None,
+        "open_meteo_error": None,
+        "sample_subdivisions": [],
+    }
+    
+    # Test 1: Check if district_coords.json exists
+    try:
+        coords_path = _Path(__file__).resolve().parent.parent.parent / "data" / "district_coords.json"
+        results["coords_file_path"] = str(coords_path)
+        results["coords_file_exists"] = coords_path.exists()
+        if coords_path.exists():
+            with open(coords_path) as f:
+                coords = _json.load(f)
+            results["coords_count"] = len(coords)
+    except Exception as e:
+        results["coords_error"] = str(e)
+    
+    # Test 2: Check district-subdivision mapping
+    try:
+        from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map
+        dmap = load_district_subdivision_map()
+        results["district_mapping_count"] = len(dmap)
+    except Exception as e:
+        results["mapping_error"] = str(e)
+    
+    # Test 3: Test Open-Meteo connectivity with a single coordinate
+    try:
+        test_lat, test_lon = 19.0760, 72.8777  # Mumbai
+        test_url = (
+            f"https://archive-api.open-meteo.com/v1/archive"
+            f"?latitude={test_lat}&longitude={test_lon}"
+            f"&start_date=2024-01-01&end_date=2024-01-31"
+            f"&daily=precipitation_sum&timezone=Asia%2FKolkata"
+        )
+        results["open_meteo_test_url"] = test_url
+        
+        req = urllib.request.Request(test_url, headers={"User-Agent": "MandiIQ/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = _json.loads(resp.read())
+            daily = data.get("daily", {})
+            times = daily.get("time", [])
+            precip = daily.get("precipitation_sum", [])
+            results["open_meteo_response"] = {
+                "status": "success",
+                "days_returned": len(times),
+                "sample_dates": times[:3] if times else [],
+                "sample_precip": precip[:3] if precip else [],
+            }
+    except Exception as e:
+        results["open_meteo_error"] = str(e)
+    
+    # Test 4: Try a mini rainfall fetch for 3 sub-divisions
+    try:
+        from mandi_rdd.ingestion.fetch_rainfall import fetch_rainfall_from_open_meteo
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        
+        # This will fetch a small sample
+        records = fetch_rainfall_from_open_meteo()
+        results["rainfall_fetch_result"] = {
+            "total_records": len(records),
+            "sample_records": records[:2] if records else [],
+        }
+        if records:
+            subdivs = list(set(r.get("sub_division") for r in records[:10]))
+            results["sample_subdivisions"] = subdivs[:5]
+    except Exception as e:
+        results["rainfall_fetch_error"] = str(e)
+    
+    return results
+
+
 # ── R2 restore helpers ──────────────────────────────────────────────
 
 def _r2_download() -> bytes:
