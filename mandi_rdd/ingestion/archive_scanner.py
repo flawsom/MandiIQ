@@ -284,6 +284,15 @@ def _probe_varietywise_pages(
 
 
 def fetch_varietywise_recent(days: int = 60, max_records: int = 20000) -> list:
+    """
+    Fetch recent variety-wise (80M-row) records from the data.gov.in archive.
+
+    The API resource does NOT support server-side date filtering, so we
+    scan *backward* from the end of the dataset (newest records first)
+    and keep only rows whose ``Arrival_Date`` falls within the requested
+    window.  This avoids the circuit-breaker problem caused by probing
+    offset 0 (which always returns Feb-2023 records).
+    """
     try:
         _get_api_key()
     except RuntimeError:
@@ -292,117 +301,78 @@ def fetch_varietywise_recent(days: int = 60, max_records: int = 20000) -> list:
 
     since = _iso_boundary_days_ago(days)
     since_date = datetime.datetime.strptime(since, "%Y-%m-%d").date()
-    extra = ["filters[Arrival_Date][>=]=" + urllib.parse.quote(since)]
     page_size = 1000
 
-    if _is_circuit_open(VARIETYWISE_RESOURCE_ID):
-        logger.warning(
-            "Variety-wise archive SKIPPED: circuit breaker is open for %s.",
-            VARIETYWISE_RESOURCE_ID[:20],
-        )
-        return []
-
-    cached_stale_max = _get_cached_stale_max(VARIETYWISE_RESOURCE_ID)
-    probe_from_offset = 0
-    if cached_stale_max is not None:
-        probe_from_offset = cached_stale_max + page_size
-        logger.info(
-            "Variety-wise: using cached quarantine, skipping offsets 0-%d (starting at %d)",
-            cached_stale_max, probe_from_offset,
-        )
-
+    # -- 1.  Get total record count (single-record probe, no filter) --
     try:
         first_page = fetch_page_for_resource(
-            VARIETYWISE_RESOURCE_ID, offset=probe_from_offset, limit=page_size,
-            extra_params=extra,
+            VARIETYWISE_RESOURCE_ID, offset=0, limit=1,
         )
     except Exception as e:
         logger.warning(f"Variety-wise initial fetch failed: {e}")
         return []
 
     total = first_page.get("total", 0)
-    first_page_count = first_page.get("count", len(first_page.get("records", [])))
     logger.info(
-        "Variety-wise archive: total=%d records, first_page_count=%d (offset=%d)",
-        total, first_page_count, probe_from_offset,
+        "Variety-wise archive: total=%d records, target window >= %s",
+        total, since,
     )
-    effective_total = max(total - probe_from_offset, 0)
-    scan_boundary = effective_total
-    if first_page_count < page_size:
-        scan_boundary = min(effective_total, first_page_count + page_size * 2)
+    if total <= 0:
+        return []
 
-    out = []
-    for r in first_page.get("records", []):
-        rec = normalize_price_record(r)
-        rec["_source"] = {
-            "source_type": "varietywise",
-            "source_name": "data.gov.in variety-wise prices archive",
-            "resource_id": VARIETYWISE_RESOURCE_ID,
-        }
-        ad = rec.get("arrival_date")
-        if ad:
-            try:
-                d = datetime.datetime.strptime(str(ad)[:10], "%Y-%m-%d").date()
-            except ValueError:
-                d = None
-            if d is not None and d >= since_date:
-                out.append(rec)
+    # -- 2.  Scan backward from the end (newest -> oldest) --
+    out: list[dict] = []
+    offset = max(0, total - page_size)
+    MAX_RETRIES = 3
+    retries = MAX_RETRIES
 
-    if scan_boundary > page_size and len(out) < max_records:
-        probe_records, stable_offset, majority_fresh, probed_offsets = _probe_varietywise_pages(
-            VARIETYWISE_RESOURCE_ID, since_date, effective_total, page_size, extra,
-        )
-        out.extend(probe_records)
-
-        if not majority_fresh:
-            _record_stale_detection(VARIETYWISE_RESOURCE_ID)
-            _quarantine_stale_range(
-                VARIETYWISE_RESOURCE_ID,
-                max_stale_offset=probe_from_offset + stable_offset,
+    while len(out) < max_records and offset >= 0 and retries > 0:
+        try:
+            data = fetch_page_for_resource(
+                VARIETYWISE_RESOURCE_ID, offset=offset, limit=page_size,
             )
-            return out
+        except Exception as e:
+            logger.warning(f"Variety-wise fetch failed at offset {offset}: {e}")
+            retries -= 1
+            offset -= page_size
+            continue
 
-        _reset_circuit(VARIETYWISE_RESOURCE_ID)
+        records = data.get("records", [])
+        if not records:
+            retries -= 1
+            offset -= page_size
+            continue
 
-        offset = stable_offset
-        while len(out) < max_records:
-            if offset >= scan_boundary:
-                break
-            if offset in probed_offsets:
-                offset += page_size
-                continue
-            try:
-                data = fetch_page_for_resource(
-                    VARIETYWISE_RESOURCE_ID, offset=probe_from_offset + offset,
-                    limit=page_size, extra_params=extra,
-                )
-            except Exception as e:
-                logger.warning(f"Variety-wise sequential fetch failed at offset {offset}: {e}")
-                break
-            records = data.get("records", [])
-            if not records:
-                break
-            for r in records:
-                rec = normalize_price_record(r)
-                rec["_source"] = {
-                    "source_type": "varietywise",
-                    "source_name": "data.gov.in variety-wise prices archive",
-                    "resource_id": VARIETYWISE_RESOURCE_ID,
-                }
-                ad = rec.get("arrival_date")
-                if ad:
-                    try:
-                        d = datetime.datetime.strptime(str(ad)[:10], "%Y-%m-%d").date()
-                    except ValueError:
-                        d = None
-                    if d is not None and d >= since_date:
-                        out.append(rec)
-                else:
+        all_too_old = True
+        for r in records:
+            rec = normalize_price_record(r)
+            rec["_source"] = {
+                "source_type": "varietywise",
+                "source_name": "data.gov.in variety-wise prices archive",
+                "resource_id": VARIETYWISE_RESOURCE_ID,
+            }
+            ad = rec.get("arrival_date")
+            if ad:
+                try:
+                    d = datetime.datetime.strptime(str(ad)[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    d = None
+                if d is not None and d >= since_date:
+                    all_too_old = False
                     out.append(rec)
-                if len(out) >= max_records:
-                    break
-            offset += page_size
-            time.sleep(0.3)
+                    if len(out) >= max_records:
+                        break
+
+        if all_too_old:
+            logger.info(
+                "Variety-wise: stopped at offset %d (all %d records are before %s)",
+                offset, len(records), since,
+            )
+            break
+
+        retries = MAX_RETRIES  # reset on success
+        offset -= page_size
+        time.sleep(0.3)
 
     logger.info(
         "Variety-wise supplement: collected %d recent rows (since %s) from %d total.",
