@@ -775,6 +775,60 @@ async def debug_rainfall_test():
     return results
 
 
+@app.post("/run-rainfall-rdd", tags=["System"])
+async def run_rainfall_rdd():
+    """Fetch rainfall data and run RDD analysis directly.
+    
+    This is a targeted endpoint that skips price fetch (since prices
+    are already loaded) and directly fetches rainfall, stores it,
+    and runs RDD analysis for rain-sensitive commodities.
+    """
+    import threading
+    
+    def _do_rainfall_rdd():
+        import time as _t
+        _start = _t.time()
+        try:
+            from mandi_rdd.ingestion.fetch_rainfall import fetch_and_store_all_rainfall
+            from mandi_rdd.storage.duckdb_store import get_connection, upsert_rainfall, save_rdd_result
+            from mandi_rdd.analysis.rdd_engine import run_rdd
+            
+            logger.info("Rainfall+RDD: Starting rainfall fetch...")
+            rainfall = fetch_and_store_all_rainfall()
+            logger.info(f"Rainfall+RDD: Fetched {len(rainfall)} rainfall records")
+            
+            if rainfall:
+                conn = get_connection()
+                n_new = upsert_rainfall(conn, rainfall)
+                conn.commit()
+                logger.info(f"Rainfall+RDD: Stored {n_new} new rainfall records")
+                
+                # Run RDD for rain-sensitive commodities
+                rain_sensitive = ["Onion", "Tomato", "Potato", "Cabbage", "Cauliflower"]
+                rdd_count = 0
+                for commodity in rain_sensitive:
+                    try:
+                        result = run_rdd(conn, commodity)
+                        if result and result.get("effect") is not None:
+                            save_rdd_result(conn, result)
+                            rdd_count += 1
+                            logger.info(f"Rainfall+RDD: {commodity} effect={result.get('effect'):.4f} p={result.get('p_value'):.4f}")
+                    except Exception as e:
+                        logger.warning(f"Rainfall+RDD: {commodity} failed: {e}")
+                
+                conn.commit()
+                conn.close()
+                duration = round(_t.time() - _start, 1)
+                logger.info(f"Rainfall+RDD: Complete in {duration}s - {len(rainfall)} rainfall, {rdd_count} RDD results")
+            else:
+                logger.warning("Rainfall+RDD: No rainfall data fetched")
+        except Exception as e:
+            logger.error(f"Rainfall+RDD failed: {e}")
+    
+    threading.Thread(target=_do_rainfall_rdd, daemon=True).start()
+    return {"status": "ok", "message": "Rainfall fetch + RDD analysis started in background"}
+
+
 # ── R2 restore helpers ──────────────────────────────────────────────
 
 def _r2_download() -> bytes:
