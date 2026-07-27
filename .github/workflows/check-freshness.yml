@@ -29,7 +29,7 @@ on:
         type: string
 
 env:
-  API_URL: https://mandiiq-api.onrender.com
+  API_URL: https://p01--mandiiq--x4n8x4gkmzht.code.run
   GH_TOKEN: ${{ github.token }}
 
 jobs:

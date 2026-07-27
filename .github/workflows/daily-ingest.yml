@@ -39,7 +39,7 @@ jobs:
         env:
           SENTINEL_CLIENT_ID: ${{ secrets.SENTINEL_CLIENT_ID }}
           SENTINEL_CLIENT_SECRET: ${{ secrets.SENTINEL_CLIENT_SECRET }}
-          MANDIQ_API_URL: https://mandiiq-api.onrender.com
+          MANDIQ_API_URL: https://p01--mandiiq--x4n8x4gkmzht.code.run
         run: |
           python run_ingest.py
 

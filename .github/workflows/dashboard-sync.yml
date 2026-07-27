@@ -31,7 +31,7 @@ on:
         default: "Manual dashboard cache refresh"
 
 env:
-  API_BASE: "https://mandiiq-api.onrender.com"
+  API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
   DASHBOARD_FILE: "dashboards/mandiiq-pipeline.json"
 
 jobs:

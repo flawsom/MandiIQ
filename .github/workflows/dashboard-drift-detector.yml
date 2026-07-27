@@ -22,11 +22,11 @@ on:
       api_url:
         description: "API base URL to check"
         required: false
-        default: "https://mandiiq-api.onrender.com"
+        default: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
         type: string
 
 env:
-  API_URL: ${{ github.event.inputs.api_url || 'https://mandiiq-api.onrender.com' }}
+  API_URL: ${{ github.event.inputs.api_url || 'https://p01--mandiiq--x4n8x4gkmzht.code.run' }}
 
 jobs:
   detect-drift:

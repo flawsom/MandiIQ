@@ -19,7 +19,7 @@ jobs:
           echo "Starting keepalive for ${HOURS}h (${TOTAL_PINGS} pings every 5 min)"
           for i in $(seq 1 $TOTAL_PINGS); do
             TS=$(date -u +%H:%M:%S)
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://mandiiq-api.onrender.com/health) || true
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://p01--mandiiq--x4n8x4gkmzht.code.run/health) || true
             echo "[$TS] Ping $i/$TOTAL_PINGS - HTTP $HTTP_CODE"
             if [ "$HTTP_CODE" != "200" ]; then
               echo "  Server returned $HTTP_CODE - waiting for wake-up..."

@@ -95,7 +95,7 @@ jobs:
         if: steps.commit.outputs.committed == 'true'
         uses: ./.github/actions/trigger-render-deploy
         with:
-          hook-url: https://mandiiq-api.onrender.com/deploy
+          hook-url: https://p01--mandiiq--x4n8x4gkmzht.code.run/deploy
 
       - name: Backup DuckDB to Cloudflare R2
         if: steps.commit.outputs.committed == 'true'

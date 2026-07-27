@@ -90,7 +90,7 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <div class="section" style="margin-top:var(--space-xl);">
 <div class="section-title">&#8505;&#65039; About This Monitor</div>
 <div style="background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);font-size:.85rem;color:var(--color-text-med);line-height:1.8;">
-<p>This page fetches live data from the MandiIQ API and GitHub Actions API every 60 seconds.</p>
+<p>This page fetches live data from the MandiIQ API and GitHub Actions API every 30 seconds.</p>
 <ul style="margin-top:var(--space-sm);padding-left:var(--space-lg);">
 <li><strong>Dashboard Cache</strong> &mdash; Status of the in-memory Grafana dashboard JSON cache (fresh / stale / error).</li>
 <li><strong>md5 Hash</strong> &mdash; Hash of the loaded dashboard JSON. Changes when the file on disk is updated.</li>
@@ -103,7 +103,7 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <div class="last-updated"><span class="live-dot"></span>Last updated: <span id="lastUpdated">just now</span> &middot; <a href="#" onclick="refreshAll();return false;" style="color:var(--color-primary);text-decoration:none;">&#10227; Refresh</a></div>
 </div>
 <script>
-const A='https://p01--mandiiq--x4n8x4gkmzht.code.run',G=A+'/proxy/github/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=6e4,STALE=70;let hist=[];
+const A='https://p01--mandiiq--x4n8x4gkmzht.code.run',G=A+'/proxy/github/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=3e4,STALE=70;let hist=[];
 function ago(d){if(!d)return'never';let t=new Date(d);if(isNaN(t))return'never';let s=Math.floor((Date.now()-t)/1e3);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';}
 function fmt(d){if(!d)return'\u2014';let t=new Date(d);return isNaN(t)?'\u2014':t.toLocaleString();}
 async function gs(){let r=await fetch(A+'/admin/dashboard-status');if(!r.ok)throw Error('Status '+r.status);return r.json();}

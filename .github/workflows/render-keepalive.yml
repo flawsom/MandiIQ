@@ -15,4 +15,4 @@ jobs:
     steps:
       - name: Ping Render health endpoint
         run: |
-          curl -s --max-time 15 "https://mandiiq-api.onrender.com/health" -o /dev/null -w "%{http_code}"
+          curl -s --max-time 15 "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" -o /dev/null -w "%{http_code}"

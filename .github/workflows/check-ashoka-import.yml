@@ -22,7 +22,7 @@ jobs:
       - name: Check import status from Render API
         id: status
         run: |
-          RESP=$(curl -s --max-time 15 "https://mandiiq-api.onrender.com/historical-import-status")
+          RESP=$(curl -s --max-time 15 "https://p01--mandiiq--x4n8x4gkmzht.code.run/historical-import-status")
           echo "Raw response: $RESP"
           STATE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','unknown'))")
           PROGRESS=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('progress',''))")
