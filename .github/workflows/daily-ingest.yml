@@ -47,7 +47,10 @@ jobs:
         run: |
           git config user.name "flawsom"
           git config user.email "siba@unifies.codes"
+          # Exclude DuckDB from commits (it's tracked via LFS and causes conflicts)
+          git reset HEAD mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || true
           git add -A
+          git reset HEAD mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || true
           # Only commit if there are changes
           if git diff --cached --quiet; then
             echo "No changes to commit"
