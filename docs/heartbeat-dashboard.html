@@ -134,6 +134,6 @@ async function refreshAll(){document.getElementById('errorBanner').style.display
 let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
 </script>
 <!-- Canvas Cursor Effect -->
-<script src="../static/cursor-effect.js"></script>
+<script src="cursor-effect.js"></script>
 </body>
 </html>
