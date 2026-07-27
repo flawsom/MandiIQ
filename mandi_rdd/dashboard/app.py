@@ -184,8 +184,6 @@ except Exception:
 
         '<link rel="canonical" href="https://mandiiq.unifies.codes/" />',
 
-        unsafe_allow_html=True,
-
     )
 
 
@@ -303,8 +301,6 @@ div[data-testid="stSidebar"] {{
 }}
 
 </style>""",
-
-        unsafe_allow_html=True,
 
     )
 
@@ -475,8 +471,6 @@ st.html(
 }})();
 
 </script>""",
-
-    unsafe_allow_html=True,
 
 )
 
@@ -1334,8 +1328,6 @@ with st.sidebar:
 
         f'<div class="sidebar-section-header">Commodities</div>',
 
-        unsafe_allow_html=True,
-
     )
 
     for name, color in COMMODITY_COLORS.items():
@@ -1345,8 +1337,6 @@ with st.sidebar:
             f'<div class="legend-item"><span class="legend-dot" style="background:{color};"></span>'
 
             f'<span>{name}</span></div>',
-
-            unsafe_allow_html=True,
 
         )
 
@@ -1362,8 +1352,6 @@ with st.sidebar:
 
         f'Theme</div>',
 
-        unsafe_allow_html=True,
-
     )
 
     st.html(
@@ -1373,8 +1361,6 @@ with st.sidebar:
         '<span style="display:flex;color:' + MUTED + ';">' + (SVG_SUN if not _surface_on else SVG_MOON) + '</span>'
 
         '<span style="font-size:0.85rem;color:' + MUTED + ';">Lighter surface</span></div>',
-
-        unsafe_allow_html=True,
 
     )
 
@@ -1413,8 +1399,6 @@ with st.sidebar:
         f'{health_labels.get(health, "Unknown")}'
 
         f'</div>',
-
-        unsafe_allow_html=True,
 
     )
 
