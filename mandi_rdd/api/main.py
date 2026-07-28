@@ -1128,6 +1128,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
                         TRY_CAST(price AS DOUBLE)
                     FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
                     WHERE date IS NOT NULL AND commodity IS NOT NULL AND price IS NOT NULL
+                      AND admin1 IS NOT NULL AND TRIM(admin1) != ''
                 """)
                 fmt = "wfp_food_prices"
             elif "Arrival_Date" in header:
