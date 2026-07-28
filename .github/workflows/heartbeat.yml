@@ -8,7 +8,6 @@ name: Heartbeat
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # Keep-alive: every 10 min (prevents free-tier cold starts)
     - cron: '17 3 * * 1'     # Weekly repo heartbeat: Monday 03:17 UTC (keeps GH cron alive)
   workflow_dispatch:
 

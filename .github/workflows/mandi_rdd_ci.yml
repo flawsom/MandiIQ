@@ -9,8 +9,7 @@ on:
     paths:
       - 'mandi_rdd/**'
   workflow_dispatch:
-  schedule:
-    - cron: '15 * * * *'  # Every hour at :15 - runs ingestion
+  # schedule removed — Northflank handles hourly ingestion internally
 
 jobs:
   test:

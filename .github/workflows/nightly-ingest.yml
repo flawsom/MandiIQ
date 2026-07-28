@@ -15,7 +15,7 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: "30 * * * *"  # every hour at :30
+    - cron: "30 5 * * *"  # daily at 05:30 UTC (Northflank handles hourly internally)
   workflow_dispatch: {}   # allow manual "Run workflow" from the Actions tab
 
 permissions:

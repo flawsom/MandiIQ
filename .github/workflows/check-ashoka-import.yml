@@ -6,8 +6,8 @@ name: Check Ashoka Import Status
 
 on:
   schedule:
-    # Every 3 hours — fast enough to catch completion within a reasonable window
-    - cron: "0 */3 * * *"
+    # Every 12 hours — check if Ashoka import completed
+    - cron: "0 */12 * * *"
   workflow_dispatch: {}   # manual trigger
 
 permissions:

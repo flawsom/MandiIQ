@@ -25,7 +25,7 @@ name: Dashboard Heartbeat
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 */6 * * *"  # every 6 hours (Northflank handles hourly internally)
   workflow_dispatch:
     inputs:
       reason:
