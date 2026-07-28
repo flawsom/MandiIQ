@@ -54,6 +54,26 @@ SNAPSHOT_COL_MAP = {
     "Modal_x0020_Price": "modal_price",
 }
 
+# Column mapping for WFP food prices (HDX HAPI)
+WFP_COL_MAP = {
+    "date": "arrival_date",
+    "admin1": "state",
+    "admin2": "district",
+    "market": "market",
+    "commodity": "commodity",
+    "price": "modal_price",
+    "usdprice": None,  # skip
+    "market_id": None,
+    "latitude": None,
+    "longitude": None,
+    "category": None,
+    "commodity_id": None,
+    "unit": None,
+    "priceflag": None,
+    "pricetype": None,
+    "currency": None,
+}
+
 TARGET_FIELDS = ["arrival_date", "state", "district", "market", "commodity",
                  "variety", "grade", "min_price", "max_price", "modal_price"]
 
@@ -169,6 +189,55 @@ def _insert_batch(conn: duckdb.DuckDBPyConnection, batch: list[dict]):
         log.debug(f"Batch insert error: {e}")
 
 
+def ingest_wfp_csv(filepath: str, conn: duckdb.DuckDBPyConnection) -> int:
+    """Ingest WFP/FAO food price CSV from HDX HAPI."""
+    log.info(f"Ingesting WFP food prices CSV: {filepath}")
+    count = 0
+    batch = []
+    batch_size = 5000
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            date_str = row.get("date", "").strip()
+            commodity = row.get("commodity", "").strip()
+            if not date_str or not commodity:
+                continue
+            # Parse date (YYYY-MM-DD format)
+            try:
+                arrival_date = datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+            price = safe_float(row.get("price"))
+            if price is None:
+                continue
+            record = {
+                "arrival_date": arrival_date,
+                "state": row.get("admin1", "").strip(),
+                "district": row.get("admin2", "").strip(),
+                "market": row.get("market", "").strip(),
+                "commodity": commodity,
+                "variety": commodity,  # WFP doesn't have variety
+                "grade": "",  # WFP doesn't have grade
+                "min_price": None,
+                "max_price": None,
+                "modal_price": price,
+            }
+            batch.append(record)
+            count += 1
+            if len(batch) >= batch_size:
+                _insert_batch(conn, batch)
+                batch = []
+                if count % 50000 == 0:
+                    log.info(f"  ... {count:,} WFP rows ingested")
+
+    if batch:
+        _insert_batch(conn, batch)
+
+    log.info(f"WFP CSV: {count:,} rows ingested")
+    return count
+
+
 def main(argv=None):
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -224,6 +293,13 @@ def main(argv=None):
         total += ingest_snapshot_csv(str(snap_file), conn)
     else:
         log.warning(f"Snapshot CSV not found: {snap_file}")
+
+    # Find and ingest WFP food prices CSV
+    wfp_file = data_dir / "wfp_food_prices_ind.csv"
+    if wfp_file.exists():
+        total += ingest_wfp_csv(str(wfp_file), conn)
+    else:
+        log.warning(f"WFP food prices CSV not found: {wfp_file}")
 
     # Report final counts
     n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
