@@ -5,6 +5,9 @@ name: Check Ashoka Import Status
 # completes (state == "complete").
 
 on:
+  push:
+    paths:
+      - '.github/workflows/check-ashoka-import.yml'
   schedule:
     # Every 12 hours — check if Ashoka import completed
     - cron: "0 */12 * * *"
