@@ -1,5 +1,6 @@
 # MandiIQ API - lightweight requirements
-# Prophet excluded (too heavy for free tier 512 MB - enable on larger instance)
+# Prophet: optional heavy dependency - uncomment if instance has >1GB RAM
+# prophet>=1.1.0
 xgboost>=2.0.0
 prometheus-client>=0.19.0
 pandas>=2.0.0
