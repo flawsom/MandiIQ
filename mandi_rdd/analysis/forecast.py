@@ -40,7 +40,10 @@ def train_forecast(
     periods: int = 6,
 ) -> dict:
     """
-    Train a Prophet forecast model on a commodity's modal price time series.
+    Train a forecast model on a commodity's modal price time series.
+    
+    Uses Prophet if available, otherwise falls back to simple exponential
+    smoothing (lightweight, no heavy dependencies).
     
     Args:
         conn: SQLite connection
@@ -52,9 +55,6 @@ def train_forecast(
     Returns:
         Dict with forecast dataframe, model, and metrics
     """
-    if not PROPHET_AVAILABLE:
-        return {"error": "Prophet not installed", "forecast": [], "metrics": {}}
-
     # Build query
     query = """
         SELECT arrival_date, AVG(modal_price) as modal_price
@@ -98,6 +98,15 @@ def train_forecast(
     if len(prophet_df) < 6:
         return {"error": f"Insufficient monthly data: {len(prophet_df)} months", "forecast": [], "metrics": {}}
     
+    # Use Prophet if available, otherwise fallback to exponential smoothing
+    if PROPHET_AVAILABLE:
+        return _train_prophet(prophet_df, commodity, state, periods)
+    else:
+        return _train_exponential_smoothing(prophet_df, commodity, state, periods)
+
+
+def _train_prophet(prophet_df, commodity, state, periods):
+    """Train Prophet forecast (original implementation)."""
     # Train/test split: last 3 months for testing
     train = prophet_df[:-3] if len(prophet_df) > 6 else prophet_df
     test = prophet_df[-3:] if len(prophet_df) > 6 else prophet_df.iloc[-2:]
@@ -145,6 +154,82 @@ def train_forecast(
         "n_training_months": len(train),
         "n_test_months": len(test),
         "model": model,
+    }
+
+
+def _train_exponential_smoothing(prophet_df, commodity, state, periods):
+    """Lightweight fallback: simple exponential smoothing with trend."""
+    from scipy.optimize import minimize_scalar
+    
+    # Use log prices for stability
+    y = prophet_df["y"].values
+    n = len(y)
+    
+    # Train/test split
+    train = y[:-3] if n > 6 else y
+    test = y[-3:] if n > 6 else y[-2:]
+    
+    # Simple exponential smoothing with linear trend
+    def forecast_with_alpha(alpha, beta=0.3):
+        level = train[0]
+        trend = (train[-1] - train[0]) / len(train) if len(train) > 1 else 0
+        forecasts = []
+        for t in range(len(train) + periods):
+            if t < len(train):
+                new_level = alpha * train[t] + (1 - alpha) * (level + trend)
+                trend = beta * (new_level - level) + (1 - beta) * trend
+                level = new_level
+            else:
+                forecasts.append(level + trend)
+        return forecasts
+    
+    # Optimize alpha
+    def mse(alpha):
+        fc = forecast_with_alpha(alpha)[:-periods]
+        if len(fc) != len(train):
+            return 1e10
+        return np.mean((np.array(fc) - train) ** 2)
+    
+    result = minimize_scalar(mse, bounds=(0.01, 0.99), method="bounded")
+    alpha_opt = result.x
+    
+    # Generate forecast
+    all_forecasts = forecast_with_alpha(alpha_opt)
+    train_forecasts = all_forecasts[:-periods]
+    future_forecasts = all_forecasts[-periods:]
+    
+    # Metrics on test set
+    metrics = {}
+    if len(train_forecasts) >= len(test):
+        test_fc = train_forecasts[-len(test):]
+        mae = np.abs(np.array(test) - np.array(test_fc)).mean()
+        rmse = np.sqrt(((np.array(test) - np.array(test_fc)) ** 2).mean())
+        mape = (np.abs((np.array(test) - np.array(test_fc)) / np.array(test)) * 100).mean()
+        metrics = {"mae": float(mae), "rmse": float(rmse), "mape": float(mape)}
+    
+    # Format forecast output
+    last_date = prophet_df["ds"].max()
+    forecast_out = []
+    for i, fc_val in enumerate(future_forecasts):
+        forecast_date = last_date + pd.DateOffset(months=i+1)
+        # Simple confidence intervals
+        std_err = np.std(np.array(train) - np.array(train_forecasts[-len(train):])) if len(train_forecasts) >= len(train) else np.std(train) * 0.1
+        forecast_out.append({
+            "date": str(forecast_date.date()),
+            "forecast": float(fc_val),
+            "forecast_lower": float(fc_val - 1.96 * std_err),
+            "forecast_upper": float(fc_val + 1.96 * std_err),
+        })
+    
+    return {
+        "commodity": commodity,
+        "state": state or "All",
+        "forecast": forecast_out,
+        "metrics": metrics,
+        "n_training_months": len(train),
+        "n_test_months": len(test),
+        "model": None,  # No model object for fallback
+        "method": "exponential_smoothing",
     }
 
 
