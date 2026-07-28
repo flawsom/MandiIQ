@@ -1086,7 +1086,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
             tmp_path = tmp.name
 
         # Determine CSV format and ingest
-        conn = duckdb.connect(str(DB_PATH))
+        conn = get_connection()
         try:
             # Ensure prices table exists
             conn.execute("""
