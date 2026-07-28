@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-07-27T13:56:46Z",
+  "n_sites_checked": 4,
+  "n_sites_healthy": 4,
+  "all_healthy": true,
+  "sites": [
+    {
+      "name": "API (Northflank)",
+      "url": "https://p01--mandiiq--x4n8x4gkmzht.code.run/health",
+      "status": 200,
+      "ok": true,
+      "response_time_s": 1.05,
+      "error": null,
+      "api_data": {
+        "status": "healthy",
+        "llm_fallback_count": 0,
+        "n_prices": 15627,
+        "n_commodities": 256,
+        "n_states": 28,
+        "n_districts": 493,
+        "n_rainfall": 1005,
+        "n_rainfall_filtered": 954,
+        "rainfall_below_threshold": 495,
+        "n_rdd_results": 15,
+        "n_ndvi": 0,
+        "n_ndvi_districts": 0,
+        "n_tests": 71,
+        "last_run_utc": "2026-07-27T07:49:08.776820Z",
+        "last_outcome": "success",
+        "commodities_analyzed": []
+      },
+      "hours_since_last_run": 6.1
+    },
+    {
+      "name": "Landing Page (mandiiq.unifies.codes)",
+      "url": "https://mandiiq.unifies.codes",
+      "status": 200,
+      "ok": true,
+      "response_time_s": 0.99,
+      "error": null,
+      "api_data": null
+    },
+    {
+      "name": "Streamlit Dashboard (mandiiq.streamlit.app)",
+      "url": "https://mandiiq.streamlit.app",
+      "status": 303,
+      "ok": true,
+      "response_time_s": 9.58,
+      "error": "HTTP 303: The HTTP server returned a redirect error that would lead to an infinite loop.\nThe last 30x error message was:\nSee Other",
+      "api_data": null
+    },
+    {
+      "name": "GitHub Repo (github.com/flawsom/MandiIQ)",
+      "url": "https://github.com/flawsom/MandiIQ",
+      "status": 200,
+      "ok": true,
+      "response_time_s": 1.04,
+      "error": null,
+      "api_data": null
+    }
+  ]
+}

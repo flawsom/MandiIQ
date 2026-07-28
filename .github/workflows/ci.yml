@@ -122,7 +122,7 @@ jobs:
 
       - name: Scan for AI defects and secrets
         run: |
-          skylos mandi_rdd --ai-defects --secrets --format github --no-cache --diff origin/main
+          skylos mandi_rdd --ai-defects --secrets --format github --no-cache --diff origin/master
           echo "Skylos scan complete. Findings appear as PR annotations."
         continue-on-error: true
 

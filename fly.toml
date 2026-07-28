@@ -1,0 +1,52 @@
+# Fly.io configuration for MandiIQ
+# Deploy: fly launch --no-deploy, then fly deploy
+
+app = "mandiiq-api"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  PYTHONPATH = "/app"
+  PORT = "8080"
+  MANDIIQ_DB_PATH = "/data/mandi_iq.duckdb"
+  # Required env vars (set via fly secrets):
+  # DATA_GOV_IN_API_KEY
+  # GEMINI_API_KEY (optional)
+  # NVIDIA_API_KEY (optional)
+  # OPENROUTER_API_KEY (optional)
+  # GRAFANA_CLOUD_PROM_URL (optional)
+  # GRAFANA_CLOUD_PROM_USER (optional)
+  # GRAFANA_CLOUD_PROM_PASSWORD (optional)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/health"
+
+[mounts]
+  source = "mandiiq_data"
+  destination = "/data"
+
+# Scale config - free tier allows 1-2 small VMs
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+  cpu_kind = "shared"
+
+# Deployment strategy
+[deploy]
+  strategy = "rolling"
+  max_unavailable = 0
+  wait_timeout = "120s"

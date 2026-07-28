@@ -83,16 +83,6 @@ jobs:
             freshness_report.md
           retention-days: 7
 
-      - name: Upload freshness report as artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: freshness-report
-          path: |
-            freshness_report.json
-            freshness_report.md
-          retention-days: 7
-
       - name: File GitHub Issue if stale commodities found
         if: steps.check.outputs.should_file_issue == 'true'
         env:
