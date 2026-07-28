@@ -148,9 +148,9 @@ def _refresh_and_push() -> None:
                     basic_auth=f"{_PROM_USER}:{_PROM_PASS}"
                 )
             )
-            def auth_handler(url, method, timeout, headers, body, **kwargs):
-                headers.update(http.headers)
-                return default_handler(url, method, timeout, headers, body, **kwargs)
+            def auth_handler(**kwargs):
+                kwargs.setdefault('headers', {}).update(http.headers)
+                return default_handler(**kwargs)
             pushadd_to_gateway(
                 _PROM_URL,
                 job="mandiiq-api",
