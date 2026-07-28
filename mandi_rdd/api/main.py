@@ -1102,18 +1102,19 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
                 header = f.readline()
 
             if "Price Date" in header or "District Name" in header:
-                # Agmarknet historical format
+                # Agmarknet historical format (date: "05 Apr 2025")
                 conn.execute(f"""
                     INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
                                        min_price, max_price, modal_price)
                     SELECT
-                        TRY_CAST("Price Date" AS DATE), TRIM(State), TRIM("District Name"),
+                        COALESCE(TRY_CAST("Price Date" AS DATE), TRY_STRPTIME("Price Date", '%d %b %Y')),
+                        TRIM(State), TRIM("District Name"),
                         TRIM("Market Name"), TRIM(Commodity), TRIM(Variety), TRIM(Grade),
                         TRY_CAST(REPLACE(CAST("Min Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
                         TRY_CAST(REPLACE(CAST("Max Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
                         TRY_CAST(REPLACE(CAST("Modal Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE)
                     FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
-                    WHERE "Price Date" IS NOT NULL AND Commodity IS NOT NULL
+                    WHERE "Price Date" IS NOT NULL AND TRIM("Price Date") != '' AND Commodity IS NOT NULL
                 """)
                 fmt = "agmarknet_historical"
             elif "date,admin1" in header or ("admin1" in header and file.filename and "wfp" in file.filename.lower()):
