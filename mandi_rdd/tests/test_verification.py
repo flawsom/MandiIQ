@@ -74,7 +74,7 @@ def test_csv_field_size_not_leaked_at_import() -> None:
         assert n >= 1
         conn = get_connection(read_only=False)
         # Check if prices table exists before trying to delete
-        tables = conn.execute("SELECT name FROM information_schema.tables WHERE table_name='prices'").fetchone()
+        tables = conn.execute("SELECT table_name FROM information_schema.tables WHERE table_name='prices'").fetchone()
         if tables:
             conn.execute("DELETE FROM prices WHERE state = 'TestVfy'")
             conn.commit()
@@ -117,7 +117,7 @@ def test_data_integrity() -> None:
     conn = get_connection(read_only=True)
     try:
         # Check if prices table exists
-        tables = conn.execute("SELECT name FROM information_schema.tables WHERE table_name='prices'").fetchone()
+        tables = conn.execute("SELECT table_name FROM information_schema.tables WHERE table_name='prices'").fetchone()
         if not tables:
             pytest.skip("prices table not present in DuckDB")
         total, with_state, empty = conn.execute(
