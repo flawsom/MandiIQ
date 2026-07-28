@@ -1070,10 +1070,14 @@ async def admin_restore_from_r2():
 
 
 @app.post("/admin/ingest-historical", tags=["Admin"])
-async def admin_ingest_historical(file: UploadFile = File(...)):
+def admin_ingest_historical(file: UploadFile = File(...)):
     """Upload and ingest a historical CSV file into the prices table.
     Accepts Agmarknet, data.gov.in snapshot, or WFP/FAO food price CSVs.
     Uses DuckDB's native CSV reader for fast bulk import.
+
+    Declared sync (not async) so FastAPI runs it in a worker thread,
+    keeping /health responsive during long-running inserts — otherwise
+    Northflank health checks fail and the container is killed mid-ingest.
     """
     import tempfile
     import shutil
