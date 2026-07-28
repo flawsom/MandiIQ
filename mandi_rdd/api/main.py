@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 import threading
-from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -1066,6 +1066,106 @@ async def admin_restore_from_r2():
         "bytes_decompressed": len(decompressed),
         "db_path": str(DB_PATH),
     }
+
+
+@app.post("/admin/ingest-historical", tags=["Admin"])
+async def admin_ingest_historical(file: UploadFile = File(...)):
+    """Upload and ingest a historical CSV file into the prices table.
+    Accepts Agmarknet, data.gov.in snapshot, or WFP/FAO food price CSVs.
+    Uses DuckDB's native CSV reader for fast bulk import.
+    """
+    import tempfile
+    import shutil
+
+    try:
+        # Save uploaded file to temp location
+        suffix = ".csv"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+
+        # Determine CSV format and ingest
+        conn = duckdb.connect(str(DB_PATH))
+        try:
+            # Ensure prices table exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prices (
+                    arrival_date DATE, state VARCHAR, district VARCHAR, market VARCHAR,
+                    commodity VARCHAR, variety VARCHAR, grade VARCHAR,
+                    min_price DOUBLE, max_price DOUBLE, modal_price DOUBLE
+                )
+            """)
+
+            # Read first line to detect format
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                header = f.readline()
+
+            if "Price Date" in header or "District Name" in header:
+                # Agmarknet historical format
+                conn.execute(f"""
+                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                                       min_price, max_price, modal_price)
+                    SELECT
+                        TRY_CAST("Price Date" AS DATE), TRIM(State), TRIM("District Name"),
+                        TRIM("Market Name"), TRIM(Commodity), TRIM(Variety), TRIM(Grade),
+                        TRY_CAST(REPLACE(CAST("Min Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
+                        TRY_CAST(REPLACE(CAST("Max Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
+                        TRY_CAST(REPLACE(CAST("Modal Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE)
+                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
+                    WHERE "Price Date" IS NOT NULL AND Commodity IS NOT NULL
+                """)
+                fmt = "agmarknet_historical"
+            elif "admin1" in header and "wfp" in file.filename.lower() or "date,admin1" in header:
+                # WFP food prices format
+                conn.execute(f"""
+                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                                       min_price, max_price, modal_price)
+                    SELECT
+                        TRY_CAST(date AS DATE), TRIM(admin1), TRIM(admin2), TRIM(market),
+                        TRIM(commodity), TRIM(commodity), '', NULL, NULL,
+                        TRY_CAST(price AS DOUBLE)
+                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
+                    WHERE date IS NOT NULL AND commodity IS NOT NULL AND price IS NOT NULL
+                """)
+                fmt = "wfp_food_prices"
+            elif "Arrival_Date" in header:
+                # data.gov.in snapshot format
+                conn.execute(f"""
+                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                                       min_price, max_price, modal_price)
+                    SELECT
+                        TRY_CAST(Arrival_Date AS DATE), TRIM(State), TRIM(District), TRIM(Market),
+                        TRIM(Commodity), TRIM(Variety), TRIM(Grade),
+                        TRY_CAST(REPLACE(CAST("Min_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE),
+                        TRY_CAST(REPLACE(CAST("Max_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE),
+                        TRY_CAST(REPLACE(CAST("Modal_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE)
+                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
+                    WHERE Arrival_Date IS NOT NULL AND Commodity IS NOT NULL
+                """)
+                fmt = "data_gov_in_snapshot"
+            else:
+                conn.close()
+                return {"status": "error", "message": f"Unrecognized CSV format. Header: {header[:100]}"}
+
+            n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
+            n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
+            conn.close()
+
+            return {
+                "status": "ok",
+                "format": fmt,
+                "filename": file.filename,
+                "total_prices": n_prices,
+                "total_commodities": n_commodities,
+            }
+        finally:
+            conn.close()
+            import os
+            os.unlink(tmp_path)
+
+    except Exception as e:
+        logger.error("Historical ingestion failed: %s", e)
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/admin/backup-to-r2", tags=["Admin"])
