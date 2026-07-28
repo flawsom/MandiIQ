@@ -1088,6 +1088,18 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
         # Determine CSV format and ingest
         conn = get_connection()
         try:
+            # Cap DuckDB memory: container has 512MB but DuckDB sizes its
+            # limit from host RAM, causing OOM kills on bulk inserts.
+            # Spill to the /data volume instead of holding everything in RAM.
+            try:
+                conn.execute("SET memory_limit='150MB'")
+                conn.execute("SET threads=1")
+                conn.execute("SET preserve_insertion_order=false")
+                spill_dir = os.path.join(tempfile.gettempdir(), "duckdb_spill")
+                os.makedirs(spill_dir, exist_ok=True)
+                conn.execute(f"SET temp_directory='{spill_dir}'")
+            except Exception as e:
+                logger.warning("Could not set DuckDB memory limits: %s", e)
             # Ensure prices table exists
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS prices (
