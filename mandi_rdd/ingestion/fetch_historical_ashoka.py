@@ -10,9 +10,9 @@ MONTHLY history per (state, commodity, district) cell via:
     -> {data:[{t:"2025-06", cmdty, district, district_id,
                  p_min, p_max, p_modal}, ...]}
 
-NOTE: that host's TLS cert is currently EXPIRED. We disable
-verification for THIS host only (public, non-sensitive price stats).
-If the cert is renewed, set VERIFY_TLS=True.
+NOTE: that host's TLS cert was EXPIRED for a long time but was renewed
+around July 2026. We re-enable verification. If it breaks again, set
+VERIFY_TLS=False and use the unverified context.
 
 OUTPUT: rows in the SAME schema as the Agmarknet bulk CSV so the
 existing backfill (ingest_historical_csv.py) ingests it unchanged:
@@ -43,9 +43,13 @@ import urllib.error
 log = logging.getLogger("mandi_rdd.ashoka")
 
 BASE = "https://agmarknet.ceda.ashoka.edu.in"
-CTX = ssl.create_default_context()
-CTX.check_hostname = False
-CTX.verify_mode = ssl.CERT_NONE  # cert expired on this academic mirror
+VERIFY_TLS = True  # cert renewed ~July 2026
+if VERIFY_TLS:
+    CTX = ssl.create_default_context()
+else:
+    CTX = ssl.create_default_context()
+    CTX.check_hostname = False
+    CTX.verify_mode = ssl.CERT_NONE
 HEADERS = {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json",
             "Accept": "application/json"}
 
@@ -142,6 +146,19 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=16)
     p.add_argument("--limit", type=int, default=0, help="Max cells to fetch (0=all).")
     args = p.parse_args(argv)
+
+    # Early health-check: if /api/prices returns 500, abort before spinning
+    # up thousands of threads that will all fail identically.
+    try:
+        probe_body = {"state_id": 29, "commodity_id": 23, "district_id": "1",
+                       "calculation_type": "m", "start_date": "2024-01-01",
+                       "end_date": "2025-01-01"}
+        probe_rows = _post(probe_body)
+        log.info(f"Ashoka health-check OK: probe returned {len(probe_rows)} rows")
+    except Exception as probe_err:
+        log.error(f"Ashoka /api/prices is unreachable ({probe_err}). "
+                   "Their backend database is likely down. Aborting historical fetch.")
+        return 1
 
     top = {x.strip().lower() for x in args.commodities.split(",") if x.strip()} or None
     cells = list(iter_cells(top_commodities=top))

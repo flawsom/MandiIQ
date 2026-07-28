@@ -247,9 +247,23 @@ def run_ingestion(
     ).fetchdf()
     all_commodities = price_df["commodity"].tolist() if len(price_df) > 0 else []
 
-    # Focus on rain-sensitive commodities for the MVP
+    # Focus on rain-sensitive commodities for the MVP, plus high-volume
+    # staples that have enough data points for meaningful RDD analysis.
     rain_sensitive = ["Onion", "Tomato", "Potato", "Cabbage", "Cauliflower"]
+    high_volume_staples = [
+        "Wheat", "Rice", "Paddy(Common)", "Paddy(Dhan)(Common)",
+        "Maize", "Soyabean", "Mustard", "Groundnut",
+        "Banana", "Mango", "Apple", "Grapes",
+        "Garlic", "Ginger (Dry)", "Chili Red", "Turmeric",
+        "Bajra(Pearl Millet/Cumbu)", "Jowar (Sorghum)",
+        "Bengal Gram (Gram)(Whole)", "Red Gram",
+        "Green Gram (Moong)(Whole)", "Black Gram (Urad Beans)(Whole)",
+        "Sugarcane", "Cotton",
+    ]
     target_commodities = [c for c in rain_sensitive if c in all_commodities]
+    for c in high_volume_staples:
+        if c in all_commodities and c not in target_commodities:
+            target_commodities.append(c)
 
     rdd_results = []
     fe_results = []

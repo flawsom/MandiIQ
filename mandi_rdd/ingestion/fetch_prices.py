@@ -172,7 +172,7 @@ PRIMARY_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 def fetch_all_prices(
     filters: Optional[dict] = None,
     max_records: Optional[int] = None,
-    page_size: int = 1000,
+    page_size: int = 5000,
     progress_callback=None,
 ) -> list[dict]:
     """

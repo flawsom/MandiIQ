@@ -845,10 +845,26 @@ async def run_rainfall_rdd():
                 conn.commit()
                 logger.info(f"Rainfall+RDD: Stored {n_new} new rainfall records")
                 
-                # Run RDD for rain-sensitive commodities
+                # Run RDD for rain-sensitive + high-volume commodities
                 rain_sensitive = ["Onion", "Tomato", "Potato", "Cabbage", "Cauliflower"]
+                high_volume = ["Wheat", "Rice", "Paddy(Common)", "Paddy(Dhan)(Common)",
+                    "Maize", "Soyabean", "Mustard", "Groundnut",
+                    "Banana", "Mango", "Apple", "Grapes",
+                    "Garlic", "Ginger (Dry)", "Chili Red", "Turmeric",
+                    "Bajra(Pearl Millet/Cumbu)", "Jowar (Sorghum)",
+                    "Bengal Gram (Gram)(Whole)", "Red Gram",
+                    "Green Gram (Moong)(Whole)", "Black Gram (Urad Beans)(Whole)",
+                    "Sugarcane", "Cotton"]
+                # Only run for commodities that exist in DB
+                all_comms = set()
+                try:
+                    df_c = conn.execute("SELECT DISTINCT commodity FROM prices").fetchdf()
+                    all_comms = set(df_c["commodity"].tolist())
+                except Exception:
+                    pass
+                target_comms = [c for c in rain_sensitive + high_volume if c in all_comms]
                 rdd_count = 0
-                for commodity in rain_sensitive:
+                for commodity in target_comms:
                     try:
                         result = run_rdd(conn, commodity)
                         if result and result.get("effect") is not None:
