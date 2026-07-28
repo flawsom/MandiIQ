@@ -117,7 +117,9 @@ function render(d){
  if(d.md5_hash){he.textContent=d.md5_hash;hs.textContent=d.md5_hash==='00000000000000000000000000000000'?'empty':'hash';let n=new Date().toISOString();if(!hist.length||hist[hist.length-1].hash!==d.md5_hash)hist.push({hash:d.md5_hash,time:n});if(hist.length>100)hist.shift();}
  else{he.textContent='\u2014';hs.textContent='No hash';}
  let re=document.getElementById('lastRefresh'),rs=document.getElementById('refreshSub');
- if(lastFetch){re.textContent=fmt(lastFetch.toISOString());rs.textContent=ago(lastFetch.toISOString());}else if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}else{re.textContent='\u2014';rs.textContent='Never';}
+ if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}
+ else if(lastFetch){re.textContent=fmt(lastFetch.toISOString());rs.textContent=ago(lastFetch.toISOString());}
+ else{re.textContent='\u2014';rs.textContent='Never';}
  let ae=document.getElementById('fileAge'),as_=document.getElementById('ageSub');
  if(d.file_mtime_utc){ae.textContent=fmt(d.file_mtime_utc);as_.textContent=ago(d.file_mtime_utc);}else{ae.textContent='\u2014';as_.textContent='No info';}
  let badge=document.getElementById('liveBadge'),dot=badge.querySelector('.dot'),label=document.getElementById('liveLabel');
