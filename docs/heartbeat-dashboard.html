@@ -117,8 +117,7 @@ function render(d){
  if(d.md5_hash){he.textContent=d.md5_hash;hs.textContent=d.md5_hash==='00000000000000000000000000000000'?'empty':'hash';let n=new Date().toISOString();if(!hist.length||hist[hist.length-1].hash!==d.md5_hash)hist.push({hash:d.md5_hash,time:n});if(hist.length>100)hist.shift();}
  else{he.textContent='\u2014';hs.textContent='No hash';}
  let re=document.getElementById('lastRefresh'),rs=document.getElementById('refreshSub');
- if(d.last_refresh_utc){re.textContent=fmt(d.last_refresh_utc);rs.textContent=ago(d.last_refresh_utc);}
- else if(lastFetch){re.textContent=fmt(lastFetch.toISOString());rs.textContent=ago(lastFetch.toISOString());}
+ if(lastFetch){re.textContent=fmt(lastFetch.toISOString());}
  else{re.textContent='\u2014';rs.textContent='Never';}
  let ae=document.getElementById('fileAge'),as_=document.getElementById('ageSub');
  if(d.file_mtime_utc){ae.textContent=fmt(d.file_mtime_utc);as_.textContent=ago(d.file_mtime_utc);}else{ae.textContent='\u2014';as_.textContent='No info';}
@@ -134,6 +133,8 @@ function render(d){
  body.innerHTML=h2;}
 async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;lastFetch=new Date();render(s);document.getElementById('lastUpdated').textContent=lastFetch.toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
 let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
+// Live countdown until next auto-refresh (1s tick)
+setInterval(()=>{if(!lastFetch)return;let rs=document.getElementById('refreshSub');if(!rs)return;let left=Math.max(0,Math.ceil((IV-(Date.now()-lastFetch))/1e3));rs.textContent=document.hidden?'paused':'next refresh in '+left+'s';},1e3);
 </script>
 <!-- Canvas Cursor Effect -->
 <script src="cursor-effect.js"></script>
