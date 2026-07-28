@@ -143,14 +143,20 @@ def _refresh_and_push() -> None:
         # Build handler with basic auth if credentials are set
         import urllib3
         if _PROM_USER and _PROM_PASS:
-            http = urllib3.PoolManager(
-                headers=urllib3.make_headers(
-                    basic_auth=f"{_PROM_USER}:{_PROM_PASS}"
-                )
-            )
-            def auth_handler(**kwargs):
-                kwargs.setdefault('headers', {}).update(http.headers)
-                return default_handler(**kwargs)
+            import base64
+            _auth_header = 'Basic ' + base64.b64encode(
+                f"{_PROM_USER}:{_PROM_PASS}".encode()
+            ).decode()
+
+            def auth_handler(url, method, timeout, headers, data):
+                # headers may be list[tuple] or dict depending on prometheus_client version
+                if isinstance(headers, list):
+                    headers = list(headers)
+                    headers.append(('Authorization', _auth_header))
+                elif isinstance(headers, dict):
+                    headers['Authorization'] = _auth_header
+                return default_handler(url, method, timeout, headers, data)
+
             pushadd_to_gateway(
                 _PROM_URL,
                 job="mandiiq-api",
