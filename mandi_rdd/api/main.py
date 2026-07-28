@@ -35,6 +35,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 import threading
+import duckdb
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
