@@ -8,8 +8,8 @@ on:
   push:
     branches: [master]
   schedule:
-    # Every 12 hours — check if Ashoka import completed
-    - cron: "0 */12 * * *"
+    # Every 3 hours — check if Ashoka import completed
+    - cron: "0 */3 * * *"
   workflow_dispatch: {}   # manual trigger
 
 permissions:
