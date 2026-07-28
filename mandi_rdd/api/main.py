@@ -1104,7 +1104,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
             if "Price Date" in header or "District Name" in header:
                 # Agmarknet historical format (date: "05 Apr 2025")
                 conn.execute(f"""
-                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
                                        min_price, max_price, modal_price)
                     SELECT
                         COALESCE(TRY_CAST("Price Date" AS DATE), TRY_STRPTIME("Price Date", '%d %b %Y')),
@@ -1120,7 +1120,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
             elif "date,admin1" in header or ("admin1" in header and file.filename and "wfp" in file.filename.lower()):
                 # WFP food prices format
                 conn.execute(f"""
-                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
                                        min_price, max_price, modal_price)
                     SELECT
                         TRY_CAST(date AS DATE), TRIM(admin1), TRIM(admin2), TRIM(market),
@@ -1133,7 +1133,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
             elif "Arrival_Date" in header:
                 # data.gov.in snapshot format
                 conn.execute(f"""
-                    INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
+                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
                                        min_price, max_price, modal_price)
                     SELECT
                         TRY_CAST(Arrival_Date AS DATE), TRIM(State), TRIM(District), TRIM(Market),
