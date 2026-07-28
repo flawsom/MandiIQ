@@ -1115,7 +1115,7 @@ async def admin_ingest_historical(file: UploadFile = File(...)):
                     WHERE "Price Date" IS NOT NULL AND Commodity IS NOT NULL
                 """)
                 fmt = "agmarknet_historical"
-            elif "admin1" in header and "wfp" in file.filename.lower() or "date,admin1" in header:
+            elif "date,admin1" in header or ("admin1" in header and file.filename and "wfp" in file.filename.lower()):
                 # WFP food prices format
                 conn.execute(f"""
                     INSERT INTO prices (arrival_date, state, district, market, commodity, variety, grade,
