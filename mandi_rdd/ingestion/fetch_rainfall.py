@@ -862,4 +862,5 @@ if __name__ == "__main__":
     print(f"\nDistrict-subdivision mappings: {len(mapping)}")
     sample = list(mapping.items())[:3]
     for (s, d), sub in sample:
-        print(f"  {s} / {d} → {sub}")
+        print(f"  {s} / {d} -> {sub}")
+
