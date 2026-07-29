@@ -111,3 +111,8 @@ verify_dashboard.mjs
 
 # IDE/agent directories
 .qoder/
+
+# Freebuff desktop app data
+.freebuff/
+.cbmignore*
+.codebuffrc*

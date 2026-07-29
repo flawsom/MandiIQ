@@ -156,11 +156,52 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
     # Detect and clean up stale LFS pointer before DuckDB tries to open it
     _try_fix_lfs_pointer(path)
 
+    # ── Corruption recovery ──────────────────────────────────────────
+    # DuckDB's ART UNIQUE index can become invalidated during large bulk
+    # inserts under memory pressure.  If the DB file is corrupted we must
+    # delete it so init_schema() can create a fresh one.
+    if path.exists():
+        try:
+            probe = duckdb.connect(str(path), read_only=True)
+            probe.execute("SELECT 1")
+            tables = [r[0] for r in probe.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()]
+            if "prices" in tables:
+                probe.execute("SELECT COUNT(*) FROM prices")
+            probe.close()
+        except Exception as probe_err:
+            try: probe.close()
+            except Exception: pass
+            err_msg = str(probe_err).lower()
+            if any(kw in err_msg for kw in [
+                "invalidated", "fatal error", "index corruption",
+                "failed to delete", "database has been invalidated",
+                "corrupt", "cannot be used",
+            ]):
+                logger.warning(
+                    "Corrupted DuckDB detected (%s); deleting %s",
+                    probe_err, path,
+                )
+                path.unlink(missing_ok=True)
+                for suffix in (".wal", ".tmp"):
+                    extra = path.with_suffix(path.suffix + suffix)
+                    extra.unlink(missing_ok=True)
+            else:
+                raise
+
     try:
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
         conn = duckdb.connect(str(path), read_only=read_only)
+
+        # Increase memory limit for large bulk inserts (ART index needs room)
+        if not read_only:
+            try:
+                conn.execute("SET memory_limit = '500MB'")
+            except Exception:
+                pass
 
         return conn
 

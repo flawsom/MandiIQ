@@ -287,8 +287,18 @@ app.add_middleware(
 async def health():
     health_stats.health_count += 1
     """Liveness check with full data counts for the documentation page."""
-    conn = get_connection()
-    init_schema(conn)
+    try:
+        conn = get_connection()
+        init_schema(conn)
+    except Exception as health_err:
+        return {
+            "status": "degraded",
+            "message": f"DB initialization failed: {health_err}",
+            "n_prices": 0, "n_commodities": 0, "n_states": 0,
+            "n_districts": 0, "n_rainfall": 0,
+            "n_rainfall_below_threshold": 0,
+            "n_rdd_results": 0, "last_run_utc": None, "last_outcome": "error",
+        }
 
     n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
     n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
