@@ -120,3 +120,22 @@ verify_dashboard.mjs
 # Data chunks (local-only, generated from DuckDB/CSV)
 mandi_rdd/data/chunks/
 mandi_rdd/data/chunks50/
+
+# DuckDB data files (too large, managed via R2/EBS)
+mandi_rdd/data/*.duckdb
+
+# Temp scripts, logs, screenshots (local artifacts)
+_upload_chunks.ps1
+_upload_log.txt
+*_login.png
+current_state.png
+*.log
+*.out
+
+# Node artifacts in root
+/package.json
+/package-lock.json
+
+# Generated docs
+docs/webgl_hero.js
+mandi_rdd/dashboard/webgl_hero.js
