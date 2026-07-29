@@ -1,4 +1,2 @@
 *.duckdb filter=lfs diff=lfs merge=lfs -text
 *.duckdb.gz filter=lfs diff=lfs merge=lfs -text
-tmp_verify_test_5120/verify_mandi_iq.duckdb.gz filter=lfs diff=lfs merge=lfs -text
-mandi_rdd/data/historical/agmarknet_ashoka.csv filter=lfs diff=lfs merge=lfs -text

@@ -116,3 +116,7 @@ verify_dashboard.mjs
 .freebuff/
 .cbmignore*
 .codebuffrc*
+
+# Data chunks (local-only, generated from DuckDB/CSV)
+mandi_rdd/data/chunks/
+mandi_rdd/data/chunks50/
