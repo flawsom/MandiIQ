@@ -287,77 +287,82 @@ app.add_middleware(
 async def health():
     health_stats.health_count += 1
     """Liveness check with full data counts for the documentation page."""
+    conn = None
     try:
         conn = get_connection()
         init_schema(conn)
-    except Exception as health_err:
-        return {
-            "status": "degraded",
-            "message": f"DB initialization failed: {health_err}",
-            "n_prices": 0, "n_commodities": 0, "n_states": 0,
-            "n_districts": 0, "n_rainfall": 0,
-            "n_rainfall_below_threshold": 0,
-            "n_rdd_results": 0, "last_run_utc": None, "last_outcome": "error",
-        }
-
-    n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
-    n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
-    n_states = conn.execute("SELECT COUNT(DISTINCT state) FROM prices").fetchone()[0]
-    n_districts = conn.execute("SELECT COUNT(DISTINCT district) FROM prices").fetchone()[0]
-    n_rainfall = conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]
-    n_rainfall_filtered = conn.execute(
-        "SELECT COUNT(*) FROM rainfall WHERE departure_pct BETWEEN -100 AND 200"
-    ).fetchone()[0]
-    rainfall_below = conn.execute(
-        "SELECT COUNT(*) FROM rainfall WHERE departure_pct < -19"
-    ).fetchone()[0]
-    n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
-
-    n_ndvi = None
-    n_ndvi_districts = None
-    try:
-        n_ndvi = conn.execute("SELECT COUNT(*) FROM ndvi").fetchone()[0]
-        n_ndvi_districts = conn.execute(
-            "SELECT COUNT(DISTINCT district) FROM ndvi"
+        
+        n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
+        n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
+        n_states = conn.execute("SELECT COUNT(DISTINCT state) FROM prices").fetchone()[0]
+        n_districts = conn.execute("SELECT COUNT(DISTINCT district) FROM prices").fetchone()[0]
+        n_rainfall = conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]
+        n_rainfall_filtered = conn.execute(
+            "SELECT COUNT(*) FROM rainfall WHERE departure_pct BETWEEN -100 AND 200"
         ).fetchone()[0]
-    except Exception:
-        pass
+        rainfall_below = conn.execute(
+            "SELECT COUNT(*) FROM rainfall WHERE departure_pct < -19"
+        ).fetchone()[0]
+        n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
 
-    # Read last ingest status
-    last_run_utc = None
-    last_outcome = None
-    try:
-        status_path = (
-            Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        n_ndvi = None
+        n_ndvi_districts = None
+        try:
+            n_ndvi = conn.execute("SELECT COUNT(*) FROM ndvi").fetchone()[0]
+            n_ndvi_districts = conn.execute(
+                "SELECT COUNT(DISTINCT district) FROM ndvi"
+            ).fetchone()[0]
+        except Exception:
+            pass
+
+        # Read last ingest status
+        last_run_utc = None
+        last_outcome = None
+        try:
+            status_path = (
+                Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+            )
+            if status_path.exists():
+                with open(status_path) as f:
+                    record = json.load(f)
+                last_run_utc = record.get("last_run_utc")
+                last_outcome = record.get("outcome")
+        except Exception:
+            pass
+
+        return HealthResponse(
+            status="healthy",
+            llm_fallback_count=get_llm_fallback_count(),
+            n_prices=n_prices,
+            n_commodities=n_commodities,
+            n_states=n_states,
+            n_districts=n_districts,
+            n_rainfall=n_rainfall,
+            n_rainfall_filtered=n_rainfall_filtered,
+            rainfall_below_threshold=rainfall_below,
+            n_rdd_results=n_rdd,
+            n_ndvi=n_ndvi,
+            n_ndvi_districts=n_ndvi_districts,
+            last_run_utc=last_run_utc,
+            last_outcome=last_outcome,
         )
-        if status_path.exists():
-            with open(status_path) as f:
-                record = json.load(f)
-            last_run_utc = record.get("last_run_utc")
-            last_outcome = record.get("outcome")
-    except Exception:
-        pass
+    except Exception as health_err:
+        return HealthResponse(
+            status="degraded",
+            llm_fallback_count=get_llm_fallback_count(),
+            n_prices=0, n_commodities=0, n_states=0,
+            n_districts=0, n_rainfall=0, n_rainfall_filtered=0,
+            rainfall_below_threshold=0, n_rdd_results=0,
+            n_ndvi=None, n_ndvi_districts=None,
+            last_run_utc=None, last_outcome="error",
+        )
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
-    conn.close()
-
-    return HealthResponse(
-        status="healthy",
-        llm_fallback_count=get_llm_fallback_count(),
-        n_prices=n_prices,
-        n_commodities=n_commodities,
-        n_states=n_states,
-        n_districts=n_districts,
-        n_rainfall=n_rainfall,
-        n_rainfall_filtered=n_rainfall_filtered,
-        rainfall_below_threshold=rainfall_below,
-        n_rdd_results=n_rdd,
-        n_ndvi=n_ndvi,
-        n_ndvi_districts=n_ndvi_districts,
-        n_tests=71,
-        last_run_utc=last_run_utc,
-        last_outcome=last_outcome,
-        commodities_analyzed=state.commodities[:20],
-    )
 
 
 @app.get("/freshness", tags=["System"])
