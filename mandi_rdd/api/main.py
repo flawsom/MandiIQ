@@ -77,7 +77,8 @@ class HealthResponse(BaseModel):
     n_tests: int = 71
     last_run_utc: Optional[str] = None
     last_outcome: Optional[str] = None
-    commodities_analyzed: list[str]
+    commodities_analyzed: list[str] = []
+
 
 
 class PriceRecord(BaseModel):
@@ -188,6 +189,7 @@ async def lifespan(app: FastAPI):
     init_schema(conn)
     
     # Check data freshness and auto-trigger pipeline if needed
+    should_trigger_pipeline = False
     try:
         df = conn.execute("SELECT DISTINCT commodity FROM prices ORDER BY commodity").fetchdf()
         state.commodities = df["commodity"].tolist() if len(df) > 0 else []
@@ -196,29 +198,34 @@ async def lifespan(app: FastAPI):
         n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
         
         logger.info(f"Startup data check: {n_prices} prices, {n_rainfall} rainfall, {n_rdd} RDD results")
-        
-        # Auto-trigger pipeline if data is missing or stale
-        if n_prices < 100 or n_rainfall < 10 or n_rdd < 1:
-            logger.warning("Data is stale or missing - triggering auto-pipeline in background...")
-            
-            def _auto_pipeline():
-                import time as _t
-                _start = _t.time()
-                try:
-                    from mandi_rdd.ingestion.scheduler import run_ingestion
-                    logger.info("Auto-pipeline starting...")
-                    summary = run_ingestion()
-                    duration = round(_t.time() - _start, 1)
-                    logger.info(f"Auto-pipeline finished in {duration}s: {summary.get('status')}")
-                except Exception as e:
-                    logger.error(f"Auto-pipeline failed: {e}")
-            
-            threading.Thread(target=_auto_pipeline, daemon=True).start()
+        should_trigger_pipeline = (n_prices < 100 or n_rainfall < 10 or n_rdd < 1)
     except Exception:
         state.commodities = []
-    
-    conn.close()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    if should_trigger_pipeline:
+        logger.warning("Data is stale or missing - triggering auto-pipeline in background...")
+        
+        def _auto_pipeline():
+            import time as _t
+            _start = _t.time()
+            try:
+                from mandi_rdd.ingestion.scheduler import run_ingestion
+                logger.info("Auto-pipeline starting...")
+                summary = run_ingestion()
+                duration = round(_t.time() - _start, 1)
+                logger.info(f"Auto-pipeline finished in {duration}s: {summary.get('status')}")
+            except Exception as e:
+                logger.error(f"Auto-pipeline failed: {e}")
+        
+        threading.Thread(target=_auto_pipeline, daemon=True).start()
+
     metrics_push.start_push_thread()
+
     # Warm the in-memory dashboard cache so heartbeat shows Fresh on boot
     global _dashboard_last_refresh, _dashboard_file_mtime
     if dashboard_json is not None:
@@ -345,6 +352,7 @@ async def health():
             n_ndvi_districts=n_ndvi_districts,
             last_run_utc=last_run_utc,
             last_outcome=last_outcome,
+            commodities_analyzed=state.commodities[:20],
         )
     except Exception as health_err:
         return HealthResponse(
@@ -355,6 +363,7 @@ async def health():
             rainfall_below_threshold=0, n_rdd_results=0,
             n_ndvi=None, n_ndvi_districts=None,
             last_run_utc=None, last_outcome="error",
+            commodities_analyzed=[],
         )
     finally:
         if conn is not None:
