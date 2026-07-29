@@ -199,7 +199,7 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         # Increase memory limit for large bulk inserts (ART index needs room)
         if not read_only:
             try:
-                conn.execute("SET memory_limit = '300MB'")
+                conn.execute("SET memory_limit = '200MB'")
             except Exception:
                 pass
 
