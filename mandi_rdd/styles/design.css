@@ -1,7 +1,7 @@
 /* ============================================
-   DESIGN TOKENS — Alche Studio (alche.studio) Inspired
+   DESIGN TOKENS — MandiIQ Design System
    ============================================
-   This file captures the design system of Alche, Inc.
+   This file captures the MandiIQ design system.
    A dark, immersive, Japanese creative studio aesthetic.
    ============================================ */
 
@@ -14,7 +14,7 @@
     --color-surface-glass-hover: rgba(255, 255, 255, 0.08);
 
     /* Accents */
-    --color-primary: #d7ff00;      /* Alche Lime Accent */
+    --color-primary: #d7ff00;      /* Lime Accent */
     --color-primary-rgb: 215, 255, 0;
     --color-rust: #D9663B;         /* Deficit Rust - price spike/risk */
     --color-sage: #8FAE89;         /* Monsoon Sage - healthy NDVI */
@@ -108,7 +108,7 @@
     animation: drift-b 40s var(--ease-soft) infinite alternate;
 }
 
-  /* Drifter layer -- Alche Studio multi-blob ambient system */
+  /* Drifter layer -- multi-blob ambient system */
   .atmosphere-drifter {
       position: absolute;
       width: var(--s, 160px);
@@ -455,7 +455,7 @@
 }
 
 /* ============================================
-   Animation Utilities — Alche Studio Motion
+   Animation Utilities
    ============================================ */
 
 .fade-in-left {
@@ -685,3 +685,4 @@ div[data-testid="stMetric"]:hover {
     box-shadow: 0 0 0 0 rgba(143, 174, 137, 0.6);
     animation: live-pulse 2.4s ease-out infinite;
 }
+

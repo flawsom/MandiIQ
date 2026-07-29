@@ -76,3 +76,4 @@ def render():
         MandiIQ Dashboard • Real data, no mock fallbacks
     </p>
     """, unsafe_allow_html=True)
+

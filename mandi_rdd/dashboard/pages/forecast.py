@@ -15,7 +15,7 @@ current month), we present an honest, data-driven *price outlook*:
 When a longer historical series is available, a Prophet trend is layered on
 top automatically.
 
-Alche Studio Design: glass KPI strip, glass chart panels, interpretation boxes,
+Design: glass KPI strip, glass chart panels, interpretation boxes,
 section labels, consistent monochrome-lime palette.
 """
 
@@ -284,3 +284,4 @@ def render():
         '</div>',
         unsafe_allow_html=True,
     )
+

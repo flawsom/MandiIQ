@@ -94,3 +94,4 @@ def render():
         Data source: data.gov.in Agmarknet • No synthetic fallbacks ever
     </p>
     """, unsafe_allow_html=True)
+

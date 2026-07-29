@@ -4,7 +4,7 @@ MandiIQ — Executive Overview page.
 Headline finding, KPI panel, price trend by district/commodity.
 Includes "Ask MandiIQ" AI chat panel (Phase 11 — OpenRouter multi-model routing).
 
-Alche Studio Design: glass cards, interpretation boxes, crosshair panels,
+Design: glass cards, interpretation boxes, crosshair panels,
 section labels, and consistent monochrome-lime palette.
 """
 
@@ -533,7 +533,7 @@ def _cached_freshness():
 
 def _render_ask_panel(default_commodity: str):
     """
-    Render the 'Ask MandiIQ' AI chat panel with Alche-styled components.
+    Render the 'Ask MandiIQ' AI chat panel with Styled components.
     """
     st.markdown(
         """
@@ -692,7 +692,7 @@ def _render_ask_panel(default_commodity: str):
 
 
 def _render_chat_entry(entry: dict, idx: int):
-    """Render a single chat entry using Alche interpretation box styling."""
+    """Render a single chat entry using interpretation box styling."""
     answer = entry.get("answer", "No answer generated.")
     model_used = entry.get("model_used")
     endpoints_used = entry.get("endpoints_used", [])
@@ -797,3 +797,4 @@ def _render_national_monsoon_strip():
         st.markdown('</div>', unsafe_allow_html=True)
     except Exception:
         return
+

@@ -4,7 +4,7 @@ MandiIQ — Causal Explorer page.
 RDD discontinuity plot, bandwidth sensitivity, placebo tests,
 density check, fixed-effects cross-check — the full causal story.
 
-Alche Studio Design: crosshair-panel glass cards, section labels,
+Design: crosshair-panel glass cards, section labels,
 glass KPI strip, interpretation boxes, consistent monochrome-lime palette.
 """
 
@@ -194,3 +194,4 @@ def render(**kwargs):
         '</p>',
         unsafe_allow_html=True,
     )
+

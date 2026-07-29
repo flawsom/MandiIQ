@@ -114,3 +114,4 @@ def render():
         Timestamp: 2026-07-18 • Last pipeline run: see /settings for details
     </p>
     """, unsafe_allow_html=True)
+

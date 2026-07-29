@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ═══════════════════════════════════════════════════════════
-           1. DESIGN TOKENS — Alche Studio Inspired
+           1. DESIGN TOKENS — MandiIQ Inspired
            ═══════════════════════════════════════════════════════════ */
         :root {
             --bg-base: #000000;
@@ -561,7 +561,7 @@
         <div class="atmosphere-drifter" style="--x:20%;--y:30%;--s:160px;--d:28s;--op:0.05"></div>
         <div class="atmosphere-drifter" style="--x:70%;--y:20%;--s:120px;--d:38s;--hue:80;--op:0.04"></div>
         <div class="atmosphere-drifter" style="--x:50%;--y:75%;--s:180px;--d:42s;--op:0.035"></div>
-        <!-- Two additional drifters per replication prompt: 5 total for full Alche coverage -->
+        <!-- Two additional drifters per replication prompt: 5 total for full ambient coverage -->
         <div class="atmosphere-drifter" style="--x:88%;--y:12%;--s:130px;--d:45s;--hue:120;--op:0.035"></div>
         <div class="atmosphere-drifter" style="--x:8%;--y:65%;--s:100px;--d:30s;--op:0.03"></div>
     </div>
@@ -878,17 +878,17 @@ flowchart LR
                         ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
                         : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
                 }
-                localStorage.setItem('alche_surface', enabled ? '1' : '0');
+                localStorage.setItem('ambient_surface', enabled ? '1' : '0');
             }
             // Restore saved preference
-            if (localStorage.getItem('alche_surface') === '1') applySurface(true);
+            if (localStorage.getItem('ambient_surface') === '1') applySurface(true);
             // Toggle button click
             document.getElementById('surface-toggle')?.addEventListener('click', function() {
                 applySurface(!document.body.classList.contains('theme-surface'));
             });
             // Cross-tab sync
             window.addEventListener('storage', function(e) {
-                if (e.key === 'alche_surface') applySurface(e.newValue === '1');
+                if (e.key === 'ambient_surface') applySurface(e.newValue === '1');
             });
         })();
     </script>
@@ -898,3 +898,4 @@ flowchart LR
     </script>
 </body>
 </html>
+

@@ -4,8 +4,8 @@ MandiIQ — Settings page.
 Data source status, model routing status, theme controls.
 Shows live health of all connected APIs.
 
-Alche Studio Design: glass status cards, section headers,
-database table with Alche tokens, consistent monochrome-lime palette.
+Design: glass status cards, section headers,
+database table with design tokens, consistent monochrome-lime palette.
 """
 
 import sys
@@ -386,3 +386,5 @@ def render():
         '</p>',
         unsafe_allow_html=True
     )
+
+

@@ -4,8 +4,7 @@ MandiIQ — Shared design-system theme (Layer 2 of the design system).
 Single source of truth for all injected CSS consumed by the dashboard pages.
 Every page calls inject_theme() once at the top of its render() function.
 
-Visual Aesthetic: Stark, immersive monochrome with chartreuse/lime highlights
-inspired by Alche Studio (alche.studio).
+Visual Aesthetic: Stark, immersive monochrome with chartreuse/lime highlights.
 """
 
 from pathlib import Path
@@ -55,13 +54,13 @@ COMMODITY_COLORS = {
     "Potato": "#B98354",
 }
 
-# Palette shorthand (Alche Studio aesthetic: monochrome-lime)
-INK      = "#000000"      # Alche Pure Black
-SLATE    = "#111111"      # Alche Dark Charcoal Card
+# Palette shorthand (monochrome-lime)
+INK      = "#000000"      # Pure Black
+SLATE    = "#111111"      # Dark Charcoal Card
 PAPER    = "#FFFFFF"      # Stark White Text
 MUTED    = "#bababa"      # High Muted Grey
 FAINT    = "#7e7e7e"      # Medium Muted Grey
-TURMERIC = "#d7ff00"      # Alche Lime Accent
+TURMERIC = "#d7ff00"      # Lime Accent
 RUST     = "#D9663B"      # Deficit Alert
 SAGE     = "#8FAE89"      # healthy NDVI
 
@@ -448,3 +447,4 @@ def render_ledger_table(df, columns=None, commodity_col=None, highlight_col=None
 
     html += "</tbody></table>"
     st.markdown(html, unsafe_allow_html=True)
+

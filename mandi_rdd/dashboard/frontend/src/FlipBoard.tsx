@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo } from "react";
 import { Streamlit } from "streamlit-component-lib";
 
 /* ═══════════════════════════════════════════════════════════
-   MandiIQ Flip-Board KPI Hero — Alche Studio Design Refined.
+   MandiIQ Flip-Board KPI Hero — MandiIQ Design.
 
    Pure black canvas · Lime (#d7ff00) single accent
    Glass cards · Crosshair corner markers on hover
@@ -24,7 +24,7 @@ export interface KpiData {
   mape: KpiItem;
 }
 
-// Alche-inspired palette
+// MandiIQ-inspired palette
 const COLORS = {
   bg: "#000000",
   surface: "#0a0a0a",
@@ -81,7 +81,7 @@ const DigitCell = React.memo(function DigitCell({
   );
 });
 
-// ── Single KPI card with Alche styling ──
+// ── Single KPI card styling ──
 
 interface KpiCardProps {
   item: KpiItem;
@@ -180,7 +180,7 @@ export default function FlipBoard({ kpis }: FlipBoardProps) {
                       border-color 0.35s ease;
         }
 
-        /* Crosshair corner markers — Alche active-target pattern */
+        /* Crosshair corner markers — active-target pattern */
         .flip-kpi-card::before {
           content: '';
           position: absolute;
@@ -305,3 +305,4 @@ export default function FlipBoard({ kpis }: FlipBoardProps) {
     </div>
   );
 }
+

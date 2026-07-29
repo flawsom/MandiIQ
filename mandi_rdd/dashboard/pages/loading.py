@@ -103,3 +103,4 @@ def render():
         Auto-refreshing... (page will reload when cache is ready)
     </p>
     """, unsafe_allow_html=True)
+

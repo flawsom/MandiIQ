@@ -4,7 +4,7 @@ MandiIQ — Risk Map page.
 Full district ledger with pagination, sortable by rainfall deficit or price change.
 Optional choropleth-style grid visualization.
 
-Alche Studio Design: glass cards, interpretation boxes, section labels,
+Design: glass cards, interpretation boxes, section labels,
 consistent monochrome-lime palette.
 """
 
@@ -261,3 +261,4 @@ def render():
                         border-radius:2px;margin-right:4px;"></span> No Data (unmapped district)</div>
     </div>
     """, unsafe_allow_html=True)
+

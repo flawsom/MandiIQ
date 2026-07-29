@@ -325,3 +325,4 @@ def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", P
     with col4:
         st.markdown("**Avatar**")
         skeleton("avatar")
+

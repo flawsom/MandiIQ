@@ -4,7 +4,7 @@ MandiIQ — Onboarding page.
 First-run walkthrough: 3 steps, skippable, session-only.
 Explains what the app does, how to use Ask MandiIQ, and how to follow districts.
 
-Alche Studio Design: crosshair-panel glass cards, interpretation boxes,
+Design: crosshair-panel glass cards, interpretation boxes,
 consistent monochrome-lime palette.
 """
 
@@ -193,3 +193,4 @@ def render_step_3():
         </div>
     </div>
     """, unsafe_allow_html=True)
+

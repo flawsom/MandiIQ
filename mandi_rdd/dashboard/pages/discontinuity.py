@@ -7,7 +7,7 @@ MandiIQ — Rainfall Discontinuity (Regression Discontinuity Design)
 ─────────────────────────────────────────────────────────────────
 RDD on India's IMD rainfall-deficit classification.
 
-Alche Studio Design: glass KPI strip, crosshair chart panels,
+Design: glass KPI strip, crosshair chart panels,
 interpretation boxes, consistent monochrome-lime palette.
 """
 
@@ -432,3 +432,4 @@ def render():
         "rolling recent window, so this page reports the real rainfall‑discontinuity evidence and the "
         "cross‑sectional price–deficit association."
     )
+

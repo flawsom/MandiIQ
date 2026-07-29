@@ -112,10 +112,6 @@ verify_dashboard.mjs
 # IDE/agent directories
 .qoder/
 
-# Freebuff desktop app data
-.freebuff/
-.cbmignore*
-.codebuffrc*
 
 # Data chunks (local-only, generated from DuckDB/CSV)
 mandi_rdd/data/chunks/

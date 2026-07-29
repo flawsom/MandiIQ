@@ -141,7 +141,7 @@ MandiIQ implements fallback states and automated recovery pipelines to handle sy
 
 ## 6. Visual Polish & Creative Studio Aesthetic
 
-To distinguish MandiIQ from typical data dashboards, we upgraded the frontend styling, adapting the design language of the Japanese creative house **Alche Studio (alche.studio)**:
+To distinguish MandiIQ from typical data dashboards, we upgraded the frontend styling, adapting a modern creative-studio design language:
 
 ### 6.1 Monochrome Surface System
 
@@ -193,9 +193,9 @@ The icons are Lucide-compatible (24×24 viewBox, `stroke="currentColor"`, `strok
 - **Dot Grid:** A 38px-spaced radial-gradient dot pattern at 0.04 opacity provides a subtle pixel-grid texture without distracting from content.
 - **Groovy Decorative Paths:** The `docs/index.html` hero includes three flowing SVG bezier paths at varying opacities (0.15 → 0.08) and two drifting accent dots, adding organic motion to the otherwise rigid frame-drawing aesthetic.
 
-### 6.6 Static Pages Alche Parity Audit
+### 6.6 Static Pages Design Parity Audit
 
-All three static pages (`docs/index.html`, `landing/index.html`, `landing/mandi-iq/index.html`) were audited against the dashboard's Alche implementation and brought to full parity:
+All three static pages (`docs/index.html`, `landing/index.html`, `landing/mandi-iq/index.html`) were audited against the dashboard's design system implementation and brought to full parity:
 
 | Feature | Dashboard | `docs/index.html` | `landing/index.html` | `landing/mandi-iq/index.html` |
 |---------|:---------:|:---:|:---:|:---:|
@@ -223,3 +223,4 @@ The design system is organized in three layers:
 | **1. Tokens** | `styles/design.css` | CSS custom properties (`--color-*`, `--font-*`, `--ease-*`, `--hairline`), base component classes (`.glass`, `.crosshair-panel`, `.slot-btn`, `.ledger-table`), surface mode overrides (`.theme-surface`) |
 | **2. Theme Injection** | `dashboard/theme.py` | One-shot session-state-gated CSS injection (`inject_theme()`), atmosphere HTML + IntersectionObserver scroll reveal (`inject_atmosphere()`), commodity color lookup, ledger table rendering |
 | **3. App Integration** | `dashboard/app.py` | Toggle JS (localStorage + URL sync + cross-tab listener), surface mode CSS overrides (`!important`), hidden `st.button` for top-bar toggle, sidebar `st.toggle`, settings page `st.button` |
+

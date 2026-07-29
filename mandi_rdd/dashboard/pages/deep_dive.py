@@ -3,7 +3,7 @@ MandiIQ — Deep Dive page.
 
 Raw data explorer, analytical SQL query results.
 
-Alche Studio Design: glass cards for data and SQL tabs,
+Design: glass cards for data and SQL tabs,
 section headers, consistent monochrome-lime palette.
 """
 
@@ -140,3 +140,4 @@ def render(**kwargs):
                         f'<div class="interpretation-box insig-box">SQL file not found: {filename}</div>',
                         unsafe_allow_html=True,
                     )
+

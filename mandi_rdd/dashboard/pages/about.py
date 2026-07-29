@@ -4,7 +4,7 @@ MandiIQ — About / Methodology page.
 Explains the RDD spec, robustness checks, limitations, and data sources.
 No mock data — all references are to real external data sources.
 
-Alche Studio Design: glass cards for methodology sections,
+Design: glass cards for methodology sections,
 interpretation boxes, section labels, consistent monochrome-lime palette.
 """
 
@@ -249,3 +249,4 @@ def render():
         '</p>',
         unsafe_allow_html=True
     )
+

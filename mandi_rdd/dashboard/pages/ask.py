@@ -4,7 +4,7 @@ MandiIQ — Ask MandiIQ Full Page.
 Expanded chat interface with conversation history.
 Dedicated route for in-depth Q&A sessions.
 
-Alche Studio Design: crosshair chat cards, interpretation boxes,
+Design: crosshair chat cards, interpretation boxes,
 section headers, consistent monochrome-lime palette.
 """
 
@@ -161,7 +161,7 @@ def _send_query(query: str):
 
 
 def _render_chat_entry(entry: dict):
-    """Render a single chat entry with crosshair panels and Alche styling."""
+    """Render a single chat entry with crosshair panels and styling."""
     query = entry.get("query", "")
     answer = entry.get("answer", "No answer generated.")
     model_used = entry.get("model_used")
@@ -199,3 +199,4 @@ def _render_chat_entry(entry: dict):
                 </span>
             </div>
         """, unsafe_allow_html=True)
+

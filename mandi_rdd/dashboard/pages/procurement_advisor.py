@@ -4,7 +4,7 @@ MandiIQ — Procurement Advisor page.
 Interactive prescriptive recommendation combining causal effect,
 risk score, and forecast.
 
-Alche Studio Design: glass KPI strip, interpretation boxes,
+Design: glass KPI strip, interpretation boxes,
 section headers, consistent monochrome-lime palette.
 """
 
@@ -115,3 +115,4 @@ def render(**kwargs):
                 <div style="font-size:1rem;margin-top:0.5rem;color:#7e7e7e;">Run the nightly pipeline to generate recommendations.</div>
             </div>
         """, unsafe_allow_html=True)
+

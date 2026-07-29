@@ -3,7 +3,7 @@ MandiIQ — Risk & Forecast page.
 
 Classifier risk scores by district and Prophet forecast chart.
 
-Alche Studio Design: glass KPI strip, glass chart panels, glass comparison cards,
+Design: glass KPI strip, glass chart panels, glass comparison cards,
 section headers, consistent monochrome-lime palette.
 """
 
@@ -285,3 +285,4 @@ def render(**kwargs):
                     f'<div class="interpretation-box insig-box">Forecast unavailable: {e}</div>',
                     unsafe_allow_html=True,
                 )
+

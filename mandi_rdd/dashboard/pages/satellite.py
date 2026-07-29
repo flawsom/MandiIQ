@@ -4,7 +4,7 @@ MandiIQ — Satellite View (NDVI) page.
 District map colored by NDVI anomaly.
 Side-by-side NDVI trend vs. rainfall trend — the cross-check from the system PRD.
 
-Alche Studio Design: glass cards, interpretation boxes, glass KPI strip,
+Design: glass cards, interpretation boxes, glass KPI strip,
 section labels, consistent monochrome-lime palette.
 """
 
@@ -293,3 +293,4 @@ def render():
         Data source: Sentinel-2 / Copernicus Programme
     </p>
     """, unsafe_allow_html=True)
+

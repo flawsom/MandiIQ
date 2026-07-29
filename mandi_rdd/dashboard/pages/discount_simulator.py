@@ -4,7 +4,7 @@ MandiIQ — Discount Approval Simulator (Superstore extension).
 Calculate optimal discount, safe range, and loss probability for retail promotions.
 SHAP contribution mini-chart explains the model's decision.
 
-Alche Studio Design: glass cards, glass result panels, section headers,
+Design: glass cards, glass result panels, section headers,
 interpretation boxes, consistent monochrome-lime palette.
 """
 
@@ -299,3 +299,4 @@ def _render_shap_chart(shap_values: dict):
     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
