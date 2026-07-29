@@ -686,3 +686,47 @@ div[data-testid="stMetric"]:hover {
     animation: live-pulse 2.4s ease-out infinite;
 }
 
+/* Mobile & Tablet Cross-Platform Responsiveness */
+@media (max-width: 768px) {
+    body, html {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+
+    .slot-btn, button, [role="button"], input, select {
+        min-height: 44px !important;
+        touch-action: manipulation;
+    }
+
+    .kpi-grid, div[data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    .glass-card, .crosshair-panel {
+        padding: 16px !important;
+    }
+
+    h1, .stMarkdown h1 {
+        font-size: 1.8rem !important;
+        line-height: 1.25 !important;
+    }
+
+    h2, .stMarkdown h2 {
+        font-size: 1.4rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    div[data-testid="stMetricValue"] {
+        font-size: 1.5rem !important;
+    }
+
+    .ledger-table th, .ledger-table td {
+        padding: 8px 10px !important;
+        font-size: 0.8rem !important;
+    }
+}
+
+
