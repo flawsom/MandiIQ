@@ -127,7 +127,8 @@ mandi_rdd/data/*.duckdb
 # Temp scripts, logs, screenshots (local artifacts)
 _upload_chunks.ps1
 _upload_log.txt
-*_login.png
+_*.png
+*login*.png
 current_state.png
 *.log
 *.out
