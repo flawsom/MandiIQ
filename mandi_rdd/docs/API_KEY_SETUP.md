@@ -48,7 +48,7 @@ The public demo key on the API code is **rate-limited to ~100 requests/day**. Fo
 
 Your API key will be displayed in a single-use popup:
 ```
-Your new key is: 579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b
+Your new key is: <the popup shows it once — copy it now, never commit it>
 ```
 
 **⚠️ Save this key immediately** — it will be hidden after closing.
@@ -276,7 +276,7 @@ curl -X POST https://your-api-url/refresh
 **Never use these in code:**
 ```python
 # ❌ BAD: Hardcoded in source code
-API_KEY = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"
+API_KEY = "YOUR_API_KEY_HERE"  # committing this is exactly how keys leak
 
 # ✅ GOOD: Load from environment
 API_KEY = os.getenv("DATA_GOV_IN_API_KEY")

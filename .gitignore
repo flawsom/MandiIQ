@@ -136,3 +136,7 @@ current_state.png
 # Generated docs
 docs/webgl_hero.js
 mandi_rdd/dashboard/webgl_hero.js
+
+# Generated codebase dumps (regenerate locally with `repomix --style markdown`)
+repomix-codebase.md
+repomix-output.xml

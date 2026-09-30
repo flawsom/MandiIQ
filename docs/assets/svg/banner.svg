@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420" width="1600" height="420" role="img" aria-label="MandiIQ — causal price intelligence for India's agricultural mandis">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B0F1E"/>
+      <stop offset="55%" stop-color="#101936"/>
+      <stop offset="100%" stop-color="#0B0F1E"/>
+    </linearGradient>
+    <linearGradient id="hairline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E8B14D" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#E8B14D" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#E8B14D" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glowT" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#E8B14D" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#E8B14D" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowR" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#D9663B" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9663B" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#E8B14D" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="420" fill="url(#bg)"/>
+  <rect width="1600" height="420" fill="url(#grid)"/>
+  <ellipse cx="300" cy="230" rx="460" ry="260" fill="url(#glowT)"/>
+  <ellipse cx="1310" cy="110" rx="430" ry="250" fill="url(#glowR)"/>
+  <rect x="0" y="0" width="1600" height="1.5" fill="url(#hairline)"/>
+  <rect x="0" y="418.5" width="1600" height="1.5" fill="url(#hairline)"/>
+
+  <!-- Wordmark -->
+  <text x="84" y="186" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="92" font-weight="700" letter-spacing="-1" fill="#F2EFE6">Mandi<tspan fill="#E8B14D">IQ</tspan></text>
+  <text x="88" y="236" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" fill="#C7D0DD">Causal price intelligence for India&#8217;s agricultural mandis</text>
+  <text x="88" y="274" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" fill="#8B96A8">RDD causal inference &#183; forecasting &#183; DuckDB warehouse &#183; hourly live data</text>
+
+  <!-- Tech pills -->
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#E8B14D">
+    <rect x="88" y="306" rx="15" width="98" height="30" fill="#E8B14D" fill-opacity="0.10" stroke="#E8B14D" stroke-opacity="0.35"/>
+    <text x="137" y="326" text-anchor="middle">FastAPI</text>
+    <rect x="200" y="306" rx="15" width="106" height="30" fill="#E8B14D" fill-opacity="0.10" stroke="#E8B14D" stroke-opacity="0.35"/>
+    <text x="253" y="326" text-anchor="middle">Streamlit</text>
+    <rect x="320" y="306" rx="15" width="96" height="30" fill="#E8B14D" fill-opacity="0.10" stroke="#E8B14D" stroke-opacity="0.35"/>
+    <text x="368" y="326" text-anchor="middle">DuckDB</text>
+    <rect x="430" y="306" rx="15" width="124" height="30" fill="#E8B14D" fill-opacity="0.10" stroke="#E8B14D" stroke-opacity="0.35"/>
+    <text x="492" y="326" text-anchor="middle">Python 3.12</text>
+  </g>
+
+  <!-- RDD discontinuity card -->
+  <rect x="880" y="62" width="640" height="296" rx="18" fill="#0E1428" stroke="#1E2A44"/>
+  <text x="912" y="100" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" fill="#8B96A8">Regression discontinuity &#183; onion modal price</text>
+  <text x="1184" y="152" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#E8B14D">+24.5% price jump</text>
+
+  <!-- cutoff line -->
+  <line x1="1160" y1="120" x2="1160" y2="332" stroke="#E8B14D" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <rect x="1078" y="118" rx="12" width="164" height="26" fill="#E8B14D" fill-opacity="0.10" stroke="#E8B14D" stroke-opacity="0.35"/>
+  <text x="1160" y="135.5" text-anchor="middle" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#E8B14D">IMD &#8722;19% cutoff</text>
+
+  <!-- pre-cutoff regression -->
+  <line x1="922" y1="272" x2="1136" y2="250" stroke="#7C8AA0" stroke-width="3" stroke-linecap="round"/>
+  <g fill="#7C8AA0">
+    <circle cx="934" cy="271" r="3.5"/><circle cx="986" cy="266" r="3.5"/><circle cx="1038" cy="259" r="3.5"/><circle cx="1090" cy="254" r="3.5"/><circle cx="1132" cy="251" r="3.5"/>
+  </g>
+
+  <!-- post-cutoff regression -->
+  <line x1="1186" y1="182" x2="1470" y2="164" stroke="#E8B14D" stroke-width="4" stroke-linecap="round"/>
+  <g fill="#E8B14D">
+    <circle cx="1196" cy="181" r="4"/><circle cx="1254" cy="176" r="4"/><circle cx="1312" cy="172" r="4"/><circle cx="1370" cy="169" r="4"/><circle cx="1428" cy="166" r="4"/><circle cx="1466" cy="164" r="4"/>
+  </g>
+
+  <!-- axis -->
+  <line x1="922" y1="332" x2="1470" y2="332" stroke="#1E2A44" stroke-width="1.5"/>
+  <text x="922" y="352" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#5B6572">rainfall departure &#8594;</text>
+  <text x="1466" y="352" text-anchor="end" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#5B6572">p = 0.003</text>
+</svg>

@@ -303,7 +303,7 @@ MandiIQ reads exactly **4** environment variables at runtime. Only `PORT` has no
 | `MANDIIQ_API_URL` | No | Your deployed API base URL | `dashboard/app.py` (Dashboard → API) | `http://localhost:8000` |
 | `PORT` | No | Set automatically by platform | `api/main.py` (uvicorn) | `8000` |
 
-> **`DATA_GOV_IN_API_KEY`:** The public demo key (`579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b`) is used by default and works for testing, but is rate-limited to ~100 requests/day. For production, register at [data.gov.in](https://api.data.gov.in/manage), create an API key, and set it as this environment variable. The key is consumed by `fetch_prices.py` and `fetch_rainfall.py` — without it, the nightly pipeline cannot pull live data and the dashboard will show empty tables.
+> **`DATA_GOV_IN_API_KEY`:** Register a free key at [data.gov.in](https://api.data.gov.in/manage), create an API key, and set it as this environment variable. A bundled demo key used to ship here — it has been removed from the repository because committed keys are scraped within hours; rotate immediately if you ever used it. The key is consumed by `fetch_prices.py` and `fetch_rainfall.py` — without it, the nightly pipeline cannot pull live data and the dashboard will show empty tables.
 
 > **`OPENROUTER_API_KEY`:** Required only for Phase 11 (AI Orchestrator). Get a free key at [openrouter.ai/keys](https://openrouter.ai/keys) (no credit card needed). Routes across free models (`meta-llama/llama-3.1-8b-instruct:free`, `deepseek/deepseek-chat:free`, etc.) with automatic circuit-breaker fallback. Without it, the "Ask MandiIQ" chat panel shows a graceful message and the nightly narrative is skipped — the core causal/predictive/prescriptive app works perfectly without it.
 

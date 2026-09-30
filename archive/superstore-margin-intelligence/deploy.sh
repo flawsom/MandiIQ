@@ -121,12 +121,10 @@ else
     echo ""
     echo "  You need a data.gov.in API key to fetch live mandi prices."
     echo "  Get a free key at: https://api.data.gov.in/manage"
-    echo "  (Or press Enter to use the public demo key — rate-limited)"
     echo ""
-    read -r -p "  Enter your API key (or press Enter for demo key): " USER_KEY
+    read -r -p "  Enter your API key (or press Enter to set it later): " USER_KEY
     if [ -z "$USER_KEY" ]; then
-        USER_KEY="579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"
-        echo -e "  ${YELLOW}ℹ️  Using public demo key (rate-limited ~100 req/day)${NC}"
+        echo -e "  ${YELLOW}ℹ️  No key entered — set DATA_GOV_IN_API_KEY in .env before running the pipeline.${NC}"
     fi
     if [ -f "$ENV_FILE" ]; then
         env_set "DATA_GOV_IN_API_KEY" "$USER_KEY"
