@@ -322,7 +322,7 @@ async function loadHealth() {
   setPill($("status-pill"), "status: " + (h.status || "unknown"), h.status === "healthy" ? "ok" : "warn");
   setPill($("api-pill"), "v" + (h.version || "?"));
   const behind = h.days_behind;
-  const fresh = behind != null && behind <= 4;
+  const fresh = behind != null && behind <= 3; // matches the API's STALE_AFTER_DAYS
   setPill($("age-pill"), "data through " + (h.data_max_date || "?") + (behind != null ? ` (${behind}d)` : ""), fresh ? "ok" : "warn");
   $("kpis").innerHTML = [
     kpi("Price records", fmt.format(h.n_prices || 0), "rows in the live warehouse"),
@@ -332,6 +332,9 @@ async function loadHealth() {
     kpi("RDD estimates", fmt.format(h.n_rdd_results || 0), "commodities with a discontinuity fit"),
     kpi("Date integrity", (h.n_future_dates ? fmt.format(h.n_future_dates) + " anomalies" : "clean"), h.n_future_dates ? "repair queued on next run" : "no impossible arrival dates"),
     kpi("Last pipeline run", h.last_run_utc ? h.last_run_utc.slice(0, 16).replace("T", " ") + "Z" : "-", (h.last_outcome || "unknown") + (h.ingestion_running ? " - running now" : "")),
+    kpi("Self-refresh", h.refresh_runs ? `${fmt.format(h.refresh_runs - (h.refresh_failures || 0))}/${fmt.format(h.refresh_runs)}` : "not reported",
+      h.refresh_failures ? `${fmt.format(h.refresh_failures)} failed - ${h.last_refresh_error || "see server logs"}`
+        : (h.refresh_interval_s ? `every ${Math.round(h.refresh_interval_s / 60)} min, ${h.last_refresh_success_utc ? "last ok " + h.last_refresh_success_utc.slice(0, 16).replace("T", " ") + "Z" : "waiting for first run"}` : "older build")),
   ].join("");
   return h;
 }

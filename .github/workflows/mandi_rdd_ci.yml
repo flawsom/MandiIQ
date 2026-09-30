@@ -62,6 +62,12 @@ jobs:
   daily-ingest:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Shared with nightly-ingest / the manual recovery workflow: only one
+    # ingestion may hold the DuckDB at a time.
+    concurrency:
+      group: mandiiq-ingest
+      cancel-in-progress: false
     permissions:
       contents: write
       issues: write
@@ -145,7 +151,9 @@ jobs:
             echo "No database/status changes - skipping commit"
           else
             git commit -m "data: ingestion update"
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master
+            git push --force-with-lease \
+              https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git \
+              HEAD:master
           fi
 
       - name: Alert on failure (open/update GitHub Issue) - Phase 3

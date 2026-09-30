@@ -21,10 +21,21 @@ on:
 permissions:
   contents: write
 
+env:
+  # The live API. It owns the DuckDB instance and the R2 credentials, so
+  # backup and refresh operations are delegated to it instead of being
+  # re-implemented on a runner that has neither.
+  API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Serialise ingestion runs: two overlapping runs would both try to
+    # force-push the DuckDB binary and one would lose the race.
+    concurrency:
+      group: mandiiq-ingest
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,6 +70,11 @@ jobs:
       - name: Run daily ingestion + RDD + forecast
         env:
           DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+          RAINFALL_RESOURCE_ID: ${{ secrets.RAINFALL_RESOURCE_ID }}
+          # NDVI is a step inside the pipeline, not a separate job: without
+          # these the satellite step silently reports "skipped".
+          SENTINEL_CLIENT_ID: ${{ secrets.SENTINEL_CLIENT_ID }}
+          SENTINEL_CLIENT_SECRET: ${{ secrets.SENTINEL_CLIENT_SECRET }}
         run: |
           python -m mandi_rdd.ingestion.scheduler
 
@@ -67,7 +83,7 @@ jobs:
         run: |
           python -m mandi_rdd.ingestion.backfill_state --with-ashoka
 
-      - name: Validate DuckDB LFS object
+      - name: Validate the DuckDB the pipeline produced
         uses: ./.github/actions/validate-duckdb
 
       - id: commit
@@ -75,10 +91,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git lfs install --local 2>/dev/null || true
-          git add mandi_rdd/data/mandi_iq.duckdb \
-            mandi_rdd/data/last_ingest_status.json \
-            mandi_rdd/data/r2_backup_metrics.json 2>/dev/null || true
+          # Only git-tracked metadata is committed. The DuckDB itself is
+          # gitignored (mandi_rdd/data/*.duckdb) and lives on the production
+          # volume + R2; adding it here was a silent no-op for years.
+          git add mandi_rdd/data/last_ingest_status.json \
+            mandi_rdd/data/ndvi_latest.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No database changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
@@ -87,7 +104,6 @@ jobs:
             # Force-with-lease: safe for bot-only repo. Rebasing binary DuckDB
             # files causes merge conflicts between concurrent workflow runs.
             git push --force-with-lease origin master 2>&1
-            git lfs push origin master 2>&1 || echo "LFS push skipped (may not be needed)"
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -97,69 +113,40 @@ jobs:
         with:
           hook-url: https://p01--mandiiq--x4n8x4gkmzht.code.run/deploy
 
-      - name: Backup DuckDB to Cloudflare R2
+      - name: Back up the production DuckDB to Cloudflare R2
         if: steps.commit.outputs.committed == 'true'
         continue-on-error: true
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
-          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::warning::R2 secrets not configured - skipping backup"
-            exit 0
-          fi
-          BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
-          METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
-          gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
-          if [ ! -s "$BACKUP_FILE" ]; then
-            echo "::warning::gzip compression failed - skipping backup"
-            rm -f "$BACKUP_FILE"
-            exit 0
-          fi
-          if ! aws s3 cp "$BACKUP_FILE" \
-            "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" \
-            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --region auto \
-            --content-encoding gzip \
-            --only-show-errors; then
-            echo "::warning::DuckDB R2 backup failed (transient error)"
-          else
-            ORIG_SIZE=$(stat -c%s mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || stat -f%z mandi_rdd/data/mandi_iq.duckdb 2>/dev/null)
-            GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
-            PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
-            echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
-            # Compute SHA256 of the source DuckDB for content integrity verification
-            DB_SHA256=$(sha256sum mandi_rdd/data/mandi_iq.duckdb | cut -d' ' -f1)
-            # Write backup metrics for the /metrics endpoint
-            if [ -n "$DB_SHA256" ]; then
-              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
-            else
-              echo "::warning::sha256sum returned empty - writing metrics without integrity hash"
-              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
-            fi
-            echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
+          # The warehouse is gitignored (mandi_rdd/data/*.duckdb); a runner only
+          # ever has the throwaway database its own smoke-test pipeline built.
+          # Uploading that used to overwrite the real R2 backup with an empty
+          # file, so production - which owns the live DB - does the backup.
+          url="${API_BASE}/admin/backup-to-r2"
+          for attempt in 1 2 3; do
+            body=$(curl -sS --max-time 600 -X POST "$url" || true)
+            printf '%s\n' "$body" | head -c 400
+            printf '\n'
+            case "${body// /}" in
+              *'"status":"ok"'*)
+                echo "::notice::Production DuckDB backed up to R2"
+                exit 0
+                ;;
+            esac
+            echo "::warning::R2 backup attempt ${attempt} did not report ok"
+            sleep 20
+          done
+          echo "::warning::Production R2 backup did not confirm success within the retry budget"
 
-          fi
-          rm -f "$BACKUP_FILE"
 
-      - name: Verify DuckDB backup on R2
-        if: steps.commit.outputs.committed == 'true'
-        continue-on-error: true
-        uses: ./.github/actions/verify-r2-backup
-        with:
-          bucket: ${{ secrets.R2_BUCKET }}
-          account-id: ${{ secrets.R2_ACCOUNT_ID }}
-          key: "mandi_iq.duckdb.gz"
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-
+  # The full 453-commodity Ashoka CEDA historical fetch takes hours and hits
+  # an external API with 16 workers. It is a periodic enrichment, not part of
+  # the daily refresh, so it only runs on the daily schedule or a manual
+  # dispatch - never on a plain push to master.
   ashoka-import:
     needs: ingest
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: always()
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -201,7 +188,7 @@ jobs:
             echo "No Ashoka CSV found; skipping."
           fi
 
-      - name: Validate DuckDB LFS object
+      - name: Validate the DuckDB the pipeline produced
         uses: ./.github/actions/validate-duckdb
 
       - id: commit-ashoka
@@ -210,74 +197,38 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git lfs install --local 2>/dev/null || true
-          git add mandi_rdd/data/mandi_iq.duckdb \
-            mandi_rdd/data/historical/agmarknet_ashoka.csv \
-            mandi_rdd/data/r2_backup_metrics.json 2>/dev/null || true
+          # The DuckDB is gitignored; the historical CSV is the real artefact.
+          git add mandi_rdd/data/historical/agmarknet_ashoka.csv 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No database changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: ashoka historical ingest update"
             git push --force-with-lease origin master 2>&1
-            git lfs push origin master 2>&1 || echo "LFS push skipped"
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Backup DuckDB to Cloudflare R2
+      - name: Back up the production DuckDB to Cloudflare R2
         if: steps.commit-ashoka.outputs.committed == 'true'
         continue-on-error: true
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
-          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::warning::R2 secrets not configured - skipping backup"
-            exit 0
-          fi
-          BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
-          METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
-          gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
-          if [ ! -s "$BACKUP_FILE" ]; then
-            echo "::warning::gzip compression failed - skipping backup"
-            rm -f "$BACKUP_FILE"
-            exit 0
-          fi
-          if ! aws s3 cp "$BACKUP_FILE" \
-            "s3://${R2_BUCKET}/mandi_iq.duckdb.gz" \
-            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --region auto \
-            --content-encoding gzip \
-            --only-show-errors; then
-            echo "::warning::DuckDB R2 backup failed (transient error)"
-          else
-            ORIG_SIZE=$(stat -c%s mandi_rdd/data/mandi_iq.duckdb 2>/dev/null || stat -f%z mandi_rdd/data/mandi_iq.duckdb 2>/dev/null)
-            GZ_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || stat -f%z "$BACKUP_FILE" 2>/dev/null)
-            PCT=$(( (ORIG_SIZE - GZ_SIZE) * 100 / ORIG_SIZE ))
-            echo "::notice::DuckDB backed up to s3://${R2_BUCKET}/mandi_iq.duckdb.gz (${PCT}% smaller)"
-            # Compute SHA256 of the source DuckDB for content integrity verification
-            DB_SHA256=$(sha256sum mandi_rdd/data/mandi_iq.duckdb | cut -d' ' -f1)
-            # Write backup metrics for the /metrics endpoint
-            if [ -n "$DB_SHA256" ]; then
-              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
-            else
-              echo "::warning::sha256sum returned empty - writing metrics without integrity hash"
-              python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
-            fi
-            echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
+          # The warehouse is gitignored (mandi_rdd/data/*.duckdb); a runner only
+          # ever has the throwaway database its own smoke-test pipeline built.
+          # Uploading that used to overwrite the real R2 backup with an empty
+          # file, so production - which owns the live DB - does the backup.
+          url="${API_BASE}/admin/backup-to-r2"
+          for attempt in 1 2 3; do
+            body=$(curl -sS --max-time 600 -X POST "$url" || true)
+            printf '%s\n' "$body" | head -c 400
+            printf '\n'
+            case "${body// /}" in
+              *'"status":"ok"'*)
+                echo "::notice::Production DuckDB backed up to R2"
+                exit 0
+                ;;
+            esac
+            echo "::warning::R2 backup attempt ${attempt} did not report ok"
+            sleep 20
+          done
+          echo "::warning::Production R2 backup did not confirm success within the retry budget"
 
-          fi
-          rm -f "$BACKUP_FILE"
-
-      - name: Verify DuckDB backup on R2
-        if: steps.commit-ashoka.outputs.committed == 'true'
-        continue-on-error: true
-        uses: ./.github/actions/verify-r2-backup
-        with:
-          bucket: ${{ secrets.R2_BUCKET }}
-          account-id: ${{ secrets.R2_ACCOUNT_ID }}
-          key: "mandi_iq.duckdb.gz"
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}

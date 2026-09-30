@@ -17,7 +17,11 @@ jobs:
       PYTHONPATH: .
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        # 3.12 is included on purpose: runtime.txt pins 3.11 for production, and
+        # a 3.12-only syntax feature once shipped and crashed the Streamlit
+        # cockpit at import time. Testing the newest supported interpreter here
+        # means that class of bug fails CI instead of production.
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4

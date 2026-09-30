@@ -85,6 +85,70 @@ def test_health_test_count_is_measured_not_hardcoded(app_module):
     assert counted == app_module._count_tests(), "count must be stable"
 
 
+def test_health_reports_self_refresh_bookkeeping(app_module):
+    fields = set(app_module.HealthResponse.model_fields)
+    assert {
+        "last_refresh_attempt_utc",
+        "last_refresh_success_utc",
+        "last_refresh_error",
+        "refresh_runs",
+        "refresh_failures",
+        "refresh_interval_s",
+    } <= fields
+
+
+@pytest.mark.parametrize(
+    "quality,expected",
+    [
+        ({"n_rows": 0, "days_behind": None, "n_future_dates": 0}, "empty"),
+        ({"n_rows": 10, "days_behind": 1, "n_future_dates": 0}, "healthy"),
+        ({"n_rows": 10, "days_behind": 3, "n_future_dates": 0}, "healthy"),
+        ({"n_rows": 10, "days_behind": 4, "n_future_dates": 0}, "stale"),
+        ({"n_rows": 10, "days_behind": 64, "n_future_dates": 0}, "stale"),
+        ({"n_rows": 10, "days_behind": None, "n_future_dates": 0}, "unknown"),
+        ({"n_rows": 10, "days_behind": 1, "n_future_dates": 7}, "degraded"),
+    ],
+)
+def test_health_status_describes_the_data(app_module, quality, expected):
+    """The regression that matters: /health answered "healthy" while serving
+    four-month-old prices. status must be derived from the warehouse."""
+    assert app_module._health_status(quality) == expected
+
+
+def test_self_refresh_records_every_outcome(app_module, monkeypatch):
+    """A silently failing scheduler is how stale data went unnoticed, so a
+    failed run has to leave a trace on the health payload."""
+    import sys
+    import types
+
+    from mandi_rdd.ingestion import scheduler as real_scheduler
+
+    fake = types.ModuleType("mandi_rdd.ingestion.scheduler")
+    fake.ingestion_running = lambda: False
+    fake.run_ingestion = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    monkeypatch.setitem(sys.modules, "mandi_rdd.ingestion.scheduler", fake)
+
+    before = app_module._REFRESH_STATE["failures"]
+    app_module._refresh_once()
+    assert app_module._REFRESH_STATE["failures"] == before + 1
+    assert "boom" in (app_module._REFRESH_STATE["last_error"] or "")
+    assert app_module._REFRESH_STATE["last_attempt_utc"]
+
+    fake.run_ingestion = lambda *a, **k: {"status": "degraded", "error": "source down"}
+    app_module._refresh_once()
+    assert app_module._REFRESH_STATE["last_success_utc"]
+    assert app_module._REFRESH_STATE["last_error"] == "source down"
+
+    # A busy scheduler must not queue a second ingestion behind the first.
+    calls = []
+    fake.ingestion_running = lambda: True
+    fake.run_ingestion = lambda *a, **k: calls.append(1) or {"status": "success"}
+    assert app_module._refresh_once()["status"] == "busy"
+    assert calls == []
+
+    monkeypatch.setitem(sys.modules, "mandi_rdd.ingestion.scheduler", real_scheduler)
+
+
 def test_ask_schemas_keep_their_contract(app_module):
     request_fields = set(app_module.AskRequest.model_fields)
     assert {"query", "commodity", "district"} <= request_fields

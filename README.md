@@ -1233,7 +1233,9 @@ No. The product ingests live public data from data.gov.in, IMD and Sentinel Hub,
 
 <br/>
 
-The production API runs the full pipeline on a **one-hour loop** and auto-heals on boot; GitHub Actions adds nightly ingestion (05:30 UTC), a daily NDVI cycle, three-hourly Ashoka polling and daily freshness alerts. `refresh-live-data.yml` additionally triggers and *verifies* an ingest every hour, so the warehouse cannot silently freeze when a container restarts. `/freshness` reports per-commodity staleness, `/data-quality` reports date integrity, and the verify workflow fails the run and opens an issue when a site is unhealthy or the newest arrival date is more than four days old.
+The API container refreshes itself: on boot it waits 90 s and then runs the full pipeline, repeating every 60 minutes. `refresh-live-data.yml` additionally triggers and *verifies* an ingest every hour from outside, so the warehouse cannot silently freeze when a container restarts. GitHub Actions adds nightly ingestion (05:30 UTC), the Ashoka historical poll (scheduled only) and daily freshness alerts. `/freshness` reports per-commodity staleness, `/data-quality` reports date integrity, and the verify workflow fails the run and opens an issue when a site is unhealthy or the newest arrival date is more than four days old.
+
+`/health` reports what is actually true rather than a fixed string: `status` is derived from the warehouse (`healthy`, `stale`, `degraded`, `empty`, `unknown`) alongside `data_max_date`, `days_behind`, `n_future_dates` and the self-refresh counters (`refresh_runs`, `refresh_failures`, `last_refresh_error`). A scheduler that fails on every tick can therefore no longer look identical to one that is simply idle.
 
 Two honest caveats: the public data source publishes with a one-to-two day lag (so `days_behind` of 0-2 is normal, not staleness), and the Streamlit cockpit needs its *Who can view this app* setting flipped to public in the Streamlit Cloud dashboard before visitors can reach it instead of a sign-in page. The always-on [Live Data Console](https://flawsom.github.io/MandiIQ/live.html) needs no such setting.
 

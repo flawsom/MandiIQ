@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.1.0"
+    version: str = "2.2.0"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -86,6 +86,15 @@ class HealthResponse(BaseModel):
     hours_since_last_run: Optional[float] = None
     n_future_dates: int = 0
     ingestion_running: bool = False
+    # Self-refresh bookkeeping. The container refreshes itself; these fields are
+    # how a caller can tell "quiet because everything is fine" from "quiet
+    # because the scheduler has been throwing on every tick since July".
+    last_refresh_attempt_utc: Optional[str] = None
+    last_refresh_success_utc: Optional[str] = None
+    last_refresh_error: Optional[str] = None
+    refresh_runs: int = 0
+    refresh_failures: int = 0
+    refresh_interval_s: int = 0
     commodities_analyzed: list[str] = []
 
 
@@ -227,6 +236,106 @@ def _ingestion_running() -> bool:
         return False
 
 
+# Data older than this many days is reported as stale rather than healthy.
+# The upstream source publishes with a 1-2 day lag, so 3 is the tightest bound
+# that a working pipeline can still satisfy.
+STALE_AFTER_DAYS = 3
+
+
+# Self-refresh bookkeeping, written by the background loop in `lifespan`.
+_REFRESH_STATE: dict = {
+    "last_attempt_utc": None,
+    "last_success_utc": None,
+    "last_error": None,
+    "runs": 0,
+    "failures": 0,
+    "interval_s": 0,
+}
+
+
+def _self_refresh_enabled() -> bool:
+    return os.environ.get("MANDIIQ_SELF_REFRESH", "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
+def _self_refresh_interval_s() -> int:
+    try:
+        minutes = int(os.environ.get("MANDIIQ_REFRESH_INTERVAL_MINUTES", "60"))
+    except ValueError:
+        minutes = 60
+    return max(5, minutes) * 60
+
+
+def _self_refresh_initial_delay_s() -> int:
+    """Seconds to wait after boot before the first refresh.
+
+    Deliberately short: a restart is the moment the warehouse is most likely
+    to be behind, and sleeping a full interval first would leave the API
+    serving yesterday's numbers until the next tick.
+    """
+    try:
+        seconds = int(os.environ.get("MANDIIQ_REFRESH_INITIAL_DELAY_S", "90"))
+    except ValueError:
+        seconds = 90
+    return max(5, seconds)
+
+
+def _utcnow_iso() -> str:
+    return datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _refresh_once() -> dict:
+    """Run the pipeline once, record the outcome, and never raise."""
+    _REFRESH_STATE["last_attempt_utc"] = _utcnow_iso()
+    _REFRESH_STATE["runs"] += 1
+    try:
+        from mandi_rdd.ingestion.scheduler import ingestion_running, run_ingestion
+    except Exception as e:  # pragma: no cover - import smoke test
+        _REFRESH_STATE["failures"] += 1
+        _REFRESH_STATE["last_error"] = f"import failed: {e}"
+        return {"status": "error", "error": str(e)}
+
+    if ingestion_running():
+        # A /refresh call or an earlier tick is already working; queueing a
+        # second run behind it would only serialise more waiting.
+        logger.info("Self-refresh skipped: an ingestion is already running")
+        return {"status": "busy"}
+
+    try:
+        summary = run_ingestion()
+    except Exception as e:
+        _REFRESH_STATE["failures"] += 1
+        _REFRESH_STATE["last_error"] = f"{type(e).__name__}: {e}"
+        logger.error(f"Self-refresh failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+    status = summary.get("status") or "unknown"
+    if status in ("success", "degraded"):
+        _REFRESH_STATE["last_success_utc"] = _utcnow_iso()
+    else:
+        _REFRESH_STATE["failures"] += 1
+    _REFRESH_STATE["last_error"] = summary.get("error")
+    return summary
+
+
+def _health_status(quality: dict) -> str:
+    """Turn the warehouse's own state into the /health `status` field.
+
+    This used to be the literal string "healthy", which is how the deployment
+    served July prices with a green checkmark. `status` now describes the data;
+    `last_outcome` still describes the most recent pipeline run.
+    """
+    if not quality or not quality.get("n_rows"):
+        return "empty"
+    if int(quality.get("n_future_dates") or 0) > 0:
+        return "degraded"
+    days_behind = quality.get("days_behind")
+    if days_behind is None:
+        return "unknown"
+    return "stale" if int(days_behind) > STALE_AFTER_DAYS else "healthy"
+
+
 @functools.lru_cache(maxsize=1)
 def _count_tests() -> int:
     """Count the test functions shipped with this build.
@@ -302,22 +411,32 @@ async def lifespan(app: FastAPI):
         _get_patched_dashboard("Grafana")
         logger.info("Dashboard cache warmed: %d entries", _dashboard_patch_count)
     
-    # Start hourly auto-refresh scheduler
-    def _hourly_refresh():
-        """Run pipeline every hour to keep data fresh."""
-        import time as _t
-        while True:
-            _t.sleep(3600)  # 1 hour
-            try:
-                from mandi_rdd.ingestion.scheduler import run_ingestion
-                logger.info("Hourly auto-refresh starting...")
-                summary = run_ingestion()
-                logger.info(f"Hourly auto-refresh finished: {summary.get('status')}")
-            except Exception as e:
-                logger.error(f"Hourly auto-refresh failed: {e}")
-    
-    threading.Thread(target=_hourly_refresh, daemon=True).start()
-    logger.info("Hourly auto-refresh scheduler started")
+    # Start the self-refresh scheduler. This container is the only place with
+    # the production credentials and the durable volume, so it keeps its own
+    # data current rather than waiting for an external cron to nudge it.
+    interval_s = _self_refresh_interval_s()
+    _REFRESH_STATE["interval_s"] = interval_s
+
+    if _self_refresh_enabled():
+        def _self_refresh_loop():
+            import time as _t
+            _t.sleep(_self_refresh_initial_delay_s())
+            while True:
+                try:
+                    summary = _refresh_once()
+                    logger.info(f"Self-refresh finished: {summary.get('status')}")
+                except Exception as e:
+                    # The loop must outlive any single bad run.
+                    logger.error(f"Self-refresh loop error: {e}")
+                _t.sleep(interval_s)
+
+        threading.Thread(target=_self_refresh_loop, daemon=True).start()
+        logger.info(
+            f"Self-refresh scheduler started: first run in "
+            f"{_self_refresh_initial_delay_s()}s, then every {interval_s}s"
+        )
+    else:
+        logger.info("Self-refresh scheduler disabled (MANDIIQ_SELF_REFRESH=0)")
 
     yield
 
@@ -343,7 +462,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
     * `/refresh` - Manual re-run of the full pipeline
     """,
-    version="2.1.0",
+    version="2.2.0",
     lifespan=lifespan,
 )
 
@@ -408,7 +527,7 @@ async def health():
         quality = _cached_date_quality(conn)
 
         return HealthResponse(
-            status="healthy",
+            status=_health_status(quality),
             llm_fallback_count=get_llm_fallback_count(),
             n_prices=n_prices,
             n_commodities=n_commodities,
@@ -430,6 +549,12 @@ async def health():
             hours_since_last_run=_hours_since(last_run_utc),
             n_future_dates=int(quality.get("n_future_dates") or 0),
             ingestion_running=_ingestion_running(),
+            last_refresh_attempt_utc=_REFRESH_STATE["last_attempt_utc"],
+            last_refresh_success_utc=_REFRESH_STATE["last_success_utc"],
+            last_refresh_error=_REFRESH_STATE["last_error"],
+            refresh_runs=int(_REFRESH_STATE["runs"]),
+            refresh_failures=int(_REFRESH_STATE["failures"]),
+            refresh_interval_s=int(_REFRESH_STATE["interval_s"]),
             commodities_analyzed=state.commodities[:20],
         )
     except Exception:

@@ -24,6 +24,9 @@
 # - R2_ACCESS_KEY_ID=<your R2 access key>
 # - R2_SECRET_ACCESS_KEY=<your R2 secret key>
 # - R2_BUCKET=mandiiq-data
+# - MANDIIQ_SELF_REFRESH=1                     (optional; disable with 0)
+# - MANDIIQ_REFRESH_INTERVAL_MINUTES=60        (optional; min 5)
+# - MANDIIQ_REFRESH_INITIAL_DELAY_S=90         (optional; min 5)
 
 # Persistent Volume:
 # - Name: mandiiq-data
@@ -76,6 +79,44 @@
 # .github/workflows/refresh-live-data.yml triggers POST /refresh hourly and then
 # verifies /health and /data-quality, so a frozen warehouse fails a workflow
 # within the hour instead of going unnoticed for weeks.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Self-refresh (the reason the data was frozen before 2026-09-30)
+# ─────────────────────────────────────────────────────────────────────────────
+# The container refreshes its own warehouse. On boot it waits 90 s and then
+# runs the full pipeline, repeating every 60 minutes. Nothing external has to
+# be alive for the numbers to be current; the GitHub cron is a second belt,
+# not the mechanism.
+#
+# That loop always existed - it was throwing a DuckDB
+# `Can't open a connection to same database file with a different configuration`
+# exception on every single tick since July, logging it, and sleeping again.
+# The bug is fixed (mandi_rdd/storage/duckdb_store.py runs its integrity probe
+# once per process), and every attempt is now recorded and exposed on /health:
+#
+#   refresh_runs, refresh_failures, refresh_interval_s,
+#   last_refresh_attempt_utc, last_refresh_success_utc, last_refresh_error
+#
+# so "quiet" can be told apart from "silently broken":
+#
+#   curl -s .../health | python3 -m json.tool | \
+#     grep -E 'status|days_behind|refresh_|last_outcome'
+#
+# `status` now describes the DATA (healthy / stale / degraded / empty / unknown)
+# rather than being the literal string "healthy". Data more than 3 days behind
+# or any impossible future date makes it stop claiming health. `last_outcome`
+# still describes the most recent pipeline run.
+#
+# Tunables (all optional):
+#   MANDIIQ_SELF_REFRESH=0                  disable the in-process scheduler
+#   MANDIIQ_REFRESH_INTERVAL_MINUTES=60     how often it runs (min 5)
+#   MANDIIQ_REFRESH_INITIAL_DELAY_S=90      delay before the first run (min 5)
+#
+# Each tick is a full pipeline run (prices + rainfall + NDVI + RDD + forecast).
+# On the 512 MB free tier that is the heaviest thing this service does; if the
+# container starts OOM-restarting, raise MANDIIQ_REFRESH_INTERVAL_MINUTES to
+# 360 rather than disabling the scheduler entirely - the GitHub workflow will
+# still nudge it hourly from outside.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data integrity operations

@@ -2,14 +2,25 @@
 # Runs every day at 03:00 UTC, fetches fresh satellite + price data,
 # and commits the updated NDVI export back to the repo.
 
-name: daily-ingest
+name: Ingestion (manual recovery)
+
+# On-demand ingestion only.
+#
+# This workflow used to fire on every push to master AND on a 06:00 cron while
+# nightly-ingest.yml fired on every push and at 05:30 UTC - two full copies of
+# the same pipeline racing each other to push the binary DuckDB to master. That
+# race is what produced the "rejected - non-fast-forward" failures and the
+# interleaved bot commits. The scheduled pipeline now lives in exactly one
+# place (nightly-ingest.yml); this file is kept as a manual recovery lever for
+# the Actions tab when a nightly run needs redoing.
 
 on:
-  push:
-    branches: [master]
-  schedule:
-    - cron: "0 6 * * *"   # daily at 06:00 UTC (NDVI doesn't need hourly)
-  workflow_dispatch:       # allow manual trigger
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why is ingestion being re-run?"
+        required: false
+        default: "Manual recovery run"
 
 permissions:
   contents: write
@@ -17,6 +28,12 @@ permissions:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Same group as nightly-ingest: never two ingestions writing the same
+    # DuckDB at once.
+    concurrency:
+      group: mandiiq-ingest
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +72,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: daily data ingest"
-            git push
+            git commit -m "chore: manual data ingest"
+            git push --force-with-lease origin master
           fi
