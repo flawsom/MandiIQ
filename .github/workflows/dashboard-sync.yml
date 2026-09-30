@@ -1,20 +1,17 @@
 # Automatically notify the API when the Grafana dashboard JSON changes.
 #
-# When dashboards/mandiiq-pipeline.json is updated on the master branch,
-# this workflow first checks whether the pushed file's MD5 hash differs
-# from what the production API is currently serving. Only if they differ
-# does it POST to /webhook/grafana-dashboard-update.
+# When dashboards/mandiiq-pipeline.json is updated on the master branch, this
+# workflow compares the pushed file's MD5 against the one production is
+# serving and only then POSTs to /webhook/grafana-dashboard-update. That avoids
+# needless cache clears (and deploys) for commits that touch the file without
+# changing it - a merge conflict resolution, a revert, or a manual dispatch.
 #
-# This avoids unnecessary cache clears (and Render deploys) when a commit
-# touches the file but its content hasn't actually changed - e.g. a merge
-# conflict resolution, a revert, or a workflow_dispatch with no real diff.
+# If RENDER_DEPLOY_HOOK_URL is set, a matching dashboard also triggers a deploy.
 #
-# SETUP (optional):
-#   To also trigger a Render deploy after the webhook, set the
-#   RENDER_DEPLOY_HOOK_URL secret:
-#   https://github.com/flawsom/MandiIQ/settings/secrets/actions
-#
-#   Without it, only the cache clear is performed.
+# Note: GitHub could not read the name of the previous revision of this file,
+# so the workflow never ran. It is kept deliberately conservative here: no
+# heredocs, no `${{ }}` inside single-quoted shell JSON, and an explicit
+# permissions block.
 
 name: Dashboard Sync
 
@@ -29,6 +26,9 @@ on:
         description: "Reason for manual trigger"
         required: false
         default: "Manual dashboard cache refresh"
+
+permissions:
+  contents: read
 
 env:
   API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
@@ -50,26 +50,24 @@ jobs:
       - name: Compute local MD5 hash
         id: local
         run: |
-          if [ -f "${{ env.DASHBOARD_FILE }}" ]; then
-            HASH=$(md5sum "${{ env.DASHBOARD_FILE }}" | cut -d' ' -f1)
-            echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
-            echo "Local dashboard MD5: ${HASH}"
+          if [ -f "${DASHBOARD_FILE}" ]; then
+            HASH=$(md5sum "${DASHBOARD_FILE}" | cut -d' ' -f1)
           else
-            echo "::error::Dashboard file not found at ${{ env.DASHBOARD_FILE }}"
+            echo "::error::Dashboard file not found at ${DASHBOARD_FILE}"
             exit 1
           fi
+          echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
+          echo "Local dashboard MD5: ${HASH}"
 
       - name: Fetch production /admin/dashboard-status
         id: remote
         run: |
           echo "Fetching dashboard status from ${API_BASE}/admin/dashboard-status..."
           HTTP_CODE=$(curl -s -o /tmp/dashboard_status.json -w "%{http_code}" \
-            "${API_BASE}/admin/dashboard-status" \
-            --max-time 15)
-          echo "API responded with HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::warning::Failed to fetch dashboard status (HTTP $HTTP_CODE)"
-            cat /tmp/dashboard_status.json
+            "${API_BASE}/admin/dashboard-status" --max-time 15 || echo "000")
+          echo "API responded with HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::warning::Failed to fetch dashboard status (HTTP ${HTTP_CODE})"
             echo "hash=UNKNOWN" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -84,23 +82,21 @@ jobs:
           REMOTE="${{ steps.remote.outputs.hash }}"
           echo "local_hash=${LOCAL}" >> "$GITHUB_OUTPUT"
           echo "remote_hash=${REMOTE}" >> "$GITHUB_OUTPUT"
-
-          if [ "$REMOTE" = "UNKNOWN" ]; then
-            # API call failed - still refresh to be safe
+          if [ "${REMOTE}" = "UNKNOWN" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "API unreachable - forcing refresh to be safe."
-          elif [ "$LOCAL" = "$REMOTE" ]; then
+            echo "API unreachable - forcing a refresh to be safe."
+          elif [ "${LOCAL}" = "${REMOTE}" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Hashes match - dashboard unchanged. Skipping webhook call."
+            echo "Hashes match - dashboard unchanged, skipping the webhook."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Hash MISMATCH: local=${LOCAL} remote=${REMOTE}. Refreshing."
           fi
 
   notify-api:
+    needs: check-hash
     if: needs.check-hash.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    needs: check-hash
     timeout-minutes: 5
 
     steps:
@@ -111,8 +107,8 @@ jobs:
           REMOTE_HASH: ${{ needs.check-hash.outputs.remote_hash }}
         run: |
           echo "Triggering dashboard cache refresh at ${API_BASE}/webhook/grafana-dashboard-update ..."
-          # Build the payload in a file: interpolating ${{ }} inside quoted JSON
-          # on the curl line does not survive shell quoting.
+          # Build the payload in a file: interpolating expressions inside a
+          # quoted JSON string on the curl line does not survive shell quoting.
           python3 -c "import json, os; json.dump({'event': 'dashboard_updated', 'title': 'MandiIQ Pipeline Dashboard', 'source': 'github-actions', 'trigger': 'dashboard-sync-workflow', 'local_hash': os.environ.get('LOCAL_HASH', ''), 'remote_hash': os.environ.get('REMOTE_HASH', '')}, open('/tmp/webhook_payload.json', 'w'))"
           args=(-s -o /tmp/webhook_response.txt -w "%{http_code}"
                 -X POST "${API_BASE}/webhook/grafana-dashboard-update"
@@ -123,35 +119,36 @@ jobs:
             args+=(-H "X-Webhook-Secret: ${WEBHOOK_SECRET}")
           fi
           HTTP_CODE=$(curl "${args[@]}" || echo "000")
-          echo "API responded with HTTP $HTTP_CODE"
+          echo "API responded with HTTP ${HTTP_CODE}"
           cat /tmp/webhook_response.txt 2>/dev/null || true
-          if [ "$HTTP_CODE" = "200" ]; then
+          if [ "${HTTP_CODE}" = "200" ]; then
             echo "Dashboard cache refresh succeeded."
           else
-            echo "::warning::Webhook returned HTTP $HTTP_CODE - the API may be down or unreachable."
+            echo "::warning::Webhook returned HTTP ${HTTP_CODE} - the API may be down or unreachable."
           fi
 
   trigger-render-deploy:
+    needs: [check-hash, notify-api]
     if: needs.check-hash.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    needs: notify-api
+    timeout-minutes: 5
+
     steps:
       - name: Trigger Render deploy hook
         env:
           RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL || '' }}
         run: |
-          if [ -z "$RENDER_HOOK" ]; then
+          if [ -z "${RENDER_HOOK}" ]; then
             echo "::warning::RENDER_DEPLOY_HOOK_URL secret not set - skipping Render deploy."
             exit 0
           fi
           echo "Sync: triggering Render deploy hook..."
           HTTP_CODE=$(curl -s -o /tmp/render_response.txt -w "%{http_code}" \
-            -X POST "$RENDER_HOOK" \
-            --max-time 30)
-          echo "Render responded with HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            -X POST "${RENDER_HOOK}" --max-time 30 || echo "000")
+          echo "Render responded with HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "201" ]; then
             echo "Sync: Render deploy triggered successfully."
           else
-            echo "::warning::Sync: Render deploy hook returned HTTP $HTTP_CODE"
-            cat /tmp/render_response.txt
+            echo "::warning::Sync: Render deploy hook returned HTTP ${HTTP_CODE}"
+            cat /tmp/render_response.txt 2>/dev/null || true
           fi

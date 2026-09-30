@@ -70,6 +70,73 @@ def test_ingestion_entrypoints_exist():
     assert callable(scheduler.run_once)
 
 
+def test_fetch_page_retries_transient_source_failures(monkeypatch):
+    """data.gov.in times out for tens of seconds at a time; one hiccup must
+    not kill a whole nightly run."""
+    import urllib.error
+
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    calls = {"n": 0}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self):
+            return b'{"records": [], "total": 0}'
+
+    def _fake_urlopen(_req, timeout=None, context=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise urllib.error.URLError("timed out")
+        return _FakeResponse()
+
+    monkeypatch.setattr(fetch_prices.urllib.request, "urlopen", _fake_urlopen)
+
+    data = fetch_prices.fetch_page(limit=10)
+
+    assert data["total"] == 0
+    assert calls["n"] == 3, "transient failures should be retried"
+
+
+def test_fetch_page_fails_fast_on_rejected_requests(monkeypatch):
+    """A bad key or bad request will not fix itself on retry."""
+    import io
+    import urllib.error
+
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    calls = {"n": 0}
+
+    def _fake_urlopen(req, timeout=None, context=None):
+        calls["n"] += 1
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(fetch_prices.urllib.request, "urlopen", _fake_urlopen)
+
+    with pytest.raises(urllib.error.HTTPError):
+        fetch_prices.fetch_page(limit=10)
+
+    assert calls["n"] == 1, "4xx responses other than 429 must not be retried"
+
+
+def test_source_outage_degrades_the_run_instead_of_aborting_it():
+    source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'summary["status"] = "degraded"' in source
+    assert 'outcome = "degraded"' in source
+    assert "continuing with existing data" in source
+
+
 def test_every_workflow_is_valid_yaml():
     paths = sorted(WORKFLOWS_DIR.glob("*.yml"))
     assert paths, "No workflow files found"

@@ -12,6 +12,7 @@ Features:
 import json
 import logging
 import os
+import random
 import time
 import urllib.parse
 from typing import Optional
@@ -155,22 +156,30 @@ def fetch_page(
 
     url = f"{BASE_URL}?{'&'.join(params)}"
 
-    # Retry with exponential backoff
-    max_retries = 3
+    # Retry with exponential backoff. data.gov.in is intermittently slow (and
+    # has been unreachable from CI runners for tens of seconds at a time), so
+    # the timeout is generous and the retries cover a real outage window.
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "Mozilla/5.0"},
             )
-            with urllib.request.urlopen(req, timeout=30, context=SSL_CTX) as f:
+            with urllib.request.urlopen(req, timeout=45, context=SSL_CTX) as f:
                 data = json.loads(f.read())
             return data
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError,
                 OSError) as e:
+            if isinstance(e, urllib.error.HTTPError) and 400 <= e.code < 500 and e.code != 429:
+                # A bad key or a bad request will not fix itself: fail fast.
+                logger.error(f"data.gov.in rejected the request (HTTP {e.code}): {e}")
+                raise
             if attempt < max_retries - 1:
-                wait = 2 ** attempt * 2  # 2s, 4s, 8s
-                logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait}s...")
+                wait = min(2 ** attempt * 2, 30) + random.uniform(0, 1.5)
+                logger.warning(
+                    f"Attempt {attempt + 1}/{max_retries} failed ({e}); retrying in {wait:.1f}s"
+                )
                 time.sleep(wait)
             else:
                 logger.error(f"All {max_retries} attempts failed for offset={offset}: {e}")

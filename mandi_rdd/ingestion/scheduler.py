@@ -144,16 +144,26 @@ def _run_ingestion_locked(
 
     # 2. Ingest mandi prices
     logger.info("Fetching mandi prices from data.gov.in...")
+    price_fetch_error = None
     with pipeline_metrics.step("fetch_prices"):
         _t0 = time.monotonic()
-        price_records = fetch_all_prices(
-            filters=filters,
-            max_records=max_records,
-            progress_callback=lambda done, total: logger.info(
-                f"  Prices: {done}/{total} records"
-            ),
-        )
-        pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, True)
+        try:
+            price_records = fetch_all_prices(
+                filters=filters,
+                max_records=max_records,
+                progress_callback=lambda done, total: logger.info(
+                    f"  Prices: {done}/{total} records"
+                ),
+            )
+            pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, True)
+        except Exception as e:
+            # A slow or briefly unreachable source must not abort the rainfall,
+            # RDD and forecast work that can still run on the existing
+            # warehouse. The run is reported as "degraded" instead.
+            logger.error(f"Price fetch failed, continuing with existing data: {e}")
+            price_records = []
+            price_fetch_error = str(e)
+            pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, False)
     n_prices = len(price_records)
     with pipeline_metrics.step("upsert_prices"):
         n_new = upsert_prices(conn, price_records)
@@ -226,6 +236,10 @@ def _run_ingestion_locked(
             summary["steps"]["prices_varietywise"] = {"status": "error", "error": str(e)}
 
     summary["steps"]["prices"] = {"fetched": n_prices, "new": n_new}
+    if price_fetch_error:
+        summary["steps"]["prices"]["error"] = price_fetch_error
+        summary["status"] = "degraded"
+        summary["error"] = f"price source unavailable: {price_fetch_error}"
     logger.info(f"Prices: {n_prices} fetched, {n_new} new")
 
     # 3. Load district-subdivision mapping (always, regardless of rainfall)
@@ -489,7 +503,14 @@ def _write_ingest_status(summary: dict) -> None:
     steps = summary.get("steps", {})
     prices_step = steps.get("prices", {})
     n_new = prices_step.get("new", 0) if isinstance(prices_step, dict) else 0
-    outcome = "success" if status == "ok" else "failure"
+    if status == "ok":
+        outcome = "success"
+    elif status == "degraded":
+        # Ran, produced useful output, but a source was unavailable: say so
+        # instead of claiming either a clean run or a total failure.
+        outcome = "degraded"
+    else:
+        outcome = "failure"
     import datetime
     quality = steps.get("date_integrity") or {}
     record = {
@@ -521,6 +542,14 @@ def run_once():
         for step, info in summary["steps"].items():
             print(f"  {step}: {info}")
         print(f"{'='*50}")
+    elif summary.get("status") == "degraded":
+        # Exit 0 so a transient source outage does not paint the whole job red,
+        # but print a GitHub annotation and record "degraded" in
+        # last_ingest_status.json so /health reports it honestly.
+        print(f"\n::warning::Pipeline ran degraded: {summary.get('error', 'unknown')}")
+        for step, info in summary["steps"].items():
+            print(f"  {step}: {info}")
+        sys.exit(0)
     else:
         print(f"\n[FAIL] Pipeline failed: {summary.get('error', 'unknown')}")
         sys.exit(1)

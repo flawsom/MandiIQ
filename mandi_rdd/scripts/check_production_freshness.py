@@ -77,8 +77,13 @@ def evaluate(report: dict, max_days_behind: int = 4) -> list:
         problems.append(
             "%d price rows carry an impossible (future) arrival date" % health["n_future_dates"]
         )
-    if health.get("last_outcome") == "failure":
+    outcome = health.get("last_outcome")
+    if outcome == "failure":
         problems.append("last ingest run reported failure")
+    elif outcome == "degraded":
+        # Ran, but a data source was unavailable: report it without pretending
+        # the warehouse is as fresh as a clean run.
+        problems.append("last ingest run was degraded (a source was unavailable)")
 
     quality = report.get("data_quality") or {}
     if quality.get("n_future_dates"):
