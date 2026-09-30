@@ -354,6 +354,15 @@ def check_provenance(health: dict, data_quality: dict, freshness=None) -> list[d
     if health.get("n_future_dates"):
         add("blocker", f"{health['n_future_dates']} rows carry an impossible date")
 
+    if health.get("index_fault_pending"):
+        # DuckDB leaves the prices UNIQUE index inconsistent after a bulk load
+        # that runs out of memory. Writes keep failing until the table is
+        # rebuilt, so a recorded-and-unrepaired fault is a stall, not a detail.
+        add("blocker",
+            "an inconsistent prices index is recorded and has not been repaired "
+            "yet - writes to the warehouse fail until the next run rebuilds the "
+            "table")
+
     outcome = health.get("last_outcome")
     if outcome == "failure":
         add("blocker", "the last ingest run failed")

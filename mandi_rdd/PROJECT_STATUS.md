@@ -2,6 +2,8 @@
 
 > **⚠️ Historical snapshot (2025-07-17).** This document records the project as it stood on that date. The onion RDD figures below (+₹350, p = 0.003, McCrary p = 0.92, FE +₹298) come from the smaller pre-repair warehouse of that era and **do not reproduce on the current data**: the live endpoint reports +₹101 (p = 0.28), the specification curve verdict is `fragile` (0/30 significant) and BH-FDR leaves 0 survivors. For current numbers see [README.md](README.md) and the live endpoints (`/rdd-result/Onion`, `/spec-curve/Onion`, `/fdr`, `/health`).
 
+> **Current deployments (2026-09-30):** API `https://p01--mandiiq--x4n8x4gkmzht.code.run` (NDVI mirror `https://p01--mandiiq--zbvjrztgjqgw.code.run`), cockpit `https://mandiiq.streamlit.app`, landing page `https://mandiiq.unifies.codes`, live console `https://flawsom.github.io/MandiIQ/live.html`. The Render/Netlify URLs used throughout this document have been retired - see the [README](README.md#-deployment-status) for the deployment that is actually live.
+
 **Date**: 2025-07-17
 **Status**: ✅ **~95% COMPLETE** - Core System Production-Ready
 
@@ -15,7 +17,7 @@ The **MandiIQ** system delivers a **production-ready causal intelligence platfor
 3. Recommends procurement actions
 4. Offers **zero-marginal-cost AI orchestration** with circuit-breaker fallback
 
-**Live on Render**: https://mandi-iq-api.onrender.com, https://mandi-iq-dashboard.onrender.com
+**Live on Render at the time**: https://mandi-iq-api.onrender.com, https://mandi-iq-dashboard.onrender.com (retired - see the banner above)
 
 **Success Metrics Achieved**:
 - ✅ Zero marginal cost (all open/free models)
@@ -446,5 +448,5 @@ python -m mandi_rdd.analysis.rdd_engine --commodity Onion --district Nashik
 
 **Version**: 1.0.0-mandiiq
 **Status**: ✅ Core System Complete (~95%)
-**Live URLs**: https://mandi-iq-api.onrender.com, https://mandi-iq-dashboard.onrender.com
+**Live URLs at the time (retired - see the banner above for the current ones)**: https://mandi-iq-api.onrender.com, https://mandi-iq-dashboard.onrender.com
 **Last Updated**: 2025-07-17

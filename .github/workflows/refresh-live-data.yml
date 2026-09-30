@@ -89,3 +89,17 @@ jobs:
         if: steps.trigger.outputs.skip == 'false'
         run: |
           python3 -m mandi_rdd.scripts.check_production_freshness --api-base "${API_BASE}"
+
+      # Freshness alone is not enough: the pages and routes a visitor uses can
+      # break while the warehouse is perfectly current. The same check that
+      # runs in consumer-check.yml runs here, so the hourly path that keeps
+      # production honest also proves the consumer surface still works.
+      - name: Verify every consumer-facing surface still works
+        if: steps.trigger.outputs.skip == 'false'
+        env:
+          PYTHONPATH: .
+        run: |
+          python3 -m mandi_rdd.scripts.consumer_check --api-base "${API_BASE}" || {
+            echo "::error::A consumer-facing page, route or link is broken - see the report above."
+            exit 1
+          }

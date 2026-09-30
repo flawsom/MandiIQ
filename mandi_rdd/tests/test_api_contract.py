@@ -7,6 +7,7 @@ backwards compatible. No database or network access is required.
 
 from __future__ import annotations
 
+import json
 import warnings
 
 import pytest
@@ -166,3 +167,132 @@ def test_ask_schemas_keep_their_contract(app_module):
         "endpoints_used",
         "error",
     } <= response_fields
+
+
+# --- price-index heal reporting --------------------------------------------
+
+
+def _keep_refresh_state(app_module):
+    """Snapshot the module-level refresh state so a test cannot leak into the next."""
+    return dict(app_module._REFRESH_STATE)
+
+
+def _restore_refresh_state(app_module, saved):
+    app_module._REFRESH_STATE.clear()
+    app_module._REFRESH_STATE.update(saved)
+
+
+def test_health_reports_the_index_check_even_when_nothing_was_repaired(app_module):
+    """`last_index_repair: null` was ambiguous: checked-and-clean looked exactly
+    like never-checked, which is how a heal could happen without ever showing up
+    on /health. Every check now leaves a record."""
+    saved = _keep_refresh_state(app_module)
+    try:
+        app_module._note_index_health(
+            {"duplicates": 0, "rebuilt": False, "trigger": None, "probed": True},
+            source="startup_probe",
+        )
+        check = app_module._REFRESH_STATE["last_index_check"]
+        assert check["source"] == "startup_probe"
+        assert check["rebuilt"] is False
+        assert check["checked_at"]
+        assert app_module._REFRESH_STATE["last_index_repair"] is None, (
+            "a clean check must never be reported as a repair"
+        )
+    finally:
+        _restore_refresh_state(app_module, saved)
+
+
+def test_a_repair_is_provable_on_the_health_payload(app_module):
+    saved = _keep_refresh_state(app_module)
+    try:
+        app_module._note_index_health(
+            {"rebuilt": True, "trigger": "write_probe", "rows_before": 12,
+             "rows_after": 10, "rows_removed": 2},
+            source="startup_rebuild",
+        )
+        repair = app_module._REFRESH_STATE["last_index_repair"]
+        assert repair["trigger"] == "write_probe"
+        assert repair["rows_removed"] == 2
+        assert repair["source"] == "startup_rebuild"
+        assert app_module._REFRESH_STATE["last_index_check"]["rebuilt"] is True
+    finally:
+        _restore_refresh_state(app_module, saved)
+
+
+def test_the_index_record_survives_the_restart_it_caused(app_module, tmp_path):
+    """A fatal index fault kills the process, taking the in-memory record with
+    it. The record the scheduler persisted has to be readable afterwards."""
+    record = {
+        "last_run_utc": "2026-09-30T18:16:36Z",
+        "outcome": "failure",
+        "index_health": {
+            "rebuilt": True,
+            "trigger": "previous_run_index_fault",
+            "rows_after": 10,
+            "fault_flagged": False,
+        },
+    }
+    path = tmp_path / "last_ingest_status.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+
+    health = app_module._persisted_index_health(path)
+    assert health["rebuilt"] is True
+    assert health["trigger"] == "previous_run_index_fault"
+
+    path.write_text("{}", encoding="utf-8")
+    assert app_module._persisted_index_health(path) is None, "no record means no claim"
+    assert app_module._persisted_index_health(tmp_path / "missing.json") is None
+
+
+def test_health_exposes_a_pending_fault_and_the_check(app_module, tmp_path, monkeypatch):
+    """An unrepaired fault must be visible immediately, not only once someone
+    notices that the numbers stopped moving."""
+    from mandi_rdd.storage import duckdb_store
+
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    fields = set(app_module.HealthResponse.model_fields)
+    assert {"last_index_check", "index_fault_pending"} <= fields
+
+    assert app_module._index_fault_pending() is False
+    duckdb_store.note_index_fault(
+        Exception("FATAL Error: Failed to delete all rows from index")
+    )
+    assert app_module._index_fault_pending() is True
+    duckdb_store.clear_index_fault()
+    assert app_module._index_fault_pending() is False
+
+
+def test_a_fatal_probe_is_recorded_and_healed_in_the_same_tick(
+    app_module, tmp_path, monkeypatch
+):
+    """The trace this fixes: the write probe dies with a FATAL index fault,
+    which invalidates the connection it ran on, so the heal could not use that
+    connection - it was deferred to a restart that never reported it. The API
+    must now record the fault and rebuild on a fresh connection immediately."""
+    from mandi_rdd.storage import duckdb_store
+
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    monkeypatch.setattr(app_module, "_INDEX_VERIFIED", False)
+    saved = _keep_refresh_state(app_module)
+    fault = Exception(
+        "FatalException: FATAL Error: Invalid Input Error: Failed to delete all "
+        "rows from index. Only deleted 0 out of 2017 rows."
+    )
+
+    def _die(_conn, probe=True):
+        raise fault
+
+    monkeypatch.setattr(duckdb_store, "verify_price_index", _die)
+    try:
+        report = app_module._verify_price_index_once()
+        assert report["rebuilt"] is True, "the heal must not be deferred to a restart"
+        assert report["trigger"] == "recorded_index_fault"
+        assert report["cause"].startswith("FatalException")
+        assert app_module._REFRESH_STATE["last_index_repair"]["rebuilt"] is True
+        assert app_module._REFRESH_STATE["last_index_check"]["source"] == "startup_rebuild"
+        assert duckdb_store.index_fault_flagged() is False, (
+            "the marker must be cleared once the rebuild succeeded"
+        )
+    finally:
+        _restore_refresh_state(app_module, saved)

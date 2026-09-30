@@ -261,6 +261,44 @@ def test_index_fault_marker_reads_the_previous_failure(tmp_path):
     assert scheduler._last_run_had_index_fault(record) is False
 
 
+def test_the_run_persists_what_the_index_check_found(tmp_path):
+    """A fatal index fault kills the process that detected it, so the check's
+    result has to be written to the status file /health reads - otherwise a
+    heal that did happen is indistinguishable from one that never ran."""
+    from mandi_rdd.ingestion import scheduler
+
+    out = tmp_path / "last_ingest_status.json"
+    scheduler._write_ingest_status(
+        {
+            "status": "ok",
+            "steps": {
+                "index_health": {
+                    "rebuilt": True,
+                    "trigger": "previous_run_index_fault",
+                    "rows_before": 12,
+                    "rows_after": 10,
+                    "rows_removed": 2,
+                    "fault_flagged": False,
+                },
+                "prices": {"fetched": 5, "new": 2},
+            },
+            "duration_seconds": 12.5,
+        },
+        status_path=out,
+    )
+
+    record = json.loads(out.read_text(encoding="utf-8"))
+    assert record["outcome"] == "success"
+    assert record["index_health"]["rebuilt"] is True
+    assert record["index_health"]["trigger"] == "previous_run_index_fault"
+    assert record["index_health"]["rows_removed"] == 2
+    assert record["index_health"]["checked_at"]
+
+    # A run with no index step must not invent one.
+    scheduler._write_ingest_status({"status": "ok", "steps": {}}, status_path=out)
+    assert json.loads(out.read_text(encoding="utf-8"))["index_health"] is None
+
+
 def test_pipeline_repairs_a_fault_it_can_only_see_from_the_last_failure():
     source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
         encoding="utf-8"

@@ -1,0 +1,96 @@
+# Consumer Check: verify what a visitor can actually reach stays reachable.
+#
+# The pytest suite proves the code is correct; it cannot prove the product is
+# up. This workflow walks MandiIQ the way a visitor does - every public page,
+# every API route a page depends on, every link on those pages - and fails on
+# a blocker (dead page, missing response key, broken link, or a warehouse that
+# is stale because *our* ingest failed rather than because data.gov.in has not
+# published newer arrivals).
+#
+# Two things make this a CI gate rather than a manual ritual:
+#   * it runs on the same schedule as the refresh loop, so a surface that broke
+#     after a deploy is caught within hours, and
+#   * it re-runs on any push that touches the check itself, so the checker
+#     cannot silently rot.
+#
+# Warnings (a private Streamlit app, an endpoint that only exists after the
+# next deploy, upstream publication lag) are reported and do not fail the run.
+# Blockers fail it, because a consumer cannot use the product in those states.
+#
+# Local equivalent:
+#   python -m mandi_rdd.scripts.consumer_check --json
+
+name: Consumer Check
+
+on:
+  schedule:
+    - cron: "23 */3 * * *"   # every 3 hours, offset from the hourly refresh
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "API base URL to check"
+        required: false
+        default: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
+  push:
+    branches: [master]
+    paths:
+      - "mandi_rdd/scripts/consumer_check.py"
+      - "mandi_rdd/scripts/check_production_freshness.py"
+      - "mandi_rdd/tests/test_consumer_check.py"
+      - ".github/workflows/consumer-check.yml"
+
+permissions:
+  contents: read
+
+env:
+  API_BASE: ${{ github.event.inputs.api_base || 'https://p01--mandiiq--x4n8x4gkmzht.code.run' }}
+
+jobs:
+  consumer-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Unit-test the checker itself (offline, no network)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          python -m pytest mandi_rdd/tests/test_consumer_check.py -q
+
+      - name: Run the check against production
+        run: |
+          set +e
+          python -m mandi_rdd.scripts.consumer_check --api-base "${API_BASE}" \
+            --json > consumer_check_report.json
+          code=$?
+          set -e
+          # Reuse the checker's own renderer so the log says the same thing the
+          # JSON does - one source of truth for both.
+          python -c "
+          import json
+          from mandi_rdd.scripts.consumer_check import render
+          print(render(json.load(open('consumer_check_report.json'))))
+          " || true
+          exit ${code}
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: consumer-check-report
+          path: consumer_check_report.json
+          if-no-files-found: warn
+
+      - name: Explain the failure
+        if: failure()
+        run: |
+          echo "::error::The consumer check found a blocker - a public page, an API route a page calls, a link on those pages, or the freshness attribution failed. Read the report above (or the uploaded artifact) for the exact surface."

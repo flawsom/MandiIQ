@@ -612,7 +612,7 @@ def _last_run_had_index_fault(status_path: Path = None) -> bool:
         return False
 
 
-def _write_ingest_status(summary: dict) -> None:
+def _write_ingest_status(summary: dict, status_path: Path = None) -> None:
     """Write last_ingest_status.json so /health sees latest status."""
     status = summary.get("status", "unknown")
     steps = summary.get("steps", {})
@@ -628,6 +628,21 @@ def _write_ingest_status(summary: dict) -> None:
         outcome = "failure"
     import datetime
     quality = steps.get("date_integrity") or {}
+    # Persist the price-index check with the run. The process that hit a fatal
+    # index fault is killed by it, so an in-memory record would be gone exactly
+    # when /health is asked to prove the heal happened.
+    index = steps.get("index_health")
+    index_health = None
+    if isinstance(index, dict):
+        index_health = {
+            key: index.get(key)
+            for key in (
+                "rebuilt", "trigger", "rows_before", "rows_after", "rows_removed",
+                "duplicates", "duplicates_after", "fault_flagged",
+            )
+            if index.get(key) is not None
+        }
+        index_health["checked_at"] = datetime.datetime.utcnow().isoformat() + "Z"
     record = {
         "last_run_utc": datetime.datetime.utcnow().isoformat() + "Z",
         "outcome": outcome,
@@ -638,9 +653,12 @@ def _write_ingest_status(summary: dict) -> None:
         "data_max_date": quality.get("max_date"),
         "days_behind": quality.get("days_behind"),
         "n_future_dates": quality.get("n_future_dates"),
+        "index_health": index_health,
     }
     try:
-        out = Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        out = status_path or (
+            Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        )
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "w") as f:
             json.dump(record, f, indent=2)

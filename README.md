@@ -603,7 +603,7 @@ MandiIQ/
 │   ├── styles/                    # design.css token system (turmeric / ink / slate)
 │   ├── scripts/                   # Freshness checks, live-data verification
 │   └── tests/                     # Verification test suite
-├── .github/workflows/             # 16 CI/CD, ingest and monitoring workflows
+├── .github/workflows/             # 17 CI/CD, ingest and monitoring workflows
 ├── dashboards/                    # Grafana dashboard JSON + setup docs
 ├── data/                          # District coordinates & static lookups
 ├── diagrams/                      # Mermaid source diagrams (architecture, flows)
@@ -1063,9 +1063,17 @@ ruff check mandi_rdd/
 | `mermaid-validate` | Validates Mermaid diagrams in docs |
 | `skylos-scan` | Static quality scan against the project's complexity budget |
 
+**What runs against the live product** (separate workflows, because they need production to be up):
+
+| Workflow | Cadence | Purpose |
+| :------- | :------ | :------ |
+| `refresh-live-data.yml` | hourly | POSTs `/refresh`, waits for the run, then verifies freshness *and* every consumer-facing surface |
+| `consumer-check.yml` | every 3 hours, on demand, and on pushes that touch the checker | Fetches every public page, calls the 20 API routes consumer surfaces depend on, follows their links, and attributes staleness (upstream publication lag = warning; our ingest failing = blocker, which fails the run) |
+| `keepalive.yml` | every 10 minutes | Keeps the API, mirror, landing page and cockpit warm |
+
 **Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
 
-**143 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
+**151 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
 
 **Suite layout** (`mandi_rdd/tests/`):
 
@@ -1073,13 +1081,13 @@ ruff check mandi_rdd/
 | :--- | :---- | :----- |
 | `test_spec_curve.py` | 20 | The general estimator must reproduce the local-linear one; a real effect survives all 30 specifications and a null one does not; BH q-values; collapsed fits are kept out of the family |
 | `test_storage_repair.py` | 18 | Index-fault detection and repair, self-healing writes, the memory cap that caused the fault, the fault marker surviving a restart |
-| `test_scheduler_integrity.py` | 17 | Missing-key failure, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading, workflow schedule/secret/CI policy |
-| `test_api_contract.py` | 14 | Documented routes exist, `/fdr` and `/spec-curve/{commodity}` schema, `/health` truthfulness, `/ask` schemas stay backwards compatible |
+| `test_scheduler_integrity.py` | 18 | Missing-key failure, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading + persistence, workflow schedule/secret/CI policy |
+| `test_api_contract.py` | 19 | Documented routes exist, `/fdr` and `/spec-curve/{commodity}` schema, `/health` truthfulness, price-index heal reporting, `/ask` schemas stay backwards compatible |
 | `test_date_integrity.py` | 14 | Day-first date parsing, future-date rejection, warehouse repair, run locking |
 | `test_analytics.py` | 14 | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
 | `test_orchestrator.py` | 13 | `/ask` commodity-detection regressions plus tool-fallback behaviour |
 | `test_freshness_contract.py` | 7 | `/health` may not call two-month-old prices fresh; the external freshness gate must fail a run that ingested nothing |
-| `test_consumer_check.py` | 9 | Staleness attribution: upstream publication lag is a warning; a failed ingest or divergent commodity dates is a blocker |
+| `test_consumer_check.py` | 11 | Staleness attribution: upstream publication lag is a warning; a failed ingest, divergent commodity dates or an unrepaired index fault is a blocker |
 | `test_analytics_db.py` | 6 | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_dashboard_boot.py` | 5 | Runs the real Streamlit app headlessly and checks every page imports and renders |
 | `test_verification.py` | 4 | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
@@ -1272,9 +1280,9 @@ It checks, in order:
 1. **Pages** - the landing page, the GitHub Pages hero, the Live Data Console, the Streamlit cockpit and the repository are fetched and must return something a browser can render. A private Streamlit app is reported as a warning with the fix; an unreachable page is a blocker.
 2. **API** - 20 routes that consumer surfaces actually call, each with the keys that surface requires. `/spec-curve/Onion` missing its `summary`, or `/data-quality` missing `days_behind`, fails here instead of rendering a blank in front of a visitor.
 3. **Links** - every link found on those pages is followed, so a CTA pointing at a dead page fails in the check rather than in front of a visitor.
-4. **Provenance** - the product's own freshness reporting is cross-examined, and staleness is *attributed* before it is graded: a future arrival date, a failed or degraded last run, a self-refresh loop that has never succeeded, or `/health` and `/data-quality` disagreeing about impossible dates are all blockers. When the newest arrival date is old, the check asks why: if every commodity in `/freshness` stops on the same date and the refresh loop is clean, that is **upstream publication lag** (data.gov.in has not published yet) and it is reported as a warning; if the refresh counters show failures, or commodities stop on *different* dates, rows exist upstream that we failed to ingest and the check fails. The primary and mirror instances disagreeing about row counts is a warning.
+4. **Provenance** - the product's own freshness reporting is cross-examined, and staleness is *attributed* before it is graded: a future arrival date, a failed or degraded last run, a self-refresh loop that has never succeeded, an unrepaired price-index fault (`index_fault_pending`), or `/health` and `/data-quality` disagreeing about impossible dates are all blockers. When the newest arrival date is old, the check asks why: if every commodity in `/freshness` stops on the same date and the refresh loop is clean, that is **upstream publication lag** (data.gov.in has not published yet) and it is reported as a warning; if the refresh counters show failures, or commodities stop on *different* dates, rows exist upstream that we failed to ingest and the check fails. The primary and mirror instances disagreeing about row counts is a warning.
 
-Exit status is 0 only when nothing is blocking. It is the same measurement used for the published status rows above, so the README and the product cannot drift apart silently.
+Exit status is 0 only when nothing is blocking. It is the same measurement used for the published status rows above, so the README and the product cannot drift apart silently - and it runs itself in CI rather than waiting to be remembered: `consumer-check.yml` every three hours (plus on demand and on any push that touches the checker), and again at the end of every hourly refresh, where a blocker fails the workflow.
 
 </details>
 

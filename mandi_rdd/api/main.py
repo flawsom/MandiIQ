@@ -93,6 +93,12 @@ class HealthResponse(BaseModel):
     last_refresh_success_utc: Optional[str] = None
     last_refresh_error: Optional[str] = None
     last_index_repair: Optional[dict] = None
+    # Every index check lands here, repaired or not, so "checked and clean" is
+    # distinguishable from "never checked". `index_fault_pending` is the one
+    # that matters operationally: a recorded fault that has not been repaired
+    # yet (it clears on the next successful rebuild).
+    last_index_check: Optional[dict] = None
+    index_fault_pending: bool = False
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
@@ -249,6 +255,7 @@ _REFRESH_STATE: dict = {
     "last_success_utc": None,
     "last_error": None,
     "last_index_repair": None,
+    "last_index_check": None,
     "runs": 0,
     "failures": 0,
     "interval_s": 0,
@@ -287,6 +294,60 @@ def _utcnow_iso() -> str:
     return datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 
+def _note_index_health(report, source: str) -> None:
+    """Record what the price-index check found, so /health can prove it ran.
+
+    ``last_index_repair`` only appears when a rebuild actually happened, which
+    made an unremarkable "checked and clean" indistinguishable from "never
+    checked" - and made a heal that ran outside this process invisible. Every
+    check now lands in ``last_index_check``, and a rebuild also lands in
+    ``last_index_repair`` with the trigger that caused it.
+    """
+    if not isinstance(report, dict):
+        return
+    record = dict(report)
+    record.setdefault("rebuilt", False)
+    record["checked_at"] = _utcnow_iso()
+    record["source"] = source
+    _REFRESH_STATE["last_index_check"] = record
+    if record["rebuilt"]:
+        _REFRESH_STATE["last_index_repair"] = record
+        logger.error(
+            "Price index repaired (%s): %d rows kept, %d removed, trigger=%s",
+            source, record.get("rows_after") or 0, record.get("rows_removed") or 0,
+            record.get("trigger"),
+        )
+
+
+def _persisted_index_health(status_path: Optional[Path] = None) -> Optional[dict]:
+    """The index record from the last pipeline run, so a restart keeps proof.
+
+    The in-process state is wiped by the restart that a fatal index fault
+    itself causes; the status file the scheduler writes survives it.
+    """
+    try:
+        status_path = status_path or (
+            Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        )
+        if not status_path.exists():
+            return None
+        with open(status_path) as f:
+            record = json.load(f)
+        health = record.get("index_health")
+        return health if isinstance(health, dict) else None
+    except Exception:
+        return None
+
+
+def _index_fault_pending() -> bool:
+    """True while a recorded index fault has not been repaired."""
+    try:
+        from mandi_rdd.storage.duckdb_store import index_fault_flagged
+        return bool(index_fault_flagged())
+    except Exception:
+        return False
+
+
 def _refresh_once() -> dict:
     """Run the pipeline once, record the outcome, and never raise."""
     _REFRESH_STATE["last_attempt_utc"] = _utcnow_iso()
@@ -312,6 +373,14 @@ def _refresh_once() -> dict:
         _REFRESH_STATE["failures"] += 1
         _REFRESH_STATE["last_error"] = f"{type(e).__name__}: {e}"
         logger.error(f"Self-refresh failed: {e}")
+        # The pipeline died before it could report: if the cause was an index
+        # fault, leave the marker on the volume so the next tick rebuilds
+        # instead of rediscovering the fault the hard way.
+        try:
+            from mandi_rdd.storage.duckdb_store import note_index_fault
+            note_index_fault(e)
+        except Exception:
+            pass
         return {"status": "error", "error": str(e)}
 
     status = summary.get("status") or "unknown"
@@ -320,6 +389,11 @@ def _refresh_once() -> dict:
     else:
         _REFRESH_STATE["failures"] += 1
     _REFRESH_STATE["last_error"] = summary.get("error")
+    # The scheduler runs its own index check inside the pipeline; recording it
+    # here means a heal that happened mid-run is visible on /health even when
+    # this process never had to repair anything itself.
+    steps = summary.get("steps") or {}
+    _note_index_health(steps.get("index_health"), source="pipeline")
     return summary
 
 
@@ -343,6 +417,7 @@ def _verify_price_index_once() -> Optional[dict]:
         from mandi_rdd.storage.duckdb_store import (
             get_connection,
             index_fault_flagged,
+            note_index_fault,
             verify_price_index,
         )
         conn = get_connection()
@@ -355,18 +430,65 @@ def _verify_price_index_once() -> Optional[dict]:
             except Exception:
                 pass
         _INDEX_VERIFIED = True
-        if report.get("rebuilt"):
-            logger.error(f"Price index repaired before ingesting: {report}")
-            _REFRESH_STATE["last_index_repair"] = report
-            return report
+        _note_index_health(report, source="startup_probe")
         if index_fault_flagged():
             # The probe succeeded but the marker survived, which means we could
             # not record the outcome. Say so rather than claim a clean bill.
             logger.warning("Price index probed clean but the fault marker persists")
-        return None
+        return report if report.get("rebuilt") else None
     except Exception as exc:
         logger.error(f"Price-index verification failed: {exc}")
-        return {"error": str(exc)}
+        # "Failed to delete all rows from index" is FATAL: DuckDB invalidates
+        # this process's database instance, so the connection that just died
+        # cannot repair anything. Record the fault first (it is what the next
+        # process - or the fresh connection below - needs), then try the
+        # rebuild here so the heal is not silently deferred to a restart that
+        # never reports it.
+        try:
+            note_index_fault(exc)
+        except Exception:
+            pass
+        repaired = _rebuild_price_index_after_probe_failure(exc)
+        if repaired is None:
+            _note_index_health(
+                {"rebuilt": False, "trigger": None, "error": str(exc)[:200]},
+                source="startup_probe_failed",
+            )
+            return {"error": str(exc)}
+        _INDEX_VERIFIED = True
+        return repaired
+
+
+def _rebuild_price_index_after_probe_failure(cause: Exception) -> Optional[dict]:
+    """Repair the prices table on a brand-new connection.
+
+    Returns the rebuild report, or None when even the fresh connection cannot
+    be opened - in which case the fault marker stays put and the next tick
+    retries, rather than a failed repair being reported as a clean index.
+    """
+    try:
+        from mandi_rdd.storage.duckdb_store import (
+            ensure_price_index,
+            get_connection,
+            index_fault_flagged,
+        )
+        conn = get_connection()
+        try:
+            init_schema(conn)
+            report = ensure_price_index(conn, force=True)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        if index_fault_flagged():
+            logger.warning("The rebuild completed but the fault marker persists")
+        report["cause"] = str(cause)[:200]
+        _note_index_health(report, source="startup_rebuild")
+        return report
+    except Exception as exc:
+        logger.error(f"Price-index rebuild after a failed probe did not complete: {exc}")
+        return None
 
 
 def _health_status(quality: dict) -> str:
@@ -576,6 +698,14 @@ async def health():
 
         quality = _cached_date_quality(conn)
 
+        # The in-process record is lost on the restart a fatal index fault
+        # causes, so fall back to the record the scheduler persisted with the
+        # last pipeline run before reporting anything about the price index.
+        index_check = _REFRESH_STATE.get("last_index_check") or _persisted_index_health()
+        index_repair = _REFRESH_STATE.get("last_index_repair")
+        if index_repair is None and isinstance(index_check, dict) and index_check.get("rebuilt"):
+            index_repair = index_check
+
         return HealthResponse(
             status=_health_status(quality),
             llm_fallback_count=get_llm_fallback_count(),
@@ -602,7 +732,9 @@ async def health():
             last_refresh_attempt_utc=_REFRESH_STATE["last_attempt_utc"],
             last_refresh_success_utc=_REFRESH_STATE["last_success_utc"],
             last_refresh_error=_REFRESH_STATE["last_error"],
-            last_index_repair=_REFRESH_STATE.get("last_index_repair"),
+            last_index_repair=index_repair,
+            last_index_check=index_check,
+            index_fault_pending=_index_fault_pending(),
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),

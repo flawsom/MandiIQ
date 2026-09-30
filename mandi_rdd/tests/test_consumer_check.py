@@ -112,6 +112,30 @@ def test_pipeline_failure_signals_are_empty_for_a_clean_health_payload():
     assert any("self-refresh" in signal for signal in signals), signals
 
 
+def test_a_recorded_index_fault_is_a_blocker_not_a_warning():
+    """A fault the heal has not cleared yet means writes are failing, and the
+    consumer sees numbers that stop moving - that is a stall, not a detail."""
+    findings = check_provenance(
+        _health(index_fault_pending=True), {}, _freshness([SHARED_DATE] * 200)
+    )
+    assert any(
+        finding["level"] == "blocker" and "inconsistent prices index" in finding["message"]
+        for finding in findings
+    ), findings
+
+
+def test_a_clean_index_report_stays_quiet():
+    findings = check_provenance(
+        _health(
+            index_fault_pending=False,
+            last_index_check={"rebuilt": False, "trigger": None, "source": "startup_probe"},
+        ),
+        {},
+        _freshness([SHARED_DATE] * 200),
+    )
+    assert "blocker" not in _levels(findings), findings
+
+
 def test_freshness_gate_notices_upstream_lag_without_failing():
     report = {
         "health": _health(days_behind=6),

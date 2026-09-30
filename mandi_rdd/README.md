@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 [![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
-[![Tests](https://img.shields.io/badge/tests-143%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-151%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -17,21 +17,24 @@ A production-adjacent end-to-end analytics product that spans the full stack: **
 
 ## 🚦 Deployment Status
 
-Live services (auto-checks via shields.io - badges turn green when services respond):
+Live services - the API badge reads the production `/health` payload directly, so it turns green (and stays honest) without anyone updating it:
 
-[![API Health](https://img.shields.io/website?url=https%3A%2F%2Fmandi-iq-api.onrender.com%2Fhealth&label=FastAPI&style=for-the-badge&color=2FA787)](https://mandi-iq-api.onrender.com/docs)
-[![Dashboard](https://img.shields.io/website?url=https%3A%2F%2Fmandi-iq-dashboard.onrender.com&label=Dashboard&style=for-the-badge&color=2FA787)](https://mandi-iq-dashboard.onrender.com)
-[![Landing Page](https://img.shields.io/website?url=https%3A%2F%2Fmandi-iq.netlify.app%2Fmandi-iq%2F&label=Landing+Page&style=for-the-badge&color=2FA787)](https://mandi-iq.netlify.app/mandi-iq/)
-[![CI/CD](https://img.shields.io/github/actions/workflow/status/flawsom/Margin-Intelligence-System/mandi_rdd_ci.yml?branch=master&label=CI&style=for-the-badge&color=2FA787&logo=github)](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml)
+[![API Health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=FastAPI&style=for-the-badge&color=2FA787)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs)
+[![Dashboard](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.streamlit.app&label=Dashboard&style=for-the-badge&color=2FA787)](https://mandiiq.streamlit.app)
+[![Landing Page](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.unifies.codes&label=Landing+Page&style=for-the-badge&color=2FA787)](https://mandiiq.unifies.codes)
+[![Live Data Console](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Flive.html&label=Live+Console&style=for-the-badge&color=2FA787)](https://flawsom.github.io/MandiIQ/live.html)
+[![CI](https://img.shields.io/github/actions/workflow/status/flawsom/MandiIQ/ci.yml?branch=master&label=CI&style=for-the-badge&color=2FA787&logo=github)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 
 | Service | Status | URL | Deployed Via |
 |---|---|---|---|
-| **FastAPI** (10 endpoints) | 🟢 Green when `/health` returns 200 | `mandi-iq-api.onrender.com` | [Render Blueprint](render.yaml) - `mandi-iq-api` |
-| **Streamlit Dashboard** (5 pages) | 🟢 Green when page loads | `mandi-iq-dashboard.onrender.com` | [Render Blueprint](render.yaml) - `mandi-iq-dashboard` |
-| **Landing Page** (static HTML) | 🟢 Green when page loads | `mandi-iq.netlify.app/mandi-iq/` | [Netlify](https://netlify.com) - `landing/` directory |
-| **Nightly Cron** (ingestion) | Runs daily at 6 AM UTC | Internal | [Render Blueprint](render.yaml) - `mandi-iq-nightly-ingest` |
+| **FastAPI** (38 documented endpoints / 47 routes) | `/health` returns 200 and `status` describes the warehouse | `p01--mandiiq--x4n8x4gkmzht.code.run` | [Northflank](NORTHFLANK_DEPLOY.md) - Docker service + persistent volume |
+| **FastAPI (NDVI instance)** | Second Northflank service carrying the satellite rows | `p01--mandiiq--zbvjrztgjqgw.code.run` | [Northflank](NORTHFLANK_DEPLOY.md) |
+| **Streamlit Dashboard** (10 routes) | 🔒 Access-restricted on Streamlit Cloud - set *Who can view this app* to public to open it up | `mandiiq.streamlit.app` | [Streamlit Cloud](https://share.streamlit.io) - `mandi_rdd/dashboard/app.py` |
+| **Landing Page** (static HTML) | 🟢 Green when page loads | `mandiiq.unifies.codes` | Netlify - `landing/mandi-iq/` directory |
+| **Live Data Console** (static HTML) | 🟢 Green when page loads; reads the production API directly | `flawsom.github.io/MandiIQ/live.html` | [GitHub Pages](https://flawsom.github.io/MandiIQ/) - `docs/` directory |
+| **Hourly refresh** (ingestion) | Runs hourly: POSTs `/refresh`, waits, then verifies freshness and every consumer surface | Internal | [GitHub Actions](https://github.com/flawsom/MandiIQ/actions/workflows/refresh-live-data.yml) - `refresh-live-data.yml` |
 
-> **Update these URLs after deployment:** Edit the shields.io `url` parameters above and the table URLs to match your actual Render/Netlify-assigned URLs. The badges use [shields.io website checks](https://shields.io/badges/website) - they auto-update to green when the service is live and responding.
+> **Where the older Render/Netlify URLs went:** earlier revisions of this README pointed at `mandi-iq-api.onrender.com`, `mandi-iq-dashboard.onrender.com` and `mandi-iq.netlify.app/mandi-iq/`. Those services no longer serve MandiIQ - the API and its NDVI mirror run on Northflank, the cockpit on Streamlit Cloud, the landing page on Netlify and the console on GitHub Pages. `render.yaml` stays in the repository as an alternative blueprint, not as the live deployment.
 
 ---
 
@@ -106,8 +109,8 @@ Palette: Ink Indigo `#0B0F1E` / Rain Slate `#2E3A55` / Paper `#F2EFE6` / **Turme
 
 ```bash
 # 1. Clone and enter
-git clone https://github.com/flawsom/Margin-Intelligence-System.git
-cd Margin-Intelligence-System
+git clone https://github.com/flawsom/MandiIQ.git
+cd MandiIQ
 
 # 2. Install dependencies
 pip install -r mandi_rdd/requirements.txt
@@ -174,21 +177,21 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**143 tests passing** (1 skipped = warehouse-dependent check):
+**151 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
 | `test_verification.py` (4 tests) | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
 | `test_no_mock_data.py` (3 tests) | Fabricated-data markers, mock libraries and mock fixture files in shipping code |
 | `test_storage_repair.py` (18 tests) | Index-fault detection and repair, table rebuild, write self-healing, the memory cap that caused the fault, fault marker surviving a restart, API repair-before-ingest order |
-| `test_scheduler_integrity.py` (17 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading, workflow YAML/schedule/secret policy |
+| `test_scheduler_integrity.py` (18 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading + persistence, workflow YAML/schedule/secret policy |
 | `test_spec_curve.py` (20 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg, collapsed fits kept out of the FDR family |
-| `test_api_contract.py` (14 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness, `/ask` schemas stay stable |
+| `test_api_contract.py` (19 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness, index-heal reporting, `/ask` schemas stay stable |
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
 | `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
 | `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
-| `test_consumer_check.py` (9 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate |
+| `test_consumer_check.py` (11 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, plus an unrepaired index fault as a blocker |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
 
@@ -283,7 +286,7 @@ pytest mandi_rdd/tests/ -v
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **143 passing, 1 skipped ✅** |
+| Tests passing | ≥ 25 | **151 passing, 1 skipped ✅** |
 | API endpoints | ≥ 10 | **38 documented endpoints (47 routes) ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |
@@ -307,9 +310,17 @@ pytest mandi_rdd/tests/ -v
 
 ---
 
-## 🐳 Deployment (Free Tier - Render + Streamlit Cloud)
+## 🐳 Deployment
 
-Two deployment options for the API + dashboard, both on free tier. The Render Blueprint (`render.yaml` at the repo root) auto-detects and deploys all 3 services at once.
+MandiIQ is live on three free-tier hosts, and each piece runs on the one that suits it:
+
+| Piece | Host | Config |
+|---|---|---|
+| **API + NDVI mirror** | [Northflank](NORTHFLANK_DEPLOY.md) | `Dockerfile.northflank`, persistent volume at `/data` holding the warehouse |
+| **Streamlit cockpit** | [Streamlit Cloud](https://share.streamlit.io) | `mandi_rdd/dashboard/app.py` on `master` |
+| **Landing page + console** | Netlify (`landing/mandi-iq/`) and GitHub Pages (`docs/`) | static HTML |
+
+The Render Blueprint (`render.yaml` at the repo root) is kept as an alternative for the API + dashboard, and the steps below cover both it and Streamlit Cloud.
 
 ### 📋 Environment Variables (you must set these)
 
@@ -326,13 +337,13 @@ MandiIQ reads exactly **4** environment variables at runtime. Only `PORT` has no
 
 > **`OPENROUTER_API_KEY`:** Required only for Phase 11 (AI Orchestrator). Get a free key at [openrouter.ai/keys](https://openrouter.ai/keys) (no credit card needed). Routes across free models (`meta-llama/llama-3.1-8b-instruct:free`, `deepseek/deepseek-chat:free`, etc.) with automatic circuit-breaker fallback. Without it, the "Ask MandiIQ" chat panel shows a graceful message and the nightly narrative is skipped - the core causal/predictive/prescriptive app works perfectly without it.
 
-> **`MANDIIQ_API_URL`:** The dashboard calls the FastAPI backend for the "Ask MandiIQ" chat panel and KPI data. Defaults to `http://localhost:8000` for local runs. On Render, set this to your deployed API URL (e.g. `https://mandi-iq-api-XXXX.onrender.com`) so the dashboard talks to the live backend.
+> **`MANDIIQ_API_URL`:** The dashboard calls the FastAPI backend for the "Ask MandiIQ" chat panel and KPI data. Defaults to `http://localhost:8000` for local runs. On a host, set this to your deployed API URL (e.g. `https://p01--mandiiq--x4n8x4gkmzht.code.run`) so the dashboard talks to the live backend.
 
 ---
 
-### Option A: Render Blueprint (Recommended - 1-click deploy)
+### Option A: Render Blueprint (alternative host - 1-click deploy)
 
-Deploys all 3 services simultaneously: FastAPI API, Streamlit dashboard, and nightly cron job.
+Not the live deployment (see the host table above), but a working alternative: deploys all 3 services simultaneously - FastAPI API, Streamlit dashboard, and nightly cron job.
 
 #### Step 1 - Create a Render account
 1. Go to [render.com](https://render.com) and click **Get Started**
@@ -340,7 +351,7 @@ Deploys all 3 services simultaneously: FastAPI API, Streamlit dashboard, and nig
 
 #### Step 2 - Connect repo and deploy Blueprint
 1. From the Render dashboard, click **New +** → **Blueprint**
-2. Select `flawsom/Margin-Intelligence-System` as the repo
+2. Select `flawsom/MandiIQ` as the repo
 3. Render auto-detects `render.yaml` at the repo root - you'll see 3 services pre-filled:
    - `mandi-iq-api` (FastAPI web service) - health check at `/health`
    - `mandi-iq-dashboard` (Streamlit dashboard web service)
@@ -387,14 +398,14 @@ This fetches ~10,000 price records from data.gov.in, stores them in DuckDB, runs
 
 ---
 
-### Option B: Streamlit Cloud (dashboard only, alternative to Render)
+### Option B: Streamlit Cloud (the cockpit's actual host, dashboard only)
 
 If you prefer to deploy the dashboard separately on Streamlit Cloud:
 
 1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub
 2. Click **New app**
 3. Configure:
-   - **Repository:** `flawsom/Margin-Intelligence-System`
+   - **Repository:** `flawsom/MandiIQ`
    - **Branch:** `master`
    - **Main file:** `mandi_rdd/dashboard/app.py`
 4. **Advanced settings → Secrets:**
@@ -444,11 +455,13 @@ curl http://localhost:8000/health
 
 ### 🤖 GitHub Actions CI/CD (already configured)
 
-The repository includes two CI workflows:
+The repository includes these CI workflows:
 
 | Workflow | File | Trigger |
 |---|---|---|
 | **CI** | `.github/workflows/ci.yml` | Push / PR - the full pytest suite on Python 3.10, 3.11 and 3.12, coverage upload, Ruff lint, Mermaid diagram validation, secret/AI-defect scan |
+| **Consumer Check** | `.github/workflows/consumer-check.yml` | Every 3 hours, on demand, and on pushes that touch the checker - fetches every public page, calls the 20 API routes the consumer surfaces depend on, follows their links, and attributes staleness; blockers fail the run |
+| **Refresh Live Data** | `.github/workflows/refresh-live-data.yml` | Hourly - POSTs `/refresh`, waits for the run, verifies freshness (upstream lag vs pipeline failure) and then the whole consumer surface |
 | **MandiRDD CI** | `.github/workflows/mandi_rdd_ci.yml` | Push to `mandi_rdd/` - test matrix + workflow-syntax validation; on schedule it also runs live ingestion from data.gov.in |
 | **Nightly ingest** | `.github/workflows/nightly-ingest.yml` | Daily schedule - live ingestion, freshness gate, R2 backup, Ashoka enrichment |
 
@@ -456,19 +469,16 @@ The badge at the top of this README shows the CI status: ![CI](https://github.co
 
 ---
 
-### 🌐 Update the Landing Page with Live URLs
+### 🌐 Point the Live Console at Your API
 
-After deployment, update `landing/mandi-iq/index.html` with your actual URLs:
+The **Live Data Console** (`docs/live.html`, served by GitHub Pages) reads every figure from the API at page load, from a single constant:
 
 ```javascript
-// In landing/mandi-iq/index.html - update these lines:
-var DEPLOY = {
-    API:     'https://mandi-iq-api-XXXX.onrender.com',     // ← Your actual Render API URL
-    DASH:    'https://mandi-iq-dashboard-XXXX.onrender.com', // ← Your actual Render dashboard URL
-};
+// docs/live.html
+const API = "https://p01--mandiiq--x4n8x4gkmzht.code.run";
 ```
 
-Then commit and push. If you deployed the `landing/` directory to Netlify, the page will auto-refresh.
+Change it only if you deploy your own API, then commit and push - GitHub Pages redeploys automatically. The Netlify landing page (`landing/mandi-iq/`) is static marketing copy and needs no API base.
 
 ---
 
@@ -478,10 +488,10 @@ Then commit and push. If you deployed the `landing/` directory to Netlify, the p
 |---|---|---|
 | Dashboard shows "No data" | Database empty - ingestion hasn't run yet | Run `curl -X POST https://api-url/refresh` |
 | Build fails with `Command 'gcc' failed` | Prophet needs C compiler | Add `build-essential` to packages.txt (already done) |
-| AI chat shows "No API key configured" | `OPENROUTER_API_KEY` not set | Set it in Render dashboard under Environment for the dashboard service |
+| AI chat shows "No API key configured" | `OPENROUTER_API_KEY` not set | Set it in the Northflank service's environment (or Streamlit Cloud secrets) |
 | AI chat shows "All models exhausted" | Free-tier rate limits reached | Wait a few minutes (cool-down period) or check router logs for which model was rate-limited |
-| `data.gov.in` returns 403 | API key missing or expired | Set `DATA_GOV_IN_API_KEY` env var in Render dashboard |
-| Cron job didn't run | Free tier cron may sleep after inactivity | Render free cron runs daily; no action needed |
+| `data.gov.in` returns 403 | API key missing or expired | Set the `DATA_GOV_IN_API_KEY` env var on the host (Northflank → Environment) |
+| Data stopped advancing | The host suspended the service, or an upstream outage | The in-process scheduler plus the hourly `refresh-live-data.yml` run both re-trigger it; check `/health` `refresh_runs` / `last_refresh_error` |
 | LSTM forecast shows "PyTorch not installed" | PyTorch removed to fit free tier RAM | Expected - app degrades gracefully to Prophet-only |
 
 ---
