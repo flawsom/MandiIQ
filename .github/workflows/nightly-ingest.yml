@@ -79,6 +79,10 @@ jobs:
           python -m mandi_rdd.ingestion.scheduler
 
       - name: Enrich district->state mappings via Ashoka API
+        # Best-effort enrichment, and the Ashoka API answers in anywhere from a
+        # second to never - it sat on one read for ten minutes during a run.
+        # Without a bound it can eat most of the job's 45-minute budget.
+        timeout-minutes: 8
         continue-on-error: true
         run: |
           python -m mandi_rdd.ingestion.backfill_state --with-ashoka
