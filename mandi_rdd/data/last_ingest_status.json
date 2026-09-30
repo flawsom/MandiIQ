@@ -1,5 +1,11 @@
 {
-  "last_run_utc": "2026-07-28T03:34:24.636477Z",
+  "last_run_utc": "2026-09-30T15:59:52.572157Z",
   "outcome": "success",
-  "price_rows": 247
+  "status": "ok",
+  "new_price_rows": 0,
+  "duration_s": 57.1,
+  "error": null,
+  "data_max_date": null,
+  "days_behind": null,
+  "n_future_dates": 0
 }
