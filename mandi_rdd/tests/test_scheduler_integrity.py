@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
+
 import pytest
 import yaml
 
@@ -226,6 +228,48 @@ def test_fetch_all_prices_still_honours_max_records(monkeypatch):
     )
     records = fetch_prices.fetch_all_prices(page_size=4, max_records=8)
     assert len(records) == 8
+
+
+def test_index_fault_marker_reads_the_previous_failure(tmp_path):
+    """A fault the read-only duplicate check cannot see must still be repaired.
+
+    The evidence is the last run's error text: probing with a write is how the
+    process dies in the first place.
+    """
+    from mandi_rdd.ingestion import scheduler
+
+    assert scheduler._last_run_had_index_fault(tmp_path / "missing.json") is False
+
+    record = tmp_path / "last_ingest_status.json"
+    record.write_text(json.dumps({
+        "outcome": "failure",
+        "status": "failed",
+        "error": "FatalException: FATAL Error: Invalid Input Error: Failed to "
+                 "delete all rows from index. Only deleted 0 out of 12 rows.",
+    }), encoding="utf-8")
+    assert scheduler._last_run_had_index_fault(record) is True
+
+    record.write_text(json.dumps({
+        "outcome": "degraded", "status": "degraded",
+        "error": "price source unavailable: <urlopen error timed out>",
+    }), encoding="utf-8")
+    assert scheduler._last_run_had_index_fault(record) is False, (
+        "a transient source outage must not trigger a table rebuild"
+    )
+
+    record.write_text("not json", encoding="utf-8")
+    assert scheduler._last_run_had_index_fault(record) is False
+
+
+def test_pipeline_repairs_a_fault_it_can_only_see_from_the_last_failure():
+    source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
+        encoding="utf-8"
+    )
+    assert "_last_run_had_index_fault()" in source
+    assert "previous_run_index_fault" in source
+    # The repair has to happen before anything else writes to the table.
+    assert source.index('step("index_health")') < source.index('step("date_integrity")')
+    assert source.index('step("index_health")') < source.index('step("fetch_prices")')
 
 
 def test_pipeline_upserts_each_page_instead_of_buffering(monkeypatch):

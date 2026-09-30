@@ -143,8 +143,25 @@ def _run_ingestion_locked(
     #     write touching those keys fails and ingestion cannot make progress.
     with pipeline_metrics.step("index_health"):
         try:
-            from mandi_rdd.storage.duckdb_store import ensure_price_index
+            from mandi_rdd.storage.duckdb_store import (
+                ensure_price_index,
+                rebuild_prices_table,
+            )
             index_report = ensure_price_index(conn)
+            if not index_report.get("rebuilt") and _last_run_had_index_fault():
+                # The duplicate check catches an index that is no longer
+                # enforcing. A fault that leaves the index self-consistent is
+                # only visible by writing to it, and probing with a write is
+                # itself how the process dies - so the evidence of the last
+                # failure is the trigger. That turns a crash loop into one bad
+                # run followed by a repair.
+                logger.error(
+                    "The previous ingestion run died on an inconsistent prices "
+                    "index; rebuilding the table before touching it again"
+                )
+                index_report = rebuild_prices_table(conn)
+                index_report["rebuilt"] = True
+                index_report["trigger"] = "previous_run_index_fault"
             summary["steps"]["index_health"] = index_report
         except Exception as e:
             logger.warning(f"Price index check skipped: {e}")
@@ -547,6 +564,32 @@ def _run_ingestion_locked(
     logger.info(f"Pipeline complete in {summary['duration_seconds']}s")
     return summary
 
+
+
+INDEX_FAULT_MARKERS = (
+    "failed to delete all rows from index",
+    "database has been invalidated",
+    "database instance is invalidated",
+    "index corruption",
+)
+
+
+def _last_run_had_index_fault(status_path: Path = None) -> bool:
+    """Did the previous run die on an inconsistent prices index?"""
+    try:
+        out = status_path or (
+            Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+        )
+        if not out.exists():
+            return False
+        record = json.loads(out.read_text(encoding="utf-8"))
+        blob = " ".join(
+            str(record.get(key) or "") for key in ("error", "status", "outcome")
+        ).lower()
+        return any(marker in blob for marker in INDEX_FAULT_MARKERS)
+    except Exception as exc:
+        logger.debug("Could not read the previous ingest status: %s", exc)
+        return False
 
 
 def _write_ingest_status(summary: dict) -> None:
