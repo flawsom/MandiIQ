@@ -179,7 +179,9 @@ def test_rebuild_collapses_duplicates_and_keeps_ids(conn):
 
 def test_ensure_price_index_only_rebuilds_when_needed(conn):
     duckdb_store.upsert_prices(conn, [_record()])
-    assert duckdb_store.ensure_price_index(conn) == {"duplicates": 0, "rebuilt": False}
+    clean = duckdb_store.ensure_price_index(conn)
+    assert clean["rebuilt"] is False
+    assert clean["duplicates"] == 0
 
     _bare_prices_table(conn)
     _insert_raw(conn, [_record(), _record()])
@@ -214,6 +216,72 @@ def test_rebuilding_does_not_delete_the_database_file(tmp_path, monkeypatch):
         playback.close()
     assert dropped == []
     assert path.exists()
+
+
+def test_an_index_fault_is_recorded_next_to_the_database(tmp_path, monkeypatch):
+    """The marker has to outlive the restart the fault caused.
+
+    A container restart discards the image layer, so a marker kept beside the
+    code disappears exactly when the next process needs it - which is why the
+    repair kept missing its cue in production.
+    """
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+
+    assert duckdb_store.index_fault_flagged() is False
+    assert duckdb_store.note_index_fault(
+        Exception("FATAL Error: Failed to delete all rows from index")
+    ) is True
+    assert duckdb_store.index_fault_flagged() is True
+    assert duckdb_store.index_fault_flag_path().parent.name == "vol", (
+        "the marker must sit on the volume, not beside the code"
+    )
+
+    duckdb_store.clear_index_fault()
+    assert duckdb_store.index_fault_flagged() is False
+
+
+def test_unrelated_errors_are_not_recorded_as_index_faults(tmp_path, monkeypatch):
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    assert duckdb_store.note_index_fault(
+        Exception("price source unavailable: <urlopen error timed out>")
+    ) is False
+    assert duckdb_store.index_fault_flagged() is False
+
+
+def test_a_recorded_fault_forces_the_rebuild(conn, tmp_path, monkeypatch):
+    """A fault a read cannot see must still be repaired, and then forgotten."""
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    duckdb_store.upsert_prices(conn, [_record(), _record(commodity="Tomato")])
+    duckdb_store.note_index_fault(
+        Exception("FATAL Error: Failed to delete all rows from index")
+    )
+
+    report = duckdb_store.heal_price_index(conn)
+
+    assert report["rebuilt"] is True
+    assert report["trigger"] == "recorded_index_fault"
+    assert report["rows_after"] == 2, "no rows may be lost in the repair"
+    assert duckdb_store.index_fault_flagged() is False, (
+        "the marker must be cleared or every run would rebuild"
+    )
+
+
+def test_heal_is_a_no_op_without_a_fault(conn, tmp_path, monkeypatch):
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    duckdb_store.upsert_prices(conn, [_record()])
+    assert duckdb_store.heal_price_index(conn)["rebuilt"] is False
+
+
+def test_the_api_repairs_before_it_ingests():
+    """The first write of a run is what dies, so the repair is in front of it."""
+    from pathlib import Path as _Path
+
+    repo_root = _Path(__file__).resolve().parents[2]
+    source = (repo_root / "mandi_rdd" / "api" / "main.py").read_text(encoding="utf-8")
+    assert "_repair_price_index_if_flagged()" in source
+    assert source.index("rehab = _repair_price_index_if_flagged()") < source.index(
+        "summary = run_ingestion()"
+    )
 
 
 # ── self-healing writes ─────────────────────────────────────────────────────

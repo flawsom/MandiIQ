@@ -742,24 +742,105 @@ def find_duplicate_price_keys(conn) -> int:
     return int(row[0] or 0)
 
 
-def ensure_price_index(conn) -> dict:
+FAULT_FLAG_NAME = "index_fault.flag"
+
+
+def index_fault_flag_path() -> Optional[Path]:
+    """Where the index-fault marker lives.
+
+    Next to the database, because that directory is the mounted volume. A
+    marker kept beside the code does not survive the container restart that
+    the fault itself causes, which is how the repair kept missing its cue.
+    """
+    try:
+        return Path(DB_PATH).parent / FAULT_FLAG_NAME
+    except Exception:
+        return None
+
+
+def note_index_fault(error: object) -> bool:
+    """Record that a write died on an inconsistent index. Returns True if so."""
+    try:
+        message = str(error)
+    except Exception:
+        return False
+    if not _is_index_fault(Exception(message)):
+        return False
+    path = index_fault_flag_path()
+    try:
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(message[:2000], encoding="utf-8")
+        logger.error(
+            "An index fault was recorded%s; the prices table will be rebuilt "
+            "before the next write",
+            f" at {path}" if path else "",
+        )
+        return True
+    except OSError as exc:
+        logger.warning(f"Could not record the index fault: {exc}")
+        return True
+
+
+def index_fault_flagged() -> bool:
+    """Is there a recorded index fault that has not been repaired yet?"""
+    path = index_fault_flag_path()
+    try:
+        return bool(path is not None and path.exists())
+    except OSError:
+        return False
+
+
+def clear_index_fault() -> None:
+    """Drop the marker once the table has been rebuilt."""
+    path = index_fault_flag_path()
+    try:
+        if path is not None:
+            path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning(f"Could not clear the index-fault marker: {exc}")
+
+
+def ensure_price_index(conn, force: bool = False) -> dict:
     """Rebuild the prices table when its unique index has stopped working.
 
     Cheap enough to call on boot: duplicates are impossible while the index is
     healthy, so the common case is one aggregate query that finds nothing.
+    ``force`` skips that check - used when a recorded fault says the index is
+    broken in a way a read cannot see.
     """
-    duplicates = find_duplicate_price_keys(conn)
-    if not duplicates:
-        return {"duplicates": 0, "rebuilt": False}
-    logger.warning(
-        "Found %d duplicate price keys - the UNIQUE index is not enforcing, "
-        "rebuilding the prices table", duplicates,
-    )
+    duplicates = 0 if force else find_duplicate_price_keys(conn)
+    if not duplicates and not force:
+        return {"duplicates": 0, "rebuilt": False, "trigger": None}
+    if force:
+        logger.error(
+            "Rebuilding the prices table: a previous write died on an "
+            "inconsistent index"
+        )
+    else:
+        logger.warning(
+            "Found %d duplicate price keys - the UNIQUE index is not enforcing, "
+            "rebuilding the prices table", duplicates,
+        )
     report = rebuild_prices_table(conn)
     report["duplicates"] = duplicates
     report["rebuilt"] = True
+    report["trigger"] = "recorded_index_fault" if force else "duplicate_keys"
     report["duplicates_after"] = find_duplicate_price_keys(conn)
+    clear_index_fault()
     return report
+
+
+def heal_price_index(conn) -> dict:
+    """Repair the index if anything says it needs it, else do nothing.
+
+    Called before a pipeline run and before the first write of a fresh
+    process, so a fault recorded by a run that crashed cannot be inherited by
+    the next one.
+    """
+    if index_fault_flagged():
+        return ensure_price_index(conn, force=True)
+    return ensure_price_index(conn)
 
 
 def upsert_prices(conn, records: list[dict]) -> int:

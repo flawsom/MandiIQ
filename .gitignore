@@ -120,6 +120,9 @@ mandi_rdd/data/chunks50/
 
 # DuckDB data files (too large, managed via R2/EBS)
 mandi_rdd/data/*.duckdb
+# Index-fault marker written beside the database; a local artifact, never code.
+mandi_rdd/data/index_fault.flag
+**/duckdb_spill/
 
 # Temp scripts, logs, screenshots (local artifacts)
 _upload_chunks.ps1

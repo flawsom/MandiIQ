@@ -92,6 +92,7 @@ class HealthResponse(BaseModel):
     last_refresh_attempt_utc: Optional[str] = None
     last_refresh_success_utc: Optional[str] = None
     last_refresh_error: Optional[str] = None
+    last_index_repair: Optional[dict] = None
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
@@ -247,6 +248,7 @@ _REFRESH_STATE: dict = {
     "last_attempt_utc": None,
     "last_success_utc": None,
     "last_error": None,
+    "last_index_repair": None,
     "runs": 0,
     "failures": 0,
     "interval_s": 0,
@@ -302,6 +304,10 @@ def _refresh_once() -> dict:
         logger.info("Self-refresh skipped: an ingestion is already running")
         return {"status": "busy"}
 
+    rehab = _repair_price_index_if_flagged()
+    if rehab:
+        _REFRESH_STATE["last_index_repair"] = rehab
+
     try:
         summary = run_ingestion()
     except Exception as e:
@@ -317,6 +323,40 @@ def _refresh_once() -> dict:
         _REFRESH_STATE["failures"] += 1
     _REFRESH_STATE["last_error"] = summary.get("error")
     return summary
+
+
+def _repair_price_index_if_flagged() -> Optional[dict]:
+    """Rebuild the prices table when a previous run recorded an index fault.
+
+    Done before the pipeline, not inside it, because the first write of a run
+    is what dies: a fault recorded by a process that was restarted must be
+    repaired by its successor rather than inherited. The marker lives on the
+    data volume so it survives that restart.
+    """
+    try:
+        from mandi_rdd.storage.duckdb_store import (
+            get_connection,
+            heal_price_index,
+            index_fault_flagged,
+        )
+        if not index_fault_flagged():
+            return None
+        logger.error(
+            "A previous run left an index fault recorded; rebuilding the prices "
+            "table before ingesting"
+        )
+        conn = get_connection()
+        try:
+            init_schema(conn)
+            return heal_price_index(conn)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.error(f"Price-index repair failed: {exc}")
+        return {"error": str(exc)}
 
 
 def _health_status(quality: dict) -> str:
@@ -552,6 +592,7 @@ async def health():
             last_refresh_attempt_utc=_REFRESH_STATE["last_attempt_utc"],
             last_refresh_success_utc=_REFRESH_STATE["last_success_utc"],
             last_refresh_error=_REFRESH_STATE["last_error"],
+            last_index_repair=_REFRESH_STATE.get("last_index_repair"),
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),

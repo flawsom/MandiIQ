@@ -103,6 +103,13 @@ def run_ingestion(
     except Exception as exc:
         logger.exception("Ingestion run failed: %s", exc)
         _write_ingest_status({"status": "failed", "error": str(exc), "steps": {}})
+        # On the volume, not beside the code: the container is restarted by the
+        # fault itself, and an image-layer marker goes with it.
+        try:
+            from mandi_rdd.storage.duckdb_store import note_index_fault
+            note_index_fault(exc)
+        except Exception:
+            pass
         raise
     finally:
         _RUN_LOCK.release()
@@ -144,17 +151,17 @@ def _run_ingestion_locked(
     with pipeline_metrics.step("index_health"):
         try:
             from mandi_rdd.storage.duckdb_store import (
-                ensure_price_index,
+                heal_price_index,
+                index_fault_flagged,
                 rebuild_prices_table,
             )
-            index_report = ensure_price_index(conn)
+            # The duplicate check catches an index that is no longer enforcing.
+            # A fault that leaves the index self-consistent is only visible by
+            # writing to it, and probing with a write is itself how the process
+            # dies - so the recorded fault is the trigger. That turns a crash
+            # loop into one bad run followed by a repair.
+            index_report = heal_price_index(conn)
             if not index_report.get("rebuilt") and _last_run_had_index_fault():
-                # The duplicate check catches an index that is no longer
-                # enforcing. A fault that leaves the index self-consistent is
-                # only visible by writing to it, and probing with a write is
-                # itself how the process dies - so the evidence of the last
-                # failure is the trigger. That turns a crash loop into one bad
-                # run followed by a repair.
                 logger.error(
                     "The previous ingestion run died on an inconsistent prices "
                     "index; rebuilding the table before touching it again"
@@ -162,6 +169,12 @@ def _run_ingestion_locked(
                 index_report = rebuild_prices_table(conn)
                 index_report["rebuilt"] = True
                 index_report["trigger"] = "previous_run_index_fault"
+                try:
+                    from mandi_rdd.storage.duckdb_store import clear_index_fault
+                    clear_index_fault()
+                except Exception:
+                    pass
+            index_report["fault_flagged"] = index_fault_flagged()
             summary["steps"]["index_health"] = index_report
         except Exception as e:
             logger.warning(f"Price index check skipped: {e}")
@@ -576,6 +589,13 @@ INDEX_FAULT_MARKERS = (
 
 def _last_run_had_index_fault(status_path: Path = None) -> bool:
     """Did the previous run die on an inconsistent prices index?"""
+    if status_path is None:
+        try:
+            from mandi_rdd.storage.duckdb_store import index_fault_flagged
+            if index_fault_flagged():
+                return True
+        except Exception:
+            pass
     try:
         out = status_path or (
             Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
