@@ -72,6 +72,15 @@ jobs:
               print(f"::warning::/health unreachable ({e}); leaving recovery to the next run")
               raise SystemExit(0)
 
+          if not health.get("safe_recovery"):
+              # Older builds rebuild a table non-atomically and decompress the
+              # R2 backup in RAM. Pointing recovery at one of those can destroy
+              # the warehouse or OOM the container, so it is refused here
+              # rather than gambling on the deployed build's behaviour.
+              print("::warning::production was not built with safe recovery; "
+                    "deploy the current master before automated healing runs")
+              raise SystemExit(0)
+
           problems = []
 
           if health.get("index_fault_pending"):

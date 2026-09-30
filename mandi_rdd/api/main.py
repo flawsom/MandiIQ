@@ -99,6 +99,13 @@ class HealthResponse(BaseModel):
     # yet (it clears on the next successful rebuild).
     last_index_check: Optional[dict] = None
     index_fault_pending: bool = False
+    # Capability flag: a caller that wants to run an automated recovery needs
+    # to know the deployed build can actually do it. This one says the rebuild
+    # is atomic and the R2 restore streams. It defaults to False so an older
+    # build - one that would rebuild a table non-atomically or decompress the
+    # backup in RAM - can never be mistaken for a safe recovery target just
+    # because the field is absent from its response.
+    safe_recovery: bool = False
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
@@ -735,6 +742,7 @@ async def health():
             last_index_repair=index_repair,
             last_index_check=index_check,
             index_fault_pending=_index_fault_pending(),
+            safe_recovery=True,
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),
