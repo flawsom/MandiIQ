@@ -41,7 +41,9 @@ from mandi_rdd.storage.duckdb_store import (
     upsert_rainfall,
     save_rdd_result,
 )
-from mandi_rdd.ingestion.fetch_prices import fetch_all_prices
+# iter_price_pages is imported inside the pipeline step: the fetch layer is
+# optional at import time so the scheduler can still run RDD on existing data
+# when the price source is unavailable.
 from mandi_rdd.ingestion.ingest_historical_csv import run_auto as run_historical_backfill
 from mandi_rdd.ingestion.fetch_ndvi import fetch_and_store_all_ndvi
 from mandi_rdd.ingestion.fetch_rainfall import (
@@ -63,6 +65,14 @@ _RUN_LOCK = threading.Lock()
 def ingestion_running() -> bool:
     """True while a pipeline run is in flight in this process."""
     return _RUN_LOCK.locked()
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float from the environment, falling back on anything unusable."""
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
 
 
 def run_ingestion(
@@ -153,57 +163,66 @@ def _run_ingestion_locked(
         except Exception as e:
             logger.warning(f"Date integrity check skipped: {e}")
 
-    # 2. Ingest mandi prices
+    # 2. Ingest mandi prices.
+    #
+    # Pages are written as they arrive rather than collected into one list:
+    # the whole archive is far larger than the container's memory, and a run
+    # that buffered it would be OOM-killed mid-ingest - taking the API down
+    # with it, because ingestion runs inside the serving process.
     logger.info("Fetching mandi prices from data.gov.in...")
     price_fetch_error = None
+    n_prices = 0
+    n_new = 0
+    price_write_error = None
+    source_info = None
+    run_budget_s = _env_float("MANDIIQ_PRICE_FETCH_MAX_SECONDS", 900.0)
+    page_size = int(_env_float("MANDIIQ_PRICE_PAGE_SIZE", 1000.0))
     with pipeline_metrics.step("fetch_prices"):
         _t0 = time.monotonic()
         try:
-            price_records = fetch_all_prices(
+            from mandi_rdd.ingestion.fetch_prices import iter_price_pages
+            for page in iter_price_pages(
                 filters=filters,
                 max_records=max_records,
+                page_size=page_size,
+                max_run_seconds=run_budget_s,
                 progress_callback=lambda done, total: logger.info(
                     f"  Prices: {done}/{total} records"
                 ),
-            )
+            ):
+                for record in page:
+                    source = record.pop("_source", None)
+                    if source is not None and source_info is None:
+                        source_info = source
+                n_prices += len(page)
+                try:
+                    n_new += upsert_prices(conn, page)
+                except Exception as e:
+                    # A write fault must not take rainfall, RDD and forecast
+                    # down with it. upsert_prices already rebuilds the table
+                    # and retries once on an index fault; if it still failed,
+                    # report a degraded run and let POST /admin/rebuild-prices
+                    # finish the job.
+                    logger.error(f"Price upsert failed; continuing with existing data: {e}")
+                    summary["steps"]["upsert_prices"] = {
+                        "status": "error", "error": str(e),
+                        "hint": "POST /admin/rebuild-prices rebuilds the table and its index",
+                    }
+                    price_write_error = str(e)
+                    break
+                pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
             pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, True)
         except Exception as e:
             # A slow or briefly unreachable source must not abort the rainfall,
             # RDD and forecast work that can still run on the existing
             # warehouse. The run is reported as "degraded" instead.
             logger.error(f"Price fetch failed, continuing with existing data: {e}")
-            price_records = []
             price_fetch_error = str(e)
             pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, False)
-    n_prices = len(price_records)
-    n_new = 0
-    price_write_error = None
-    with pipeline_metrics.step("upsert_prices"):
-        try:
-            n_new = upsert_prices(conn, price_records)
-            pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
-        except Exception as e:
-            # A write fault in the prices table must not take rainfall, RDD and
-            # forecast down with it. upsert_prices already rebuilds the table
-            # and retries once on an index fault; if it still failed, report a
-            # degraded run and let POST /admin/rebuild-prices finish the job.
-            logger.error(f"Price upsert failed; continuing with existing data: {e}")
-            summary["steps"]["upsert_prices"] = {
-                "status": "error", "error": str(e),
-                "hint": "POST /admin/rebuild-prices rebuilds the table and its index",
-            }
-            price_write_error = str(e)
 
     # Record lineage for primary price fetch
     try:
         from mandi_rdd.storage.duckdb_store import record_lineage_batch
-        # Extract _source tags if present (added by fetch_all_prices)
-        source_info = None
-        for r in price_records:
-            src = r.pop("_source", None)
-            if src is not None:
-                source_info = src
-                break
         if source_info:
             record_lineage_batch(
                 conn,
@@ -212,8 +231,8 @@ def _run_ingestion_locked(
                 resource_id=source_info.get("resource_id"),
                 row_count=n_prices,
                 n_new=n_new,
-                records=price_records,
-                metadata={"filters": filters},
+                records=[],
+                metadata={"filters": filters, "streamed": True},
             )
     except Exception as e:
         logger.warning(f"Failed to record lineage for prices: {e}")

@@ -187,6 +187,74 @@ def fetch_page(
 
 PRIMARY_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 
+def iter_price_pages(
+    filters: Optional[dict] = None,
+    max_records: Optional[int] = None,
+    page_size: int = 1000,
+    progress_callback=None,
+    max_run_seconds: Optional[float] = None,
+):
+    """Yield pages of price records instead of returning one giant list.
+
+    The pipeline that serves live traffic must not hold the whole archive in
+    memory: a container that fetches every page into a list before writing any
+    of it is one bad day away from being OOM-killed mid-ingest. Callers upsert
+    each page and drop it, so peak memory is one page regardless of how far the
+    walk gets.
+
+    ``max_run_seconds`` bounds a single walk so a slow source cannot keep an
+    ingest open indefinitely; the next run continues from the newest data.
+    """
+    # Graceful skip if no API key - allows pipeline to run RDD on existing data
+    try:
+        _get_api_key()
+    except RuntimeError:
+        logger.info(
+            "DATA_GOV_IN_API_KEY not set - skipping price fetch. "
+            "RDD analysis can still run on existing data."
+        )
+        return
+
+    started = time.monotonic()
+    offset = 0
+    fetched = 0
+    while True:
+        data = fetch_page(offset=offset, limit=page_size, filters=filters)
+        records = data.get("records", []) or []
+        total = data.get("total", 0) or 0
+
+        for record in records:
+            record["_source"] = {
+                "source_type": "api",
+                "source_name": "data.gov.in daily mandi prices",
+                "resource_id": PRIMARY_RESOURCE_ID,
+            }
+
+        fetched += len(records)
+        if progress_callback:
+            progress_callback(fetched, total)
+        if records:
+            yield records
+
+        if not records:
+            break
+        if max_records and fetched >= max_records:
+            logger.info(f"Price fetch stopping at the {max_records}-record budget")
+            break
+        if max_run_seconds and (time.monotonic() - started) >= max_run_seconds:
+            logger.info(
+                f"Price fetch stopping after {max_run_seconds:.0f}s "
+                f"({fetched} records); the next run continues from the top"
+            )
+            break
+        if offset + page_size >= total:
+            break
+
+        offset += page_size
+        # Small delay to be polite to the API
+        time.sleep(0.2)
+
+
 def fetch_all_prices(
     filters: Optional[dict] = None,
     max_records: Optional[int] = None,
@@ -216,47 +284,19 @@ def fetch_all_prices(
     Returns:
         List of record dicts, each with a ``_source`` metadata key.
     """
-    # Graceful skip if no API key - allows pipeline to run RDD on existing data
-    try:
-        _get_api_key()
-    except RuntimeError:
-        logger.info("DATA_GOV_IN_API_KEY not set - skipping price fetch. RDD analysis can still run on existing data.")
-        return []
+    # Kept for callers that genuinely want one list (CLI one-shots, tests).
+    # The pipeline uses iter_price_pages so it can write each page as it lands.
+    all_records: list[dict] = []
+    for page in iter_price_pages(
+        filters=filters,
+        max_records=max_records,
+        page_size=page_size,
+        progress_callback=progress_callback,
+    ):
+        all_records.extend(page)
 
-    all_records = []
-    offset = 0
-    total = None
-
-    while True:
-        data = fetch_page(offset=offset, limit=page_size, filters=filters)
-        records = data.get("records", [])
-        total = data.get("total", 0)
-
-        # Tag each record with source metadata
-        for r in records:
-            r["_source"] = {
-                "source_type": "api",
-                "source_name": "data.gov.in daily mandi prices",
-                "resource_id": PRIMARY_RESOURCE_ID,
-            }
-
-        all_records.extend(records)
-
-        if progress_callback:
-            progress_callback(len(all_records), total)
-
-        # Check termination conditions
-        if max_records and len(all_records) >= max_records:
-            all_records = all_records[:max_records]
-            break
-
-        if offset + page_size >= total:
-            break
-
-        offset += page_size
-        # Small delay to be polite to the API
-        time.sleep(0.5)
-
+    if max_records:
+        all_records = all_records[:max_records]
     return all_records
 
 def fetch_commodities() -> list[str]:

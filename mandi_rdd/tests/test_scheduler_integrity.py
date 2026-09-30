@@ -137,6 +137,107 @@ def test_source_outage_degrades_the_run_instead_of_aborting_it():
     assert "continuing with existing data" in source
 
 
+def test_price_pages_are_yielded_lazily(monkeypatch):
+    """The pipeline must never hold the whole archive in memory.
+
+    Buffering every page into one list is what puts a fetch-heavy ingest on a
+    collision course with the container's memory limit, and the ingest runs
+    inside the API process.
+    """
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    pages = [
+        {"records": [{"commodity": f"C{i}"} for i in range(3)], "total": 9},
+        {"records": [{"commodity": f"D{i}"} for i in range(3)], "total": 9},
+        {"records": [{"commodity": f"E{i}"} for i in range(3)], "total": 9},
+    ]
+    calls = {"n": 0}
+
+    def _fake_fetch_page(offset=0, limit=1000, filters=None, format="json"):
+        calls["n"] += 1
+        return pages.pop(0)
+
+    monkeypatch.setattr(fetch_prices, "fetch_page", _fake_fetch_page)
+
+    iterator = fetch_prices.iter_price_pages(page_size=3)
+    first = next(iterator)
+    assert len(first) == 3
+    assert calls["n"] == 1, "the second page must not be requested before it is needed"
+    assert first[0]["_source"]["resource_id"] == fetch_prices.PRIMARY_RESOURCE_ID
+
+    rest = [page for page in iterator]
+    assert len(rest) == 2
+
+
+def test_price_pages_respect_the_record_budget(monkeypatch):
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        fetch_prices,
+        "fetch_page",
+        lambda offset=0, limit=1000, filters=None, format="json": {
+            "records": [{"commodity": "Onion"}], "total": 10_000,
+        },
+    )
+    pages = list(fetch_prices.iter_price_pages(page_size=1, max_records=3))
+    assert sum(len(p) for p in pages) == 3
+
+
+def test_price_pages_stop_at_the_time_budget(monkeypatch):
+    """A slow source must not keep an ingest open forever."""
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        fetch_prices,
+        "fetch_page",
+        lambda offset=0, limit=1000, filters=None, format="json": {
+            "records": [{"commodity": "Onion"}], "total": 10_000,
+        },
+    )
+    clock = {"t": 0.0}
+
+    def _monotonic():
+        clock["t"] += 100.0
+        return clock["t"]
+
+    monkeypatch.setattr(fetch_prices.time, "monotonic", _monotonic)
+    pages = list(fetch_prices.iter_price_pages(page_size=1, max_run_seconds=150.0))
+    assert len(pages) <= 3, f"time budget ignored: {len(pages)} pages"
+
+
+def test_fetch_all_prices_still_honours_max_records(monkeypatch):
+    """The list-returning wrapper is used by the CLI and must behave as before."""
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        fetch_prices,
+        "fetch_page",
+        lambda offset=0, limit=1000, filters=None, format="json": {
+            "records": [{"commodity": "Onion"}] * 4, "total": 100,
+        },
+    )
+    records = fetch_prices.fetch_all_prices(page_size=4, max_records=8)
+    assert len(records) == 8
+
+
+def test_pipeline_upserts_each_page_instead_of_buffering(monkeypatch):
+    source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
+        encoding="utf-8"
+    )
+    assert "for page in iter_price_pages(" in source
+    assert "n_new += upsert_prices(conn, page)" in source
+    assert "MANDIIQ_PRICE_FETCH_MAX_SECONDS" in source
+    assert "price_records" not in source, "the buffered fetch path is still there"
+
+
 def test_every_workflow_is_valid_yaml():
     paths = sorted(WORKFLOWS_DIR.glob("*.yml"))
     assert paths, "No workflow files found"

@@ -364,20 +364,33 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         # index", which is how ingestion stayed dead from July until now.
         # DuckDB's own default (80% of detected RAM) is the safe choice, so the
         # limit is only overridden when an operator sets it explicitly.
+        #   The container is 512 MB and DuckDB sizes its default limit from
+        #   the *host* RAM it can see, which is why the cap exists at all. The
+        #   fix is a cap that leaves the index room to work plus a spill
+        #   directory on the volume, not a cap of 200 MB with nowhere to go.
         if not read_only:
 
-            limit = os.environ.get("MANDIIQ_MEMORY_LIMIT", "").strip()
-            if limit:
+            limit = os.environ.get("MANDIIQ_MEMORY_LIMIT", "384MB").strip()
+            try:
 
-                try:
+                conn.execute(f"SET memory_limit = '{limit}'")
 
-                    conn.execute(f"SET memory_limit = '{limit}'")
+            except Exception:
 
-                    logger.info(f"DuckDB memory_limit set to {limit}")
+                logger.warning(f"Ignoring invalid MANDIIQ_MEMORY_LIMIT={limit!r}")
 
-                except Exception:
+            try:
 
-                    logger.warning(f"Ignoring invalid MANDIIQ_MEMORY_LIMIT={limit!r}")
+                # Spill to the data volume rather than to /tmp, which on these
+                # hosts is small or memory-backed.
+                spill_dir = os.environ.get("MANDIIQ_SPILL_DIR") or str(path.parent / "duckdb_spill")
+                os.makedirs(spill_dir, exist_ok=True)
+                conn.execute(f"SET temp_directory = '{spill_dir}'")
+                conn.execute("SET threads = 2")
+
+            except Exception as exc:
+
+                logger.warning(f"Could not configure the DuckDB spill directory: {exc}")
 
 
         return conn
