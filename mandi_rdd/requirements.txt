@@ -24,3 +24,8 @@ pytz>=2023.3
 # Phase 11 - AI Orchestrator (OpenRouter - OpenAI-compatible, free-tier multi-model routing)
 openai>=1.0.0
 pyyaml>=6.0
+# Exported by the API's /metrics endpoint and pushed to Grafana Cloud.
+# requirements/api.txt already had this; CI installs this file, which is why
+# test_api_contract.py could not import the API at all.
+prometheus-client>=0.19.0
+urllib3>=2.0.0

@@ -160,6 +160,44 @@ def get_freshness(commodity: Optional[str] = None) -> list:
             return []
 
 
+def get_health() -> dict:
+    """Fetch /health - live counts, newest data date and last pipeline run.
+
+    Streamlit Cloud serves the repository from an immutable layer, so the local
+    last_ingest_status.json can be stale; the API is the source of truth.
+    """
+    import requests
+    api_base = _get_api_base()
+    try:
+        resp = requests.get(f"{api_base}/health", timeout=8)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        _warn_stale_fallback("/health", str(e))
+        return {}
+
+
+def get_data_quality() -> dict:
+    """Fetch the live date-integrity report, falling back to local DuckDB."""
+    import requests
+    api_base = _get_api_base()
+    try:
+        resp = requests.get(f"{api_base}/data-quality", timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        _warn_stale_fallback("/data-quality", str(e))
+        try:
+            from mandi_rdd.core.dates import date_quality
+            from mandi_rdd.storage.duckdb_store import get_connection
+            conn = get_connection(read_only=True)
+            report = date_quality(conn)
+            conn.close()
+            return report
+        except Exception as fallback_error:
+            return {"error": f"Data quality unavailable: {e} ({fallback_error})"}
+
+
 def get_analytics(commodity: str) -> dict:
     """Fetch the composite analytics deep-dive, falling back to local DuckDB."""
     import requests

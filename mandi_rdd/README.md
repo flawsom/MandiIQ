@@ -172,7 +172,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**49 tests passing** (1 skipped = warehouse-dependent check):
+**69 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -183,6 +183,8 @@ pytest mandi_rdd/tests/ -v
 | `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
+| `test_dashboard_boot.py` (4 tests) | Headless Streamlit run, every page imports, route table intact |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
 

@@ -32,29 +32,36 @@ jobs:
           git commit -m "chore: weekly heartbeat" || echo "nothing to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master || echo "push skipped"
 
-  # Keep-alive pings: free-tier hosts (Render, Streamlit) spin down after
-  # inactivity. Pinging their public URLs on a schedule prevents cold starts.
-  # Configure the URLs via repo secrets: RENDER_API_URL, STREAMLIT_APP_URL.
+  # Keep-alive pings: free-tier hosts spin down after inactivity, so the first
+  # visitor of the day would otherwise pay a cold start (or find a sleeping
+  # service). The continuous pinger lives in keepalive.yml (every 10 minutes);
+  # this weekly pass is the belt-and-braces version and still works if GitHub
+  # disabled the frequent schedule after a long period of repo inactivity.
+  #
+  # These URLs are public production endpoints, so no secrets are required -
+  # the old job silently did nothing because its RENDER_API_URL /
+  # STREAMLIT_APP_URL secrets were never set.
   keep-alive:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Ping Render API (if configured)
-        if: ${{ env.RENDER_API_URL != '' }}
+      - name: Ping production endpoints
         env:
-          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+          API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
+          MIRROR_BASE: "https://p01--mandiiq--zbvjrztgjqgw.code.run"
+          LANDING_URL: "https://mandiiq.unifies.codes"
+          STREAMLIT_URL: "https://mandiiq.streamlit.app"
         run: |
-          echo "Pinging Render API health endpoint..."
-          curl -fsS --max-time 30 "${RENDER_API_URL%/}/health" && echo "Render API OK" || echo "Render API ping failed (may be cold-starting)"
-      - name: Ping Streamlit app (if configured)
-        if: ${{ env.STREAMLIT_APP_URL != '' }}
-        env:
-          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
-        run: |
-          echo "Pinging Streamlit app..."
-          curl -fsS --max-time 30 "${STREAMLIT_APP_URL}" >/dev/null && echo "Streamlit OK" || echo "Streamlit ping failed"
-      - name: Skip notice
-        if: ${{ env.RENDER_API_URL == '' && env.STREAMLIT_APP_URL == '' }}
-        env:
-          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
-          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
-        run: echo "No RENDER_API_URL / STREAMLIT_APP_URL secrets set - keep-alive skipped. Add them in repo Settings > Secrets to enable."
+          failures=0
+          for target in "${API_BASE}/health" "${MIRROR_BASE}/health" "${LANDING_URL}" "${STREAMLIT_URL}"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 25 --retry 2 --retry-delay 5 --retry-all-errors \
+              "$target" 2>/dev/null || echo "000")
+            echo "HTTP ${code}  ${target}"
+            if [ "${code}" != "200" ] && [ "${code}" != "303" ]; then
+              failures=$(( failures + 1 ))
+            fi
+          done
+          if [ "${failures}" -gt 0 ]; then
+            echo "::warning::${failures} keep-alive request(s) failed - a service may be asleep or down."
+          fi

@@ -32,6 +32,8 @@ EXPECTED_ROUTES = {
     ("/tail-risk/{commodity}", "GET"),
     ("/dml/{commodity}", "GET"),
     ("/nowcast/{commodity}", "GET"),
+    ("/data-quality", "GET"),
+    ("/admin/repair-dates", "POST"),
 }
 
 
@@ -60,6 +62,27 @@ def test_openapi_schema_builds(app_module):
     spec = app_module.app.openapi()
     assert spec["info"]["title"]
     assert len(spec["paths"]) >= 20
+
+
+def test_health_reports_live_provenance(app_module):
+    """A caller must be able to tell how fresh the data is without a second
+    request, so /health carries the newest arrival date and its age."""
+    fields = set(app_module.HealthResponse.model_fields)
+    assert {
+        "version",
+        "data_max_date",
+        "data_min_date",
+        "days_behind",
+        "hours_since_last_run",
+        "n_future_dates",
+        "ingestion_running",
+    } <= fields
+
+
+def test_health_test_count_is_measured_not_hardcoded(app_module):
+    counted = app_module._count_tests()
+    assert counted > 0, "test discovery broke"
+    assert counted == app_module._count_tests(), "count must be stable"
 
 
 def test_ask_schemas_keep_their_contract(app_module):

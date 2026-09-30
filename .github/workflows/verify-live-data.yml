@@ -1,8 +1,18 @@
 # MandiIQ - Daily End-to-End Live Data Verification
 #
-# Runs daily at 08:00 UTC. Checks all 4 production URLs and validates
-# the API serves fresh (non-stale) data. Files a GitHub issue if any
-# site is unhealthy or data is >48h stale.
+# Runs daily at 08:00 UTC. Checks every production URL, validates the API
+# serves fresh data (pipeline recency, newest arrival date, date integrity),
+# files a GitHub issue when something is unhealthy, and fails the run so an
+# unhealthy production is never green.
+#
+# Maintainer notes:
+#   * Multi-line JSON must never be written to $GITHUB_OUTPUT verbatim: the
+#     runner rejects the whole step ("Invalid value. Matching delimiter not
+#     found") and every downstream step silently loses its inputs. Only
+#     compact scalars are exported below.
+#   * Filing an issue needs `issues: write` on the workflow token.
+#   * Markdown for the run page and the issue body is rendered by
+#     mandi_rdd/scripts/verify_live_data.py, so no shell heredocs are needed.
 
 name: Verify Live Data
 
@@ -11,8 +21,13 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 env:
   GH_TOKEN: ${{ github.token }}
+  API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
 
 jobs:
   verify:
@@ -35,18 +50,28 @@ jobs:
         continue-on-error: true
         run: |
           python -m mandi_rdd.scripts.verify_live_data \
-            --output verify_report.json --timeout 30
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+            --output verify_report.json \
+            --markdown verify_summary.md \
+            --issue-body verify_issue.md \
+            --issue-title verify_title.txt \
+            --timeout 30
 
       - name: Read verification report
         id: report
         run: |
           if [ -f verify_report.json ]; then
-            echo "report<<EOF" >> "$GITHUB_OUTPUT"
-            cat verify_report.json >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+            HEALTHY=$(python3 -c "import json; print(str(json.load(open('verify_report.json')).get('all_healthy', False)).lower())")
+            SUMMARY=$(python3 -c "import json; d=json.load(open('verify_report.json')); print('%d/%d sites healthy' % (d.get('n_sites_healthy', 0), d.get('n_sites_checked', 0)))")
           else
-            echo 'report={"all_healthy":false}' >> "$GITHUB_OUTPUT"
+            HEALTHY=false
+            SUMMARY="verify_report.json missing"
+          fi
+          echo "all_healthy=${HEALTHY}" >> "$GITHUB_OUTPUT"
+          echo "summary=${SUMMARY}" >> "$GITHUB_OUTPUT"
+          if [ -f verify_summary.md ]; then
+            cat verify_summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No markdown summary produced" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload report as artifact
@@ -54,30 +79,43 @@ jobs:
         if: always()
         with:
           name: verify-report
-          path: verify_report.json
+          path: |
+            verify_report.json
+            verify_summary.md
           retention-days: 7
 
       - name: Print summary
         run: |
           echo "=== Verification Summary ==="
-          python3 -c "import json; r=json.load(open('verify_report.json')); print('Checked: %d sites' % r['n_sites_checked']); print('Healthy: %d/%d' % (r['n_sites_healthy'], r['n_sites_checked'])); [print('  [%s] %s (%s)' % ('OK' if s['ok'] else 'FAIL', s['name'], s.get('status','?'))) for s in r.get('sites', [])]"
+          python3 -c "import json; r=json.load(open('verify_report.json')); print('Checked: %d sites' % r['n_sites_checked']); print('Healthy: %d/%d' % (r['n_sites_healthy'], r['n_sites_checked'])); [print('  [%s] %s (%s)' % ('OK' if s['ok'] else 'FAIL', s['name'], s.get('error') or s.get('status','?'))) for s in r.get('sites', [])]"
 
       - name: File GitHub Issue if unhealthy
-        if: fromJSON(steps.report.outputs.report).all_healthy == false
+        if: steps.report.outputs.all_healthy == 'false'
         run: |
-          REPORT=$(cat verify_report.json)
-          CHECKED_AT=$(echo "$REPORT" | python3 -c "import sys,json;print(json.load(sys.stdin).get('checked_at','?'))")
-          N_OK=$(echo "$REPORT" | python3 -c "import sys,json;print(json.load(sys.stdin).get('n_sites_healthy',0))")
-          N_TOTAL=$(echo "$REPORT" | python3 -c "import sys,json;print(json.load(sys.stdin).get('n_sites_checked',0))")
-          TITLE="[Verify] ${N_OK}/${N_TOTAL} sites healthy - ${CHECKED_AT}"
-
-          # Build issue body via single-line Python (avoids YAML block-scalar indentation issues)
-          python3 -c "import json; r=json.load(open('verify_report.json')); lines=['## Live Data Verification Report','','**Checked at:** %s' % r['checked_at']]; lines.append('**Result:** %d/%d sites healthy' % (r['n_sites_healthy'], r['n_sites_checked'])); lines.append(''); lines.append('| Site | Status | HTTP | Time | Details |'); lines.append('|------|--------|------|------|---------|'); [lines.append('| %s | %s | %s | %s | %s |' % (s['name'], 'OK' if s['ok'] else 'FAIL', str(s.get('status','?')), '%.1fs' % s.get('response_time_s',0), (('%s prices, %s commodities' % (ad['n_prices'], ad['n_commodities'])) + (', last_run=%.0fh ago' % s['hours_since_last_run'] if s.get('hours_since_last_run') is not None else '') if (ad:=s.get('api_data') or {}).get('n_prices') is not None else (s.get('error') or '-'))) for s in r.get('sites',[])]; lines.append(''); [lines.extend(['### Failed Sites']+['- **%s**: %s' % (s['name'], s.get('error','unknown')) for s in r.get('sites',[]) if not s['ok']]+['','### Suggested Actions','1. Check [Render Dashboard](https://dashboard.render.com)','2. Check [GitHub Actions](https://github.com/flawsom/MandiIQ/actions)','3. Verify DNS for custom domains']) if not r.get('all_healthy', True) else None]; lines.extend(['','---','_Auto-generated by verify-live-data.yml_']); open('/tmp/issue_body.md','w').write('\n'.join(lines))"
+          if [ -f verify_title.txt ]; then
+            TITLE=$(cat verify_title.txt)
+          else
+            TITLE="[Verify] production unhealthy"
+          fi
+          BODY="verify_issue.md"
+          if [ ! -f "$BODY" ]; then
+            echo "No issue body rendered; skipping." >&2
+            exit 0
+          fi
 
           EXISTING=$(gh issue list --repo ${{ github.repository }} --label "verify,automated" --state open --json number --jq 'length')
           if [ "$EXISTING" -gt 0 ]; then
             echo "Found $EXISTING open issue(s). Skipping - duplicate prevention."
             exit 0
           fi
-          gh issue create --repo ${{ github.repository }} --title "$TITLE" --body-file /tmp/issue_body.md --label "verify,automated"
+
+          gh label create verify --color FBCA04 --force >/dev/null 2>&1 || true
+          gh label create automated --color 1D76DB --force >/dev/null 2>&1 || true
+          gh issue create --repo ${{ github.repository }} --title "$TITLE" --body-file "$BODY" --label "verify,automated"
           echo "Issue filed."
+
+      - name: Fail when production is unhealthy
+        if: steps.report.outputs.all_healthy == 'false'
+        run: |
+          echo "::error::Live data verification failed - ${{ steps.report.outputs.summary }}"
+          exit 1

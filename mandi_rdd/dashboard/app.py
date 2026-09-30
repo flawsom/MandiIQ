@@ -172,21 +172,22 @@ st.set_page_config(
 
 # fully guarded and can never raise, so it cannot break page rendering.
 
-try:
+def _inject_page_seo() -> None:
+    """Route-aware canonical, Open Graph, Twitter and JSON-LD tags.
 
-    from mandi_rdd.dashboard.seo import inject_page_seo
-
-    st.html(inject_page_seo(pg.url_path))
-
-except Exception:
-
-    # Absolute fallback: a minimal canonical link only.
-
-    st.html(
-
-        '<link rel="canonical" href="https://mandiiq.unifies.codes/" />',
-
-    )
+    Must run after st.navigation() creates ``pg``: referencing it earlier
+    raised NameError on every page, so the function was silently swallowed by
+    the guard below and the fallback canonical link was all that ever reached
+    the page.
+    """
+    try:
+        from mandi_rdd.dashboard.seo import inject_page_seo
+        st.html(inject_page_seo(pg.url_path))
+    except Exception:
+        # Absolute fallback: a minimal canonical link only.
+        st.html(
+            '<link rel="canonical" href="https://mandiiq.unifies.codes/" />',
+        )
 
 
 
@@ -1084,11 +1085,25 @@ def _model_health_status():
 
 def _latest_pipeline_run():
 
-    # Phase 10: last_ingest_status.json is the single source of truth,
+    # The production API is the source of truth: Streamlit Cloud serves this
+    # repository from an immutable layer, so the committed status file can be
+    # months old even while the pipeline keeps running.
 
-    # written by run_nightly. The pipeline_log table is not populated,
+    try:
 
-    # so read the JSON file from the package data dir.
+        from mandi_rdd.dashboard import data_access as _da
+
+        _health = _da.get_health()
+
+        if _health.get("last_run_utc"):
+
+            return _health["last_run_utc"]
+
+    except Exception:
+
+        pass
+
+    # Fallback: last_ingest_status.json, written by run_nightly / the pipeline.
 
     try:
 
@@ -1211,6 +1226,11 @@ if _HAS_COMPONENTS_PAGE:
 
 
 pg = st.navigation(_all_pages, position="hidden")
+
+# `pg` now exists, so the route-aware SEO tags can be emitted with the real
+# url_path of the page being served.
+
+_inject_page_seo()
 
 
 
@@ -1381,6 +1401,70 @@ with st.sidebar:
         label_visibility="collapsed",
 
     )
+
+
+
+    # ── Live data provenance ──
+
+    # Every figure in this cockpit is only as good as the warehouse behind
+
+    # it, so the newest arrival date is stated honestly (and flagged when it
+
+    # drifts) instead of implying freshness.
+
+    try:
+
+        from mandi_rdd.dashboard import data_access as _da
+
+        _live = _da.get_health()
+
+        _quality = _da.get_data_quality()
+
+        _max_date = _quality.get("max_date") or _live.get("data_max_date") or "unknown"
+
+        _behind = _quality.get("days_behind")
+
+        if _behind is None:
+
+            _behind = _live.get("days_behind")
+
+        _future = _quality.get("n_future_dates", _live.get("n_future_dates")) or 0
+
+        _n_prices = _live.get("n_prices")
+
+        _stale = _behind is None or _behind > 4
+
+        _accent = RUST if _stale else SAGE
+
+        _behind_txt = "age unknown" if _behind is None else ("%d day(s) behind" % _behind)
+
+        _rows_txt = "%s rows" % format(_n_prices, ",") if _n_prices else "row count unknown"
+
+        _anomaly_txt = ("%d impossible date(s)" % _future) if _future else "no impossible dates"
+
+        st.html(
+
+            '<div class="sidebar-section-header">Live data</div>'
+
+            '<div style="padding:0 1rem 0.4rem;font-family:IBM Plex Mono,monospace;'
+
+            'font-size:0.68rem;line-height:1.6;color:' + MUTED + ';">'
+
+            '<span style="color:' + _accent + ';">&#9679;</span> data through '
+
+            '<span style="color:' + PAPER + ';">' + str(_max_date) + '</span>'
+
+            '<br>' + _behind_txt + ' &middot; ' + _rows_txt +
+
+            '<br>' + _anomaly_txt +
+
+            '</div>'
+
+        )
+
+    except Exception:
+
+        pass
 
 
 

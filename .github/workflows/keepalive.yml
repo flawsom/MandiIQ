@@ -1,0 +1,89 @@
+# Keep-alive: pin the hosted services awake so the first visitor of the day
+# never waits for a cold start.
+#
+# Why a loop instead of a bare cron: the shortest GitHub cron interval is
+# 5 minutes and scheduled runs are best-effort (they can be delayed or skipped
+# under load). Each run therefore pings until the next run is due, so coverage
+# is continuous rather than "every ten minutes, hopefully".
+#
+# Targets:
+#   * API /health        - the container that sleeps; also warms the DuckDB
+#   * mirror API /health - the NDVI-enabled deployment
+#   * landing page       - static, but keeps the CDN edge warm
+#   * Streamlit app      - a Streamlit app idles out after long inactivity
+#
+# Belt and braces: worker/worker.js also carries a Cloudflare cron trigger, so
+# `wrangler deploy` adds per-minute pings from Cloudflare's edge (independent
+# of GitHub). UptimeRobot on /health is a third, external option.
+
+name: Keepalive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes; each run covers the full gap
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Minutes to keep pinging (manual runs)"
+        required: false
+        default: "9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Keep production endpoints warm
+        env:
+          API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
+          MIRROR_BASE: "https://p01--mandiiq--zbvjrztgjqgw.code.run"
+          LANDING_URL: "https://mandiiq.unifies.codes"
+          STREAMLIT_URL: "https://mandiiq.streamlit.app"
+          MINUTES: ${{ github.event.inputs.minutes || '9' }}
+        run: |
+          set -u
+          deadline=$(( $(date +%s) + MINUTES * 60 ))
+          cycles=0
+          failures=0
+
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            cycles=$(( cycles + 1 ))
+            for target in \
+              "${API_BASE}/health" \
+              "${MIRROR_BASE}/health" \
+              "${LANDING_URL}" \
+              "${STREAMLIT_URL}" \
+              "${API_BASE}/data-quality"
+            do
+              # --retry covers a cold start: the first request wakes the
+              # container, the retry confirms it is actually serving.
+              code=$(curl -s -o /dev/null -w "%{http_code}" \
+                --max-time 20 --retry 2 --retry-delay 4 --retry-all-errors \
+                "${target}" 2>/dev/null || echo "000")
+              printf '%s  HTTP %s  %s\n' "$(date -u +%H:%M:%S)" "${code}" "${target}"
+              if [ "${code}" != "200" ] && [ "${code}" != "303" ]; then
+                failures=$(( failures + 1 ))
+              fi
+            done
+            remaining=$(( deadline - $(date +%s) ))
+            if [ "${remaining}" -gt 50 ]; then
+              sleep 50
+            fi
+          done
+
+          echo "Keepalive finished: ${cycles} cycles, ${failures} non-200 responses."
+          if [ "${cycles}" -eq 0 ]; then
+            echo "::error::Keepalive performed no cycles - check the workflow logs."
+            exit 1
+          fi
+          if [ "${failures}" -gt $(( cycles * 2 )) ]; then
+            echo "::warning::Keepalive saw ${failures} failed requests across ${cycles} cycles - the API may be unhealthy."
+          fi

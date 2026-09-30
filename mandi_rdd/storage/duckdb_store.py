@@ -34,6 +34,8 @@ import pandas as pd
 
 import logging
 
+from mandi_rdd.core.dates import parse_arrival_date
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -135,6 +137,59 @@ def _try_fix_lfs_pointer(path: Path) -> bool:
         return False
 
 
+# DuckDB refuses to open the same file twice in one process with a different
+# configuration (read-only vs read-write). Callers get here in exactly that
+# state whenever an ingest run holds a writable handle and a helper opens a
+# second connection, so the config clash has to be handled, never raised.
+_CONFIG_MISMATCH_MARKERS = (
+    "different configuration",
+    "different config",
+)
+# A probe must never fight the write lock held by another process.
+_LOCK_CONTENTION_MARKERS = (
+    "conflicting lock",
+    "could not set lock",
+    "being used by another",
+    "another process",
+)
+_CORRUPTION_MARKERS = (
+    "invalidated", "fatal error", "index corruption",
+    "failed to delete", "database has been invalidated",
+    "corrupt", "cannot be used",
+)
+# Files already probed successfully by this process: the first open verifies
+# the ART indexes, later opens share the same instance and skip the scan.
+_INTEGRITY_CHECKED: set[str] = set()
+
+
+def _integrity_checked(path: Path) -> bool:
+    return str(path) in _INTEGRITY_CHECKED
+
+
+def _mark_integrity_checked(path: Path) -> None:
+    _INTEGRITY_CHECKED.add(str(path))
+
+
+def _matches(err: Exception, markers: tuple) -> bool:
+    msg = str(err).lower()
+    return any(kw in msg for kw in markers)
+
+
+def _is_config_mismatch(err: Exception) -> bool:
+    return _matches(err, _CONFIG_MISMATCH_MARKERS)
+
+
+def _is_lock_contention(err: Exception) -> bool:
+    return _matches(err, _LOCK_CONTENTION_MARKERS)
+
+
+def _drop_corrupt_database(path: Path) -> None:
+    """Delete an unusable DuckDB file plus its WAL/tmp siblings."""
+    path.unlink(missing_ok=True)
+    for suffix in (".wal", ".tmp"):
+        path.with_suffix(path.suffix + suffix).unlink(missing_ok=True)
+
+
 def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "duckdb.DuckDBPyConnection":
 
     """Get a DuckDB connection.
@@ -160,34 +215,43 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
     # DuckDB's ART UNIQUE index can become invalidated during large bulk
     # inserts under memory pressure.  If the DB file is corrupted we must
     # delete it so init_schema() can create a fresh one.
-    if path.exists():
+
+    if path.exists() and not _integrity_checked(path):
+
         try:
+
             probe = duckdb.connect(str(path), read_only=True)
             probe.execute("SELECT 1")
             tables = [r[0] for r in probe.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()]
             if "prices" in tables:
+
                 probe.execute("SELECT COUNT(*) FROM prices")
+
             probe.close()
+
+            _mark_integrity_checked(path)
         except Exception as probe_err:
             try: probe.close()
             except Exception: pass
-            err_msg = str(probe_err).lower()
-            if any(kw in err_msg for kw in [
-                "invalidated", "fatal error", "index corruption",
-                "failed to delete", "database has been invalidated",
-                "corrupt", "cannot be used",
-            ]):
+            if _matches(probe_err, _CORRUPTION_MARKERS):
                 logger.warning(
                     "Corrupted DuckDB detected (%s); deleting %s",
                     probe_err, path,
                 )
-                path.unlink(missing_ok=True)
-                for suffix in (".wal", ".tmp"):
-                    extra = path.with_suffix(path.suffix + suffix)
-                    extra.unlink(missing_ok=True)
+                _drop_corrupt_database(path)
+            elif (_is_config_mismatch(probe_err)
+                  or _is_lock_contention(probe_err)):
+                # Another handle (or another process) already owns this file.
+                # Skip the probe instead of failing the whole run; the real
+                # open below reports any genuine problem.
+                logger.info(
+                    "Skipping DuckDB integrity probe for %s (%s)", path, probe_err,
+                )
+                _mark_integrity_checked(path)
             else:
+
                 raise
 
     try:
@@ -206,6 +270,16 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         return conn
 
     except Exception as exc:
+
+        if _is_config_mismatch(exc):
+            # A handle to this file is already open in this process with the
+            # opposite access mode. DuckDB forbids mixing configurations, so
+            # join the live instance rather than failing the call.
+            logger.debug("Joining the existing DuckDB instance: %s", exc)
+            try:
+                return duckdb.connect(str(path), read_only=not read_only)
+            except Exception as join_err:
+                logger.warning("Could not join existing DuckDB instance: %s", join_err)
 
         logger.warning("Read-write open failed, trying read-only: %s", exc)
 
@@ -558,11 +632,23 @@ def upsert_prices(conn, records: list[dict]) -> int:
 
             df[col] = None
 
-    # Parse dates
-
+    # Parse dates explicitly (day-first) and reject impossible ones.
+    # pd.to_datetime guesses month-first for "12/09/2026", which is how future
+    # dated rows used to reach the warehouse; see mandi_rdd.core.dates.
     if "arrival_date" in df.columns:
-
-        df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce")
+        parsed = [parse_arrival_date(v) for v in df["arrival_date"]]
+        df["arrival_date"] = [iso for iso in parsed]
+        n_rejected = sum(1 for iso in parsed if iso is None)
+        if n_rejected:
+            logger.warning(
+                "upsert_prices: dropped %d/%d records with missing, unparseable "
+                "or future arrival dates",
+                n_rejected, len(parsed),
+            )
+            df = df[df["arrival_date"].notna()]
+        if df.empty:
+            logger.warning("upsert_prices: no rows left after date validation")
+            return 0
 
     # Register temp table and INSERT OR IGNORE via DuckDB
 
@@ -903,7 +989,7 @@ def record_lineage_batch(
     Returns:
         The id of the inserted lineage row.
     """
-    import hashlib, json, datetime
+    import hashlib, json
 
     # Compute batch fingerprint from a hash of the records
     fingerprint = None

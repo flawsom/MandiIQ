@@ -133,7 +133,11 @@ def btn(label, key=None, variant="primary", disabled=False, loading=False, on_cl
 
     # Use st.button for functionality, apply styles via class
     btn_html = f'<button class="{css_class}" {"disabled" if disabled else ""}>'
-    btn_html += f'<span class="pulse-dots" style="display:{'inline' if loading else 'none'};">...</span>' if loading else ""
+    # NB: keep the inner quotes distinct from the f-string quotes. Same-quote
+    # nesting is Python 3.12+ only, and this repo runs on 3.11 (runtime.txt),
+    # where it made the whole dashboard die at import time.
+    display = "inline" if loading else "none"
+    btn_html += f'<span class="pulse-dots" style="display:{display};">...</span>' if loading else ""
     btn_html += label
     btn_html += "</button>"
 

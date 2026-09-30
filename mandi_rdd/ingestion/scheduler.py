@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import logging
+import threading
 from pathlib import Path
 
 # Defensive: ensure stdout/stderr never crash on Unicode (e.g. cp1252 consoles)
@@ -40,7 +41,7 @@ from mandi_rdd.storage.duckdb_store import (
     upsert_rainfall,
     save_rdd_result,
 )
-from mandi_rdd.ingestion.fetch_prices import fetch_all_prices, fetch_page
+from mandi_rdd.ingestion.fetch_prices import fetch_all_prices
 from mandi_rdd.ingestion.ingest_historical_csv import run_auto as run_historical_backfill
 from mandi_rdd.ingestion.fetch_ndvi import fetch_and_store_all_ndvi
 from mandi_rdd.ingestion.fetch_rainfall import (
@@ -48,7 +49,6 @@ from mandi_rdd.ingestion.fetch_rainfall import (
     load_district_subdivision_map,
 )
 from mandi_rdd.analysis.rdd_engine import run_rdd
-from mandi_rdd.analysis.forecast import train_forecast
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +57,49 @@ logging.basicConfig(
 logger = logging.getLogger("mandi_rdd.scheduler")
 
 
+_RUN_LOCK = threading.Lock()
+
+
+def ingestion_running() -> bool:
+    """True while a pipeline run is in flight in this process."""
+    return _RUN_LOCK.locked()
+
+
 def run_ingestion(
+
+    filters: dict = None,
+
+    max_records: int = None,
+
+    skip_rainfall: bool = False,
+
+) -> dict:
+    """Serialise pipeline runs, then execute one.
+
+    The hourly in-process loop, POST /refresh and external schedulers all
+    trigger the same pipeline. Overlapping runs fight over the DuckDB write
+    lock and can corrupt the ART indexes, so concurrent calls are refused
+    instead of queued.
+    """
+    if not _RUN_LOCK.acquire(blocking=False):
+        logger.warning("Ingestion already running; skipping this trigger")
+        return {
+            "status": "busy",
+            "steps": {},
+            "error": "ingestion already running",
+        }
+    try:
+        return _run_ingestion_locked(filters, max_records, skip_rainfall)
+    except Exception as exc:
+        logger.exception("Ingestion run failed: %s", exc)
+        _write_ingest_status({"status": "failed", "error": str(exc), "steps": {}})
+        raise
+    finally:
+        _RUN_LOCK.release()
+
+
+def _run_ingestion_locked(
+
     filters: dict = None,
     max_records: int = None,
     skip_rainfall: bool = False,
@@ -85,6 +127,20 @@ def run_ingestion(
     conn = get_connection()
     init_schema(conn)
     logger.info("Storage initialized")
+
+    # 1b. Heal arrival dates before anything analytical runs. Future-dated
+    #     rows are month-first mis-parses of a DD/MM/YYYY source, and they
+    #     poison freshness, RDD, forecasts and nowcasts alike.
+    with pipeline_metrics.step("date_integrity"):
+        try:
+            from mandi_rdd.core.dates import date_quality, repair_future_dates
+            repair = repair_future_dates(conn)
+            quality = date_quality(conn)
+            summary["steps"]["date_integrity"] = {**repair, **quality}
+            if repair.get("repaired") or repair.get("dropped"):
+                logger.warning("Date integrity repair applied: %s", repair)
+        except Exception as e:
+            logger.warning(f"Date integrity check skipped: {e}")
 
     # 2. Ingest mandi prices
     logger.info("Fetching mandi prices from data.gov.in...")
@@ -184,8 +240,10 @@ def run_ingestion(
     # 3.5. Backfill state fields in prices using district map
     with pipeline_metrics.step("backfill_state"):
         logger.info("Backfilling state fields using district-to-state mapping...")
-        from mandi_rdd.ingestion.backfill_state import backfill
-        n_updated = backfill(conn)
+        from mandi_rdd.ingestion.backfill_state import backfill, build_lookup
+        # backfill() takes a district->state lookup, not the connection it will
+        # open itself; passing the connection here used to abort every run.
+        n_updated = backfill(build_lookup())
         summary["steps"]["backfill_state"] = {"updated": n_updated}
         logger.info(f"State fields backfilled: {n_updated} records")
 
@@ -347,10 +405,7 @@ def run_ingestion(
             with pipeline_metrics.step("forecast_persist"):
                 logger.info(f"Training forecast + persisting MAPE for {commodity}...")
                 try:
-                    from mandi_rdd.storage.duckdb_store import (
-                        save_forecast_metrics,
-                        get_avg_price_and_districts,
-                    )
+                    from mandi_rdd.storage.duckdb_store import save_forecast_metrics
                     fc = train_forecast(conn, commodity=commodity, periods=12)
                     if fc and fc.get("metrics"):
                         m = fc["metrics"]
@@ -418,6 +473,10 @@ def run_ingestion(
     # Record the full pipeline run in pipeline_metrics
     pipeline_metrics.record_pipeline_run(summary)
 
+    # /health reads this file: without it "last_run_utc" silently freezes at
+    # the last CLI run even while ingestion keeps running in-process.
+    _write_ingest_status(summary)
+
     conn.close()
     logger.info(f"Pipeline complete in {summary['duration_seconds']}s")
     return summary
@@ -432,6 +491,7 @@ def _write_ingest_status(summary: dict) -> None:
     n_new = prices_step.get("new", 0) if isinstance(prices_step, dict) else 0
     outcome = "success" if status == "ok" else "failure"
     import datetime
+    quality = steps.get("date_integrity") or {}
     record = {
         "last_run_utc": datetime.datetime.utcnow().isoformat() + "Z",
         "outcome": outcome,
@@ -439,6 +499,9 @@ def _write_ingest_status(summary: dict) -> None:
         "new_price_rows": n_new,
         "duration_s": summary.get("duration_seconds"),
         "error": None if status == "ok" else summary.get("error"),
+        "data_max_date": quality.get("max_date"),
+        "days_behind": quality.get("days_behind"),
+        "n_future_dates": quality.get("n_future_dates"),
     }
     try:
         out = Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"

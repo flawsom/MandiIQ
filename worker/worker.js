@@ -76,6 +76,34 @@ async function proxyToUpstream(request, upstream) {
   return fetch(target.toString(), init);
 }
 
+// ── Keep-alive ───────────────────────────────────────────────────────────────
+// Cron trigger (see [triggers] in wrangler.toml): ping the hosted services
+// every minute so free-tier hosts never idle out and the first visitor of the
+// day never pays a cold start. This runs on Cloudflare's edge scheduler, so it
+// keeps working even if GitHub Actions cron is throttled or disabled.
+const KEEPALIVE_TARGETS = [
+  "https://p01--mandiiq--x4n8x4gkmzht.code.run/health",
+  "https://p01--mandiiq--zbvjrztgjqgw.code.run/health",
+  "https://mandiiq.streamlit.app",
+];
+
+async function keepalive() {
+  const results = await Promise.all(KEEPALIVE_TARGETS.map(async (url) => {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { "user-agent": "mandiiq-keepalive" },
+        // Bypass the cache: the point is to touch the origin.
+        cf: { cacheTtl: 0, cacheEverything: false },
+      });
+      return `${res.status} ${url}`;
+    } catch (err) {
+      return `ERR ${url} ${err}`;
+    }
+  }));
+  console.log("[keepalive] " + results.join(" | "));
+}
+
 export default {
   async fetch(request, env, ctx) {
     const upstream = env.UPSTREAM || UPSTREAM;
@@ -89,5 +117,10 @@ export default {
 
     // Everything else (the Streamlit app, assets, APIs) proxies through.
     return proxyToUpstream(request, upstream);
+  },
+
+  // Cloudflare cron entrypoint (every minute).
+  async scheduled(_event, _env, ctx) {
+    ctx.waitUntil(keepalive());
   },
 };

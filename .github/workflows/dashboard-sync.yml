@@ -107,21 +107,28 @@ jobs:
       - name: Trigger dashboard cache webhook
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          LOCAL_HASH: ${{ needs.check-hash.outputs.local_hash }}
+          REMOTE_HASH: ${{ needs.check-hash.outputs.remote_hash }}
         run: |
           echo "Triggering dashboard cache refresh at ${API_BASE}/webhook/grafana-dashboard-update ..."
-          HTTP_CODE=$(curl -s -o /tmp/webhook_response.txt -w "%{http_code}" \
-            -X POST "${API_BASE}/webhook/grafana-dashboard-update" \
-            -H "Content-Type: application/json" \
-            $(if [ -n "$WEBHOOK_SECRET" ]; then echo "-H 'X-Webhook-Secret: $WEBHOOK_SECRET'"; fi) \
-            -d '{"event":"dashboard_updated","title":"MandiIQ Pipeline Dashboard","source":"github-actions","trigger":"dashboard-sync-workflow","local_hash":"${{ needs.check-hash.outputs.local_hash }}","remote_hash":"${{ needs.check-hash.outputs.remote_hash }}"}' \
-            --max-time 15)
+          # Build the payload in a file: interpolating ${{ }} inside quoted JSON
+          # on the curl line does not survive shell quoting.
+          python3 -c "import json, os; json.dump({'event': 'dashboard_updated', 'title': 'MandiIQ Pipeline Dashboard', 'source': 'github-actions', 'trigger': 'dashboard-sync-workflow', 'local_hash': os.environ.get('LOCAL_HASH', ''), 'remote_hash': os.environ.get('REMOTE_HASH', '')}, open('/tmp/webhook_payload.json', 'w'))"
+          args=(-s -o /tmp/webhook_response.txt -w "%{http_code}"
+                -X POST "${API_BASE}/webhook/grafana-dashboard-update"
+                -H "Content-Type: application/json"
+                --data-binary @/tmp/webhook_payload.json
+                --max-time 15)
+          if [ -n "${WEBHOOK_SECRET:-}" ]; then
+            args+=(-H "X-Webhook-Secret: ${WEBHOOK_SECRET}")
+          fi
+          HTTP_CODE=$(curl "${args[@]}" || echo "000")
           echo "API responded with HTTP $HTTP_CODE"
+          cat /tmp/webhook_response.txt 2>/dev/null || true
           if [ "$HTTP_CODE" = "200" ]; then
             echo "Dashboard cache refresh succeeded."
-            cat /tmp/webhook_response.txt
           else
             echo "::warning::Webhook returned HTTP $HTTP_CODE - the API may be down or unreachable."
-            cat /tmp/webhook_response.txt
           fi
 
   trigger-render-deploy:
@@ -131,8 +138,12 @@ jobs:
     steps:
       - name: Trigger Render deploy hook
         env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL || '' }}
         run: |
+          if [ -z "$RENDER_HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL secret not set - skipping Render deploy."
+            exit 0
+          fi
           echo "Sync: triggering Render deploy hook..."
           HTTP_CODE=$(curl -s -o /tmp/render_response.txt -w "%{http_code}" \
             -X POST "$RENDER_HOOK" \

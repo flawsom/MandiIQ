@@ -11,6 +11,12 @@ on:
   workflow_dispatch:
   # schedule removed - Northflank handles hourly ingestion internally
 
+# This workflow commits the refreshed DuckDB back to the branch and opens an
+# issue when ingestion fails, so it needs both write scopes explicitly.
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   test:
     if: github.event_name != 'schedule'

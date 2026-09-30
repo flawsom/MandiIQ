@@ -1,0 +1,91 @@
+# Refresh Live Data: keep the production warehouse genuinely current.
+#
+# The API runs an in-process hourly ingest loop, but a container restart (or a
+# crash inside the loop) silently freezes the warehouse - which is exactly how
+# the live numbers went stale. This workflow triggers the pipeline from
+# outside, waits for it to finish, and fails loudly when the warehouse did not
+# advance, so staleness is caught in minutes instead of months.
+#
+# Overlap safety: the pipeline is serialised by a run lock inside the API, so a
+# trigger that lands while another run is in flight reports "busy" instead of
+# corrupting the DuckDB file.
+
+name: Refresh Live Data
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # hourly, offset from the top of the hour
+  workflow_dispatch:
+    inputs:
+      wait_minutes:
+        description: "Minutes to wait for the pipeline to finish"
+        required: false
+        default: "18"
+
+permissions:
+  contents: read
+
+env:
+  API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger the production ingest
+        id: trigger
+        run: |
+          set -u
+          health=$(curl -s --max-time 30 "${API_BASE}/health")
+          BEFORE=$(echo "${health}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('last_run_utc') or '')")
+          RUNNING=$(echo "${health}" | python3 -c "import sys,json; print(str(json.load(sys.stdin).get('ingestion_running', False)).lower())")
+          echo "before=${BEFORE}" >> "$GITHUB_OUTPUT"
+          echo "Pipeline last ran at: ${BEFORE:-unknown} (running now: ${RUNNING})"
+
+          if [ "${RUNNING}" = "true" ]; then
+            echo "::notice::A pipeline run is already in flight; skipping this trigger."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          code=$(curl -s -o /tmp/refresh.json -w "%{http_code}" \
+            -X POST "${API_BASE}/refresh" --max-time 60 || echo "000")
+          echo "POST /refresh -> HTTP ${code}"
+          cat /tmp/refresh.json || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "::error::Could not trigger the production pipeline (HTTP ${code})"
+            exit 1
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the pipeline to complete
+        if: steps.trigger.outputs.skip == 'false'
+        env:
+          BEFORE: ${{ steps.trigger.outputs.before }}
+          WAIT_MINUTES: ${{ github.event.inputs.wait_minutes || '18' }}
+        run: |
+          set -u
+          deadline=$(( $(date +%s) + WAIT_MINUTES * 60 ))
+          while [ "$(date +%s)" -lt "${deadline}" ]; do
+            sleep 30
+            health=$(curl -s --max-time 30 "${API_BASE}/health")
+            AFTER=$(echo "${health}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('last_run_utc') or '')")
+            RUNNING=$(echo "${health}" | python3 -c "import sys,json; print(str(json.load(sys.stdin).get('ingestion_running', False)).lower())")
+            echo "$(date -u +%H:%M:%S)  last_run=${AFTER:-unknown} running=${RUNNING}"
+            if [ -n "${AFTER}" ] && [ "${AFTER}" != "${BEFORE}" ]; then
+              echo "::notice::Pipeline completed at ${AFTER}"
+              exit 0
+            fi
+          done
+          echo "::error::Pipeline did not report a new run within ${WAIT_MINUTES} minutes."
+          exit 1
+
+      - name: Verify the warehouse is fresh
+        if: steps.trigger.outputs.skip == 'false'
+        run: |
+          python3 -m mandi_rdd.scripts.check_production_freshness --api-base "${API_BASE}"

@@ -62,8 +62,9 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 | Service | What it is | Status |
 | :------ | :--------- | :----- |
 | **Landing page** | Product tour, live KPIs, pipeline explainer | [![Landing](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.unifies.codes&style=flat-square&label=mandiiq.unifies.codes&up_color=2E7D32)](https://mandiiq.unifies.codes) |
-| **Streamlit cockpit** | 14 routes - overview, discontinuity, forecast, risk map, satellite, advisor, ask. Currently access-restricted on Streamlit Cloud (login) - run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
-| **FastAPI (primary)** | 29 endpoints + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
+| **Live Data Console** | Always-on public console: live counters, price series, RDD plot, analytics cards - reads the production API directly | [![Console](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Flive.html&style=flat-square&label=live%20console&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/live.html) |
+| **Streamlit cockpit** | 10 routes - overview, discontinuity, forecast, risk map, satellite, advisor, ask, analyst lab. Access-restricted on Streamlit Cloud (login); set *Who can view this app* to public in the Streamlit dashboard to open it up - or run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
+| **FastAPI (primary)** | 35 documented endpoints (40 routes) + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
 | **FastAPI (NDVI instance)** | Second Northflank instance carrying satellite NDVI rows | [![API mirror](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--zbvjrztgjqgw.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--zbvjrztgjqgw.code.run/docs) |
 | **GitHub Pages** | Static docs, SEO surface and heartbeat monitor | [![Pages](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2F&style=flat-square&label=flawsom.github.io%2FMandiIQ&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/) |
 | **Heartbeat monitor** | Live cache + freshness board fed by the heartbeat workflow | [![Heartbeat](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Fheartbeat-dashboard.html&style=flat-square&label=heartbeat&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/heartbeat-dashboard.html) |
@@ -81,7 +82,13 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 | Cached RDD estimates | ![RDD](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_rdd_results&label=RDD%20estimates&style=flat-square&color=5B8C6E&cacheSeconds=3600) |
 
 > [!NOTE]
-> **Freshness is a feature, not an afterthought.** The production API keeps a full ingestion pipeline running **in-process on a 1-hour loop** (`mandi_rdd/api/main.py`) and auto-heals an empty warehouse on boot. GitHub Actions layers on the scheduled jobs - nightly ingestion (05:30 UTC), NDVI/daily cycle (06:00 UTC), Ashoka import polling (every 3 h), dashboard heartbeat (every 6 h), freshness alerts (daily) and live-endpoint verification (daily). See [Data cadence](#data-cadence) for the full table.
+> **Freshness is a feature, not an afterthought.** The production API keeps a full ingestion pipeline running **in-process on a 1-hour loop** (`mandi_rdd/api/main.py`) and auto-heals an empty warehouse on boot. Three independent layers keep it honest:
+>
+> 1. **Keep-alive** - `keepalive.yml` pings the API, mirror API, landing page and Streamlit app every 10 minutes *continuously* (each run covers the gap until the next one), and the Cloudflare worker carries a `*/1` cron trigger so `wrangler deploy` adds per-minute pings from the edge.
+> 2. **External refresh** - `refresh-live-data.yml` POSTs `/refresh` every hour, waits for the run to finish, then verifies `/health` and `/data-quality`. If the warehouse does not advance, the workflow fails loudly, so staleness is caught in minutes instead of months.
+> 3. **Date integrity** - arrival dates are parsed explicitly as `DD/MM/YYYY` (month-first guessing used to file September records under December), impossible future dates are rejected at ingest, and any that already exist are repaired by `POST /admin/repair-dates`. `/health` reports `data_max_date`, `days_behind` and `n_future_dates` so no surface can claim freshness it does not have.
+>
+> GitHub Actions also layers on the scheduled jobs - nightly ingestion (05:30 UTC), NDVI/daily cycle (06:00 UTC), Ashoka import polling (every 3 h), dashboard heartbeat (every 6 h), freshness alerts (daily) and live-endpoint verification (daily, which fails the run and files an issue when production is stale). See [Data cadence](#data-cadence) for the full table.
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -196,7 +203,7 @@ A single-file analytical warehouse (~1.6M price rows on the primary instance) wi
 </td>
 <td width="33%" valign="top">
 
-### 🖥 15-route Streamlit cockpit
+### 🖥 10-route Streamlit cockpit
 A designed product, not a demo: global shell, sidebar + breadcrumbs, flip-board KPIs, commodity colour system, error states and a dark turmeric/ink theme.
 
 <sub>`st.navigation()` routing · reduced-motion support</sub>
@@ -718,6 +725,8 @@ MandiIQ/
 | `POST` | `/backfill-historical` | Launch a historical backfill |
 | `POST` | `/trigger-backfill` | Queue a backfill job |
 | `POST` | `/trigger-ashoka-import` | Start the Ashoka archive import |
+| `GET` | `/data-quality` | Date-integrity report: newest arrival date, days behind, impossible-date rows |
+| `POST` | `/admin/repair-dates` | Rewrite (or drop) rows whose arrival date cannot be true (`?dry_run=false` to apply) |
 | `POST` | `/run-rainfall-rdd` | Recompute RDD with the rainfall join |
 | `GET` | `/debug/rainfall-test` | Rainfall pipeline diagnostics |
 | `GET` | `/proxy/github/{path}` | Token-backed GitHub API proxy |
@@ -1059,6 +1068,8 @@ ruff check mandi_rdd/
 | `test_orchestrator.py` | `/ask` commodity-detection regressions plus tool-fallback behaviour |
 | `test_analytics.py` | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
 | `test_analytics_db.py` | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_date_integrity.py` | Day-first date parsing, future-date rejection, warehouse repair, run locking |
+| `test_dashboard_boot.py` | Runs the real Streamlit app headlessly and checks every page imports and renders |
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -1072,7 +1083,8 @@ ruff check mandi_rdd/
 | **Render** | Render Blueprint service for the API | `render.yaml` |
 | **Fly.io** | API with a 1 GB volume (`ord` region) | `fly.toml`, `Dockerfile.fly` |
 | **Streamlit Community Cloud** | The cockpit (dashboard-only mode) | `mandi_rdd/requirements.txt`, secrets UI |
-| **GitHub Pages** | Landing site, SEO surface, heartbeat monitor | `.github/workflows/deploy-pages.yml` |
+| **GitHub Pages** | Landing site, SEO surface, heartbeat monitor, always-on live console (`docs/live.html`) | `.github/workflows/deploy-pages.yml` |
+| **Cloudflare Workers** | Edge proxy plus per-minute keep-alive cron | `worker/worker.js`, `worker/wrangler.toml` |
 | **Docker / any host** | Same image on Compose, ECS, DigitalOcean, Railway… | `docker-compose.yml`, `mandi_rdd/Dockerfile` |
 
 <details>
@@ -1221,7 +1233,9 @@ No. The product ingests live public data from data.gov.in, IMD and Sentinel Hub,
 
 <br/>
 
-The production API runs the full pipeline on a **one-hour loop** and auto-heals on boot; GitHub Actions adds nightly ingestion (05:30 UTC), a daily NDVI cycle, three-hourly Ashoka polling and daily freshness alerts. `/freshness` reports per-commodity staleness, and the freshness workflow opens an issue when a top commodity goes stale beyond 48 h.
+The production API runs the full pipeline on a **one-hour loop** and auto-heals on boot; GitHub Actions adds nightly ingestion (05:30 UTC), a daily NDVI cycle, three-hourly Ashoka polling and daily freshness alerts. `refresh-live-data.yml` additionally triggers and *verifies* an ingest every hour, so the warehouse cannot silently freeze when a container restarts. `/freshness` reports per-commodity staleness, `/data-quality` reports date integrity, and the verify workflow fails the run and opens an issue when a site is unhealthy or the newest arrival date is more than four days old.
+
+Two honest caveats: the public data source publishes with a one-to-two day lag (so `days_behind` of 0-2 is normal, not staleness), and the Streamlit cockpit needs its *Who can view this app* setting flipped to public in the Streamlit Cloud dashboard before visitors can reach it instead of a sign-in page. The always-on [Live Data Console](https://flawsom.github.io/MandiIQ/live.html) needs no such setting.
 
 </details>
 

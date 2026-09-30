@@ -140,7 +140,7 @@ def ingest_file(path: str, batch: int = 5000) -> int:
             "resource_id": path,
         }
     """
-    from mandi_rdd.storage.duckdb_store import get_connection, upsert_prices, record_lineage_batch
+    from mandi_rdd.storage.duckdb_store import get_connection, upsert_prices
 
     conn = get_connection(read_only=False)
     try:
@@ -187,6 +187,11 @@ def _record_lineage(conn, records, n_new, source_name, resource_id):
     the upstream source in metadata for full provenance.
     """
     try:
+        # Local import: the storage layer imports this module lazily, so a
+        # module-level import would create a cycle. Without it this helper
+        # raised NameError on every call and no CSV lineage was ever recorded.
+        from mandi_rdd.storage.duckdb_store import record_lineage_batch
+
         metadata = {"file_path": resource_id}
         # If the CSV was written by the Ashoka background import,
         # tag the lineage so we know the origin, not just the medium.

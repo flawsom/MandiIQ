@@ -1,9 +1,20 @@
 name = "mandiiq-edge-proxy"
 main = "worker.js"
 compatibility_date = "2024-09-23"
-account_id = "e27f25b7a13997395e9a17005dc3cf3c"
+
+# No account id here on purpose. Export CLOUDFLARE_ACCOUNT_ID and
+# CLOUDFLARE_API_TOKEN in your shell for `wrangler deploy`, or set them in the
+# Cloudflare dashboard. The value that used to live in this file was committed
+# to git, so treat it as public metadata rather than a secret.
 
 # The live Streamlit app sitting behind this zone.
 # Override per-environment with: wrangler secret put UPSTREAM
 [vars]
 UPSTREAM = "https://mandiiq.streamlit.app"
+
+# Per-minute keep-alive: the worker's scheduled() handler pings the API,
+# the mirror API and the Streamlit app so nothing idles out. This is the
+# strongest keep-alive available (edge-scheduled, independent of GitHub cron).
+# Deploy with:  wrangler deploy
+[triggers]
+crons = ["* * * * *"]

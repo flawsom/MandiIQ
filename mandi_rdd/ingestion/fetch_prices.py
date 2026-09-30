@@ -9,7 +9,6 @@ Features:
 - Progress reporting
 """
 
-import datetime
 import json
 import logging
 import os
@@ -17,7 +16,8 @@ import time
 import urllib.parse
 from typing import Optional
 
-from mandi_rdd.ingestion.http_client import SSL_CTX, get_api_key, http_get_json, safe_float
+from mandi_rdd.core.dates import classify_date
+from mandi_rdd.ingestion.http_client import SSL_CTX
 
 # Default public API key (rate-limited but works)
 
@@ -60,6 +60,15 @@ def normalize_price_record(raw: dict) -> dict:
     for f in ("state", "district", "market", "commodity", "variety", "grade"):
         if f in out and out[f] == "":
             out[f] = None
+    if out.get("arrival_date") not in (None, ""):
+        iso, status = classify_date(out["arrival_date"])
+        if status == "ok":
+            out["arrival_date"] = iso
+        else:
+            # A wrong date is worse than no date: upsert_prices drops the row
+            # instead of filing it under a day it was never quoted on.
+            logger.debug("Rejecting arrival_date %r (%s)", out["arrival_date"], status)
+            out["arrival_date"] = None
     return out
 
 def fetch_page_for_resource(resource_id: str, offset: int = 0, limit: int = 1000,

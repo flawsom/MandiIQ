@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MandiIQ Live Console - real-time mandi price intelligence</title>
+<meta name="description" content="Live MandiIQ console: real mandi prices, rainfall-driven discontinuity estimates, conformal forecasts and tail risk straight from the production API. Nothing cached, nothing mocked.">
+<link rel="canonical" href="https://flawsom.github.io/MandiIQ/live.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --glass: rgba(255, 255, 255, 0.03);
+    --hairline: rgba(255, 255, 255, 0.08);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+    --lime: #d7ff00;
+    --paper: #ffffff;
+    --text-high: #bababa;
+    --text-med: #7e7e7e;
+    --text-low: #555555;
+    --rust: #d9663b;
+    --sage: #8fae89;
+    --violet: #8b6bc4;
+    --font-display: "Space Grotesk", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text-high); font-family: var(--font-body); }
+  a { color: var(--lime); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 72px; }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--hairline); }
+  .brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: 22px; letter-spacing: -0.02em; color: var(--paper); }
+  .brand .dot { width: 10px; height: 10px; background: var(--lime); border-radius: 50%; box-shadow: 0 0 12px rgba(215,255,0,0.7); }
+  .brand small { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text-low); text-transform: uppercase; }
+  .status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-family: var(--font-mono); font-size: 12px; }
+  .pill { border: 1px solid var(--hairline-strong); border-radius: 999px; padding: 5px 12px; color: var(--text-high); background: var(--glass); }
+  .pill.ok { border-color: rgba(215,255,0,0.5); color: var(--lime); }
+  .pill.warn { border-color: rgba(217,102,59,0.6); color: var(--rust); }
+  button { font-family: var(--font-mono); font-size: 12px; background: var(--lime); color: #000; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+
+  .grid-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 22px 0 8px; }
+  .kpi { border: 1px solid var(--hairline); border-radius: 10px; padding: 14px 16px; background: var(--surface); }
+  .kpi .label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-low); }
+  .kpi .value { font-family: var(--font-display); font-size: 26px; color: var(--paper); margin-top: 6px; letter-spacing: -0.02em; }
+  .kpi .sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-med); margin-top: 4px; }
+
+  .panel { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface); padding: 18px; margin-top: 18px; }
+  .panel h2 { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper); margin: 0 0 4px; }
+  .panel p.hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-low); margin: 0 0 14px; }
+  .row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+
+  select { background: #000; color: var(--paper); border: 1px solid var(--hairline-strong); border-radius: 6px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; max-width: 320px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 18px; }
+  svg { width: 100%; height: auto; display: block; }
+  .axis { stroke: var(--hairline-strong); stroke-width: 1; }
+  .gridline { stroke: var(--hairline); stroke-width: 1; stroke-dasharray: 3 5; }
+  .axis-label { fill: var(--text-low); font-family: var(--font-mono); font-size: 9px; }
+  .series { fill: none; stroke: var(--lime); stroke-width: 2; }
+  .area { fill: rgba(215,255,0,0.09); }
+  .cutoff { stroke: var(--rust); stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .fit-left { stroke: var(--violet); stroke-width: 2; }
+  .fit-right { stroke: var(--sage); stroke-width: 2; }
+  .bin { fill: var(--paper); opacity: 0.85; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); }
+  th { color: var(--text-low); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+  td.num { text-align: right; color: var(--paper); }
+  .muted { color: var(--text-med); }
+  .err { color: var(--rust); font-family: var(--font-mono); font-size: 12px; }
+  footer { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--hairline); font-family: var(--font-mono); font-size: 11px; color: var(--text-low); line-height: 1.7; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .card { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: rgba(255,255,255,0.015); }
+  .card .label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-low); }
+  .card .big { font-family: var(--font-display); font-size: 20px; color: var(--paper); margin-top: 4px; }
+  .card .note { font-family: var(--font-mono); font-size: 10px; color: var(--text-med); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="dot"></span>
+      <span>MandiIQ <small>Live data console</small></span>
+    </div>
+    <div class="status">
+      <span id="status-pill" class="pill">connecting</span>
+      <span id="api-pill" class="pill">api</span>
+      <span id="age-pill" class="pill">data age ?</span>
+      <button id="refresh">Refresh now</button>
+      <span id="countdown" class="muted">auto in 60s</span>
+    </div>
+  </header>
+
+  <section class="grid-kpi" id="kpis"></section>
+
+  <div class="controls">
+    <label class="muted" for="commodity">Commodity</label>
+    <select id="commodity"></select>
+    <span id="commodity-meta" class="muted"></span>
+  </div>
+
+  <div class="row">
+    <section class="panel">
+      <h2>Price history</h2>
+      <p class="hint" id="price-hint">Daily median modal price across every market reporting that day.</p>
+      <div id="price-chart"></div>
+    </section>
+    <section class="panel">
+      <h2>Rainfall discontinuity (RDD)</h2>
+      <p class="hint">Price response around the -19% rainfall deficiency cutoff.</p>
+      <div id="rdd-chart"></div>
+      <div id="rdd-text" class="muted" style="margin-top:12px;font-size:12px;line-height:1.6"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Analytics engine</h2>
+    <p class="hint" id="analytics-hint">Conformal intervals, drift monitors, EVT tail risk, DoubleML effects and Kalman nowcasts.</p>
+    <div class="cards" id="analytics-cards"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Freshness by commodity</h2>
+    <p class="hint">Newest arrival date actually present in the warehouse, per commodity.</p>
+    <div style="max-height:340px;overflow:auto">
+      <table>
+        <thead><tr><th>Commodity</th><th>Newest date</th><th>Rows</th><th class="num">Districts</th><th class="num">States</th></tr></thead>
+        <tbody id="fresh-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div>Source of truth: <a id="api-link" href="https://p01--mandiiq--x4n8x4gkmzht.code.run/docs">the production MandiIQ API</a> - every figure above is fetched live from it on each refresh. Nothing is cached, hardcoded or mocked.</div>
+    <div>Underlying data: data.gov.in Agmarknet daily mandi prices, IMD/Datameet rainfall departures, Sentinel-2 NDVI. Date integrity is validated on ingest: impossible (future-dated) rows are rejected and repaired.</div>
+    <div>Analysis: regression discontinuity on the -19% rainfall deficiency threshold, split-conformal intervals, PSI/KS drift monitors, EVT (GPD) tail risk, cross-fitted DoubleML, Kalman nowcast.</div>
+    <div><a href="./index.html">Back to the product page</a> - <a href="https://mandiiq.streamlit.app">full Streamlit cockpit</a> - <a href="https://github.com/flawsom/MandiIQ">repository</a></div>
+  </footer>
+</div>
+
+<script>
+const API = "https://p01--mandiiq--x4n8x4gkmzht.code.run";
+const AUTO_SECONDS = 60;
+let countdown = AUTO_SECONDS;
+let refreshTimer = null;
+
+const $ = (id) => document.getElementById(id);
+const fmt = new Intl.NumberFormat("en-IN");
+const inr = (v) => (v == null || isNaN(v)) ? "-" : "₹" + Math.round(v).toLocaleString("en-IN");
+const num = (v, d = 2) => (v == null || isNaN(v)) ? "-" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: d });
+
+async function getJSON(path, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(API + path, { signal: controller.signal, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function setPill(el, text, cls) {
+  el.textContent = text;
+  el.className = "pill" + (cls ? " " + cls : "");
+}
+
+function kpi(label, value, sub) {
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub || ""}</div></div>`;
+}
+
+function svgLine(points, opts) {
+  const w = 640, h = 260, pad = { l: 58, r: 16, t: 14, b: 30 };
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  const span = (maxY - minY) || 1;
+  minY -= span * 0.08; maxY += span * 0.08;
+  const sx = (x) => pad.l + ((x - minX) / ((maxX - minX) || 1)) * (w - pad.l - pad.r);
+  const sy = (y) => h - pad.b - ((y - minY) / ((maxY - minY) || 1)) * (h - pad.t - pad.b);
+  const line = points.map((p, i) => `${i ? "L" : "M"}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
+  const area = `${line} L${sx(maxX).toFixed(1)},${(h - pad.b).toFixed(1)} L${sx(minX).toFixed(1)},${(h - pad.b).toFixed(1)} Z`;
+  let grid = "";
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * (h - pad.t - pad.b);
+    const val = maxY - (i / 4) * (maxY - minY);
+    grid += `<line class="gridline" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w - pad.r}" y2="${y.toFixed(1)}"/>`;
+    grid += `<text class="axis-label" x="${pad.l - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end">${Math.round(val).toLocaleString("en-IN")}</text>`;
+  }
+  const ticks = opts.ticks || [];
+  const tickMarks = ticks.map(t =>
+    `<text class="axis-label" x="${sx(t.x).toFixed(1)}" y="${h - 10}" text-anchor="middle">${t.label}</text>`).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${opts.aria || "chart"}">
+    ${grid}
+    <line class="axis" x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}"/>
+    <path class="area" d="${area}"/>
+    <path class="series" d="${line}"/>
+    ${tickMarks}
+  </svg>`;
+}
+
+function svgRdd(plot) {
+  const w = 640, h = 300, pad = { l: 58, r: 16, t: 14, b: 34 };
+  const xs = (plot.raw_x || []).filter(Number.isFinite);
+  const ys = (plot.raw_y || []).filter(Number.isFinite);
+  if (!xs.length || !ys.length) return '<div class="err">No discontinuity estimate available yet.</div>';
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  const span = (maxY - minY) || 1;
+  minY -= span * 0.08; maxY += span * 0.08;
+  const sx = (x) => pad.l + ((x - minX) / ((maxX - minX) || 1)) * (w - pad.l - pad.r);
+  const sy = (y) => h - pad.b - ((y - minY) / ((maxY - minY) || 1)) * (h - pad.t - pad.b);
+  const cut = plot.cutoff;
+  const line = (xArr, yArr) => xArr.map((x, i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(yArr[i]).toFixed(1)}`).join(" ");
+  let grid = "";
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * (h - pad.t - pad.b);
+    grid += `<line class="gridline" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w - pad.r}" y2="${y.toFixed(1)}"/>`;
+  }
+  const bins = (plot.bin_centers || []).map((cx, i) => {
+    const cy = (plot.bin_means || [])[i];
+    const n = (plot.bin_counts || [])[i] || 0;
+    if (cx == null || cy == null || !n) return "";
+    const r = Math.min(6, 2 + Math.sqrt(n) / 3);
+    return `<circle class="bin" cx="${sx(cx).toFixed(1)}" cy="${sy(cy).toFixed(1)}" r="${r.toFixed(1)}"><title>${cx.toFixed(1)}% departure, ${inr(cy)}, ${n} obs</title></circle>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Discontinuity plot">
+    ${grid}
+    <line class="axis" x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}"/>
+    ${bins}
+    ${plot.left_x && plot.left_x.length ? `<path class="fit-left" d="${line(plot.left_x, plot.left_y)}"/>` : ""}
+    ${plot.right_x && plot.right_x.length ? `<path class="fit-right" d="${line(plot.right_x, plot.right_y)}"/>` : ""}
+    <line class="cutoff" x1="${sx(cut).toFixed(1)}" y1="${pad.t}" x2="${sx(cut).toFixed(1)}" y2="${h - pad.b}"/>
+    <text class="axis-label" x="${sx(cut).toFixed(1)}" y="${h - 12}" text-anchor="middle" fill="#d9663b">cutoff ${cut}%</text>
+  </svg>`;
+}
+
+function card(label, big, note) {
+  return `<div class="card"><div class="label">${label}</div><div class="big">${big}</div><div class="note">${note}</div></div>`;
+}
+
+function analyticsCards(report, rdd) {
+  const s = (report && report.sections) || {};
+  const out = [];
+  if (rdd && rdd.effect != null) {
+    out.push(card("RDD effect at -19% rainfall", inr(rdd.effect),
+      `p=${num(rdd.p_value, 3)} - ${fmt.format(rdd.n_left || 0)} left / ${fmt.format(rdd.n_right || 0)} right obs`));
+  }
+  const conf = s.conformal || {};
+  if (conf.half_width != null) {
+    out.push(card("Conformal interval", "± " + inr(conf.half_width),
+      `split conformal, ${Math.round((conf.calibration_coverage || 0) * 100)}% realised coverage over ${fmt.format(conf.calibration_points || 0)} calibration points`));
+  }
+  const drift = s.drift || {};
+  if (drift.psi && drift.psi.psi != null) {
+    const ks = drift.ks || {};
+    out.push(card("Distribution drift (PSI)", num(drift.psi.psi, 3),
+      `${(drift.psi.verdict || "pending").replace(/_/g, " ")} - KS ${num(ks.statistic, 3)} (p=${num(ks.p_value, 3)})`));
+  }
+  if (drift.data_quality && drift.data_quality.score != null) {
+    out.push(card("Data quality", num(drift.data_quality.score, 1) + "/100",
+      "completeness, freshness and repeat-price penalty"));
+  }
+  const tail = s.tail_risk || {};
+  if (tail.evt_99 && tail.evt_99.var != null) {
+    out.push(card("EVT tail risk (99%)", num(tail.evt_99.var * 100, 2) + "%",
+      `GPD tail, expected shortfall ${num((tail.evt_99.cvar || 0) * 100, 2)}%`));
+  } else if (tail.var_99 && tail.var_99.var != null) {
+    out.push(card("Historical VaR (99%)", num(tail.var_99.var * 100, 2) + "%",
+      `CVaR ${num((tail.var_99.cvar || 0) * 100, 2)}% over ${fmt.format(tail.var_99.n_returns || 0)} returns`));
+  }
+  if (tail.max_drawdown && tail.max_drawdown.max_drawdown_pct != null) {
+    out.push(card("Max drawdown", num(tail.max_drawdown.max_drawdown_pct, 1) + "%",
+      `${num(tail.annualised_volatility_pct, 1)}% annualised volatility`));
+  }
+  const dml = s.dml || {};
+  if (dml.effect_10pp_pct != null) {
+    out.push(card("DoubleML: +10pp rainfall", num(dml.effect_10pp_pct, 2) + "%",
+      `95% CI ${num(dml.ci95_lower, 2)}% to ${num(dml.ci95_upper, 2)}% on log price, n=${fmt.format(dml.n_obs || 0)}`));
+  }
+  const now = s.nowcast || {};
+  if (now.nowcast_price != null) {
+    out.push(card("Kalman nowcast (month end)", inr(now.nowcast_price),
+      `80% interval ${inr(now.ci_lower)} to ${inr(now.ci_upper)}`));
+  }
+  if (!out.length) {
+    out.push('<div class="err">The live API returned no analytics figures for this commodity yet - the next pipeline run computes them.</div>');
+  }
+  return out.join("");
+}
+
+function buildPriceSeries(rows) {
+  const byDay = new Map();
+  for (const r of rows) {
+    const day = (r.arrival_date || "").slice(0, 10);
+    const price = r.modal_price;
+    if (!day || price == null || price <= 0) continue;
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(price);
+  }
+  const entries = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return entries.map(([day, prices]) => {
+    prices.sort((a, b) => a - b);
+    const mid = Math.floor(prices.length / 2);
+    const median = prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+    return { x: Date.parse(day), y: median, day };
+  });
+}
+
+async function loadHealth() {
+  const h = await getJSON("/health");
+  setPill($("status-pill"), "status: " + (h.status || "unknown"), h.status === "healthy" ? "ok" : "warn");
+  setPill($("api-pill"), "v" + (h.version || "?"));
+  const behind = h.days_behind;
+  const fresh = behind != null && behind <= 4;
+  setPill($("age-pill"), "data through " + (h.data_max_date || "?") + (behind != null ? ` (${behind}d)` : ""), fresh ? "ok" : "warn");
+  $("kpis").innerHTML = [
+    kpi("Price records", fmt.format(h.n_prices || 0), "rows in the live warehouse"),
+    kpi("Commodities", fmt.format(h.n_commodities || 0), `${fmt.format(h.n_states || 0)} states, ${fmt.format(h.n_districts || 0)} districts`),
+    kpi("Newest arrival date", h.data_max_date || "-", behind != null ? `${behind} day(s) behind today` : "age unknown"),
+    kpi("Rainfall rows", fmt.format(h.n_rainfall || 0), `${fmt.format(h.rainfall_below_threshold || 0)} below the -19% threshold`),
+    kpi("RDD estimates", fmt.format(h.n_rdd_results || 0), "commodities with a discontinuity fit"),
+    kpi("Date integrity", (h.n_future_dates ? fmt.format(h.n_future_dates) + " anomalies" : "clean"), h.n_future_dates ? "repair queued on next run" : "no impossible arrival dates"),
+    kpi("Last pipeline run", h.last_run_utc ? h.last_run_utc.slice(0, 16).replace("T", " ") + "Z" : "-", (h.last_outcome || "unknown") + (h.ingestion_running ? " - running now" : "")),
+  ].join("");
+  return h;
+}
+
+async function loadFreshness() {
+  const rows = await getJSON("/freshness");
+  const sorted = rows.slice().sort((a, b) => (b.row_count || 0) - (a.row_count || 0));
+  $("fresh-body").innerHTML = sorted.slice(0, 60).map(r => `<tr>
+      <td>${r.commodity}</td><td class="muted">${r.latest_date || "-"}</td>
+      <td class="num">${fmt.format(r.row_count || 0)}</td>
+      <td class="num">${fmt.format(r.n_districts || 0)}</td>
+      <td class="num">${fmt.format(r.n_states || 0)}</td></tr>`).join("");
+  const select = $("commodity");
+  const keep = select.value;
+  select.innerHTML = sorted.slice(0, 60).map(r => `<option value="${r.commodity}">${r.commodity}</option>`).join("");
+  if (keep && sorted.some(r => r.commodity === keep)) select.value = keep;
+  else if (sorted.some(r => r.commodity === "Onion")) select.value = "Onion";
+  return sorted;
+}
+
+async function loadCommodity(name) {
+  $("commodity-meta").textContent = "loading " + name + "...";
+  let detail = null;
+  try {
+    const [prices, rdd, plot, analytics] = await Promise.all([
+      getJSON(`/prices?commodity=${encodeURIComponent(name)}&limit=5000`),
+      getJSON(`/rdd-result/${encodeURIComponent(name)}`).catch(() => null),
+      getJSON(`/rdd-plot/${encodeURIComponent(name)}`).catch(() => null),
+      getJSON(`/analytics/${encodeURIComponent(name)}`).catch(() => null),
+    ]);
+    detail = { prices, rdd, plot, analytics };
+
+    const series = buildPriceSeries(prices);
+    if (series.length >= 2) {
+      const windowed = series.slice(-240);
+      const ticks = [windowed[0], windowed[Math.floor(windowed.length / 2)], windowed[windowed.length - 1]]
+        .map(p => ({ x: p.x, label: p.day.slice(2) }));
+      $("price-chart").innerHTML = svgLine(windowed, { aria: name + " median price history", ticks });
+      const first = windowed[0], last = windowed[windowed.length - 1];
+      const change = ((last.y - first.y) / first.y) * 100;
+      $("price-hint").textContent = `Daily median modal price, ${windowed.length} sessions from ${first.day} to ${last.day}. Latest ${inr(last.y)} (${change >= 0 ? "+" : ""}${num(change, 1)}% over the window).`;
+    } else {
+      $("price-chart").innerHTML = '<div class="err">Not enough dated price observations to plot a series.</div>';
+    }
+
+    if (plot) {
+      $("rdd-chart").innerHTML = svgRdd(plot);
+      $("rdd-text").innerHTML = rdd && rdd.effect != null
+        ? `${rdd.interpretation || ""}<br><span class="muted">Bandwidth ±${num(plot.bandwidth, 1)}pp, cutoff ${plot.cutoff}%, ${fmt.format((plot.raw_x || []).length)} observations.</span>`
+        : "No RDD estimate yet for this commodity.";
+    } else {
+      $("rdd-chart").innerHTML = '<div class="err">Discontinuity data unavailable for this commodity.</div>';
+    }
+
+    $("analytics-cards").innerHTML = analyticsCards(analytics, rdd);
+    $("analytics-hint").textContent = analytics
+      ? (analytics.headline || "Computed by the live analytics engine.") + " (engine v" + (analytics.version || "?") + ")"
+      : "The deployed API build does not expose /analytics yet - these cards fill in automatically after the next deploy.";
+  } finally {
+    $("commodity-meta").textContent = detail ? "updated " + new Date().toLocaleTimeString() : "load failed";
+  }
+}
+
+async function refreshAll() {
+  countdown = AUTO_SECONDS;
+  try {
+    await loadHealth();
+    await loadFreshness();
+    await loadCommodity($("commodity").value || "Onion");
+  } catch (err) {
+    setPill($("status-pill"), "api unreachable", "warn");
+    $("commodity-meta").textContent = "error: " + err.message;
+  }
+}
+
+$("refresh").addEventListener("click", refreshAll);
+$("commodity").addEventListener("change", (e) => loadCommodity(e.target.value));
+$("api-link").href = API + "/docs";
+
+refreshAll();
+refreshTimer = setInterval(() => {
+  countdown -= 1;
+  $("countdown").textContent = "auto in " + Math.max(countdown, 0) + "s";
+  if (countdown <= 0) refreshAll();
+}, 1000);
+</script>
+</body>
+</html>

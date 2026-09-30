@@ -288,21 +288,37 @@ def _run_import_in_bg(workers: int = 2, limit_cells: int = 0,
             log.warning(f"Backfill failed (can run later): {e}")
             _status["backfill_error"] = str(e)
 
+    
         # Record overall Ashoka import lineage
         try:
-            from mandi_rdd.storage.duckdb_store import record_lineage_batch
-            record_lineage_batch(
-                _get_test_conn(),
-                source_type="ashoka",
-                source_name="ashoka_full_import",
-                resource_id=OUTPUT_CSV.name,
-                row_count=rows_written,
-                n_new=-1,
-                records=None,
-                metadata={"cells_total": total, "cells_done": len(done), "duration_sec": elapsed},
+            # A stale test helper (_get_test_conn) used to be called here, so
+            # this block always raised NameError and the Ashoka import never
+            # recorded lineage. Use the real storage connection.
+            from mandi_rdd.storage.duckdb_store import (
+                get_connection,
+                record_lineage_batch,
             )
-        except Exception:
-            pass
+            lineage_conn = get_connection()
+            try:
+                record_lineage_batch(
+                    lineage_conn,
+                    source_type="ashoka",
+                    source_name="ashoka_full_import",
+                    resource_id=OUTPUT_CSV.name,
+                    row_count=rows_written,
+                    n_new=-1,
+                    records=None,
+                    metadata={
+                        "cells_total": total,
+                        "cells_done": len(done),
+                        "duration_sec": elapsed,
+                    },
+                )
+            finally:
+                lineage_conn.close()
+        except Exception as lineage_error:
+            # Lineage is provenance, not correctness: log it, never abort.
+            log.warning(f"Could not record Ashoka lineage: {lineage_error}")
 
     except Exception as e:
         _status["state"] = "error"

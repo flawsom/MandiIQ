@@ -24,6 +24,7 @@ import logging
 import time
 
 import hashlib
+import functools
 import gzip
 import shutil
 import hmac
@@ -62,6 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
+    version: str = "2.1.0"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -76,6 +78,14 @@ class HealthResponse(BaseModel):
     n_tests: int = 71
     last_run_utc: Optional[str] = None
     last_outcome: Optional[str] = None
+    # Live-data provenance: the newest arrival date in the warehouse and how
+    # far behind today it is, so no surface can claim "live" while stale.
+    data_max_date: Optional[str] = None
+    data_min_date: Optional[str] = None
+    days_behind: Optional[int] = None
+    hours_since_last_run: Optional[float] = None
+    n_future_dates: int = 0
+    ingestion_running: bool = False
     commodities_analyzed: list[str] = []
 
 
@@ -177,6 +187,65 @@ class AppState:
         self.commodities = []
 
 
+_QUALITY_CACHE: dict = {"at": 0.0, "data": None}
+
+
+def _cached_date_quality(conn, ttl_seconds: float = 60.0) -> dict:
+    """Date-integrity snapshot, memoised so /health stays cheap to poll."""
+    now = time.time()
+    cached = _QUALITY_CACHE.get("data")
+    if cached is not None and now - float(_QUALITY_CACHE.get("at") or 0.0) < ttl_seconds:
+        return cached
+    try:
+        from mandi_rdd.core.dates import date_quality
+        data = date_quality(conn)
+    except Exception as exc:
+        logger.warning("Date quality report unavailable: %s", exc)
+        return cached or {}
+    _QUALITY_CACHE["at"] = now
+    _QUALITY_CACHE["data"] = data
+    return data
+
+
+def _hours_since(timestamp: Optional[str]) -> Optional[float]:
+    """Whole hours between an ISO-8601 UTC stamp and now, else None."""
+    if not timestamp:
+        return None
+    try:
+        parsed = datetime.datetime.strptime(str(timestamp)[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+    delta = datetime.datetime.utcnow() - parsed
+    return round(delta.total_seconds() / 3600.0, 2)
+
+
+def _ingestion_running() -> bool:
+    try:
+        from mandi_rdd.ingestion.scheduler import ingestion_running
+        return bool(ingestion_running())
+    except Exception:
+        return False
+
+
+@functools.lru_cache(maxsize=1)
+def _count_tests() -> int:
+    """Count the test functions shipped with this build.
+
+    /health must not report a number nobody can verify, so the count is read
+    from the test suite instead of being hardcoded.
+    """
+    tests_dir = Path(__file__).resolve().parent.parent / "tests"
+    try:
+        return sum(
+            1
+            for path in tests_dir.glob("*.py")
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+            if line.lstrip().startswith("def test_")
+        )
+    except Exception:
+        return 0
+
+
 state = AppState()
 
 
@@ -274,7 +343,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
     * `/refresh` - Manual re-run of the full pipeline
     """,
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -336,6 +405,8 @@ async def health():
         except Exception:
             pass
 
+        quality = _cached_date_quality(conn)
+
         return HealthResponse(
             status="healthy",
             llm_fallback_count=get_llm_fallback_count(),
@@ -351,6 +422,14 @@ async def health():
             n_ndvi_districts=n_ndvi_districts,
             last_run_utc=last_run_utc,
             last_outcome=last_outcome,
+            version=app.version,
+            n_tests=_count_tests(),
+            data_max_date=quality.get("max_date"),
+            data_min_date=quality.get("min_date"),
+            days_behind=quality.get("days_behind"),
+            hours_since_last_run=_hours_since(last_run_utc),
+            n_future_dates=int(quality.get("n_future_dates") or 0),
+            ingestion_running=_ingestion_running(),
             commodities_analyzed=state.commodities[:20],
         )
     except Exception:
@@ -371,6 +450,53 @@ async def health():
             except Exception:
                 pass
 
+
+@app.get("/data-quality", tags=["System"])
+async def data_quality_endpoint():
+    """Warehouse date integrity and live-data provenance.
+
+    Reports the newest arrival date actually present, how many days behind
+    today that is, and how many rows carried an impossible (future) arrival
+    date. Every surface that claims "live" can be audited against this.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.core.dates import date_quality as _date_quality
+        report = _date_quality(conn)
+        report["n_prices"] = int(
+            conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0
+        )
+        report["ingestion_running"] = _ingestion_running()
+        report["version"] = app.version
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.post("/admin/repair-dates", tags=["Admin"])
+async def admin_repair_dates(dry_run: bool = Query(True)):
+    """Correct price rows whose arrival date cannot be true.
+
+    A future arrival date is the inverse of a month-first mis-parse of a
+    DD/MM/YYYY source, so the day and month are swapped back
+    (2026-12-09 -> 2026-09-12). Rows that stay impossible are dropped.
+    Pass ``dry_run=false`` to apply; defaults to a report-only dry run.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.core.dates import date_quality as _date_quality
+        from mandi_rdd.core.dates import repair_future_dates
+        report = repair_future_dates(conn, dry_run=dry_run)
+        report["quality_after"] = _date_quality(conn)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 
 @app.get("/freshness", tags=["System"])
