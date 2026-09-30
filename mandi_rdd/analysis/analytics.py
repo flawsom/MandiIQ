@@ -8,6 +8,8 @@ One call assembles the full analyst work-packet for a commodity:
 - tail_risk: historical VaR/CVaR, EVT tail fits, max drawdown
 - dml: cross-fitted debiased rainfall-price sensitivity
 - nowcast: Kalman month-end projection for incomplete reporting
+- spec_curve: the same RDD across 30 defensible specifications, so a headline
+  effect can be checked against the choices that produced it
 
 Each section degrades independently, so a missing rainfall table or short
 history never takes down the whole report.
@@ -25,7 +27,7 @@ ANALYTICS_VERSION = "2.0"
 
 def commodity_analytics(conn, commodity: str) -> dict:
     """Run every analytics module for one commodity and assemble the report."""
-    from mandi_rdd.analysis import conformal, dml, drift, nowcast, tail_risk
+    from mandi_rdd.analysis import conformal, dml, drift, nowcast, spec_curve, tail_risk
 
     sections: dict[str, dict] = {}
     runners = {
@@ -34,6 +36,7 @@ def commodity_analytics(conn, commodity: str) -> dict:
         "tail_risk": tail_risk.tail_risk_report,
         "dml": dml.dml_report,
         "nowcast": nowcast.nowcast_report,
+        "spec_curve": spec_curve.spec_curve_report,
     }
 
     for name, runner in runners.items():
@@ -79,6 +82,14 @@ def _headline(sections: dict) -> str:
         notes.append(
             f"month-end nowcast {nowcast['nowcast_price']:.0f} "
             f"({nowcast['completion_pct']:.0f}% of month reported)"
+        )
+
+    curve = (sections.get("spec_curve") or {}).get("summary") or {}
+    if curve.get("median_effect") is not None:
+        notes.append(
+            f"median effect across {curve['n_estimated']} specifications "
+            f"{curve['median_effect']:.0f} ({curve.get('verdict')}, "
+            f"{curve.get('n_significant', 0)} significant)"
         )
 
     if not notes:

@@ -35,6 +35,8 @@ EXPECTED_ROUTES = {
     ("/data-quality", "GET"),
     ("/admin/repair-dates", "POST"),
     ("/admin/rebuild-prices", "POST"),
+    ("/fdr", "GET"),
+    ("/spec-curve/{commodity}", "GET"),
 }
 
 

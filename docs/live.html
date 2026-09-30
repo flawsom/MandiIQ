@@ -293,6 +293,13 @@ function analyticsCards(report, rdd) {
     out.push(card("Kalman nowcast (month end)", inr(now.nowcast_price),
       `80% interval ${inr(now.ci_lower)} to ${inr(now.ci_upper)}`));
   }
+  const curve = (s.spec_curve || {}).summary || {};
+  if (curve.median_effect != null) {
+    out.push(card("Specification curve", inr(curve.median_effect),
+      `median of ${fmt.format(curve.n_estimated || 0)} specifications - ${curve.verdict}` +
+      `, ${fmt.format(curve.n_significant || 0)} significant at alpha ${num(curve.alpha, 2)}` +
+      (curve.iqr_effect != null ? `, IQR ${inr(curve.iqr_effect)}` : "")));
+  }
   if (!out.length) {
     out.push('<div class="err">The live API returned no analytics figures for this commodity yet - the next pipeline run computes them.</div>');
   }
@@ -319,6 +326,10 @@ function buildPriceSeries(rows) {
 
 async function loadHealth() {
   const h = await getJSON("/health");
+  // Warehouse-wide multiplicity control: with 400+ commodities fitted at
+  // p < 0.05, the raw count of "significant" effects is not a finding until
+  // Benjamini-Hochberg says how many survive.
+  const fdr = await getJSON("/fdr").catch(() => null);
   setPill($("status-pill"), "status: " + (h.status || "unknown"), h.status === "healthy" ? "ok" : "warn");
   setPill($("api-pill"), "v" + (h.version || "?"));
   const behind = h.days_behind;
@@ -332,6 +343,8 @@ async function loadHealth() {
     kpi("RDD estimates", fmt.format(h.n_rdd_results || 0), "commodities with a discontinuity fit"),
     kpi("Date integrity", (h.n_future_dates ? fmt.format(h.n_future_dates) + " anomalies" : "clean"), h.n_future_dates ? "repair queued on next run" : "no impossible arrival dates"),
     kpi("Last pipeline run", h.last_run_utc ? h.last_run_utc.slice(0, 16).replace("T", " ") + "Z" : "-", (h.last_outcome || "unknown") + (h.ingestion_running ? " - running now" : "")),
+    ...(fdr ? [kpi("Effects surviving FDR", fmt.format(fdr.n_significant_fdr || 0) + " of " + fmt.format(fdr.n_hypotheses || 0),
+      `${fmt.format(fdr.n_significant_raw || 0)} raw p<${num(fdr.alpha, 2)}; ~${num(fdr.expected_false_positives, 1)} expected false positives`)] : []),
     kpi("Self-refresh", h.refresh_runs ? `${fmt.format(h.refresh_runs - (h.refresh_failures || 0))}/${fmt.format(h.refresh_runs)}` : "not reported",
       h.refresh_failures ? `${fmt.format(h.refresh_failures)} failed - ${h.last_refresh_error || "see server logs"}`
         : (h.refresh_interval_s ? `every ${Math.round(h.refresh_interval_s / 60)} min, ${h.last_refresh_success_utc ? "last ok " + h.last_refresh_success_utc.slice(0, 16).replace("T", " ") + "Z" : "waiting for first run"}` : "older build")),

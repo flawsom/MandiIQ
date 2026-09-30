@@ -624,6 +624,47 @@ async def admin_repair_dates(dry_run: bool = Query(True)):
         conn.close()
 
 
+@app.get("/fdr", tags=["Analytics"])
+async def fdr(alpha: float = Query(0.05, ge=0.001, le=0.5)):
+    """Benjamini-Hochberg control across every stored commodity estimate.
+
+    With 400+ commodities each fitted at p < 0.05, roughly one in twenty looks
+    significant by chance. q-values say how many survive that correction.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.spec_curve import fdr_report
+        return fdr_report(conn, alpha=alpha)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/spec-curve/{commodity}", tags=["Analytics"])
+async def spec_curve_endpoint(commodity: str, cutoff: float = Query(-19.0)):
+    """Fit the RDD across bandwidths, kernels and polynomial orders.
+
+    A headline effect is one point in a space of defensible choices; the curve
+    reports the distribution so a fragile result cannot pass as a firm one.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.spec_curve import spec_curve_report
+        report = spec_curve_report(conn, commodity, cutoff=cutoff)
+        if report.get("error"):
+            raise HTTPException(status_code=404, detail=report["error"])
+        return report
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
 @app.post("/admin/rebuild-prices", tags=["Admin"])
 async def admin_rebuild_prices():
     """Rebuild the prices table to clear an inconsistent ART index.
