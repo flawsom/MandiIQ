@@ -4,13 +4,20 @@
 Used by .github/workflows/refresh-live-data.yml right after an ingest run, so
 "the data is live" is verified rather than assumed.
 
+Staleness is attributed before it is raised: when every commodity stops on the
+same date and /health's refresh counters are clean, the newest arrival date is
+waiting on data.gov.in (an upstream publication lag, reported as a notice),
+not on this pipeline. A failed last run, a failed self-refresh loop, or
+commodities stopping on *different* dates means rows exist upstream that we
+failed to ingest - that fails the check.
+
 Usage:
     python -m mandi_rdd.scripts.check_production_freshness --api-base URL
       [--max-days-behind 4] [--json]
 
 Exit codes:
-    0 - fresh, no impossible dates, last run succeeded
-    1 - stale, unhealthy, or unreachable
+    0 - fresh, or stale only because upstream has published nothing yet
+    1 - pipeline failure, impossible dates, unhealthy warehouse, or unreachable
 """
 
 from __future__ import annotations
@@ -21,6 +28,14 @@ import os
 import sys
 import urllib.error
 import urllib.request
+
+try:  # module execution (CI) vs direct script execution
+    from mandi_rdd.scripts.consumer_check import (
+        pipeline_failure_signals,
+        upstream_lag_signature,
+    )
+except ImportError:  # pragma: no cover - direct invocation fallback
+    from consumer_check import pipeline_failure_signals, upstream_lag_signature
 
 DEFAULT_API = os.environ.get(
     "MANDIIQ_API_URL", "https://p01--mandiiq--x4n8x4gkmzht.code.run"
@@ -37,7 +52,8 @@ def _get(url: str, timeout: float = 30.0):
 def collect(api_base: str) -> dict:
     api_base = api_base.rstrip("/")
     report: dict = {"api_base": api_base, "health": None, "data_quality": None,
-                    "problems": [], "reachable": True}
+                    "freshness": None, "problems": [], "notes": [],
+                    "reachable": True}
     try:
         report["health"] = _get(f"{api_base}/health")
     except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -55,6 +71,11 @@ def collect(api_base: str) -> dict:
         report["problems"].append(
             f"/data-quality unavailable ({exc}); deploy the current build"
         )
+
+    try:
+        report["freshness"] = _get(f"{api_base}/freshness")
+    except Exception:
+        report["freshness"] = None
     return report
 
 
@@ -76,10 +97,26 @@ def evaluate(report: dict, max_days_behind: int = 4) -> list:
             % (health.get("data_max_date"), -days_behind)
         )
     elif days_behind > max_days_behind:
-        problems.append(
-            "newest arrival date %s is %d days old (>%dd)"
-            % (health.get("data_max_date"), days_behind, max_days_behind)
-        )
+        failures = pipeline_failure_signals(health)
+        lag = upstream_lag_signature(report.get("freshness"), health.get("data_max_date"))
+        if failures:
+            problems.append(
+                "newest arrival date %s is %d days old and our ingest is failing "
+                "(%s) - a pipeline stall, not upstream lag"
+                % (health.get("data_max_date"), days_behind, failures[0])
+            )
+        elif lag:
+            report.setdefault("notes", []).append(
+                "newest arrival date %s is %d days old, but all %d commodities stop "
+                "on the same date: upstream publication lag, not a pipeline failure"
+                % (health.get("data_max_date"), days_behind, lag["n_commodities"])
+            )
+        else:
+            problems.append(
+                "newest arrival date %s is %d days old and commodities do not share "
+                "one latest date - our ingest is behind upstream"
+                % (health.get("data_max_date"), days_behind)
+            )
 
     status = health.get("status")
     if status in ("empty", "degraded"):
@@ -131,6 +168,8 @@ def main(argv=None) -> int:
         print("days behind      :", health.get("days_behind"))
         print("future dates     :", health.get("n_future_dates"))
         print("last run         :", health.get("last_run_utc"), "/", health.get("last_outcome"))
+        for note in report.get("notes") or []:
+            print(f"::notice::{note}")
         for problem in problems:
             print(f"::error::{problem}")
         if not problems:

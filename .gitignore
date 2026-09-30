@@ -127,11 +127,14 @@ mandi_rdd/data/index_fault.flag
 # Temp scripts, logs, screenshots (local artifacts)
 _upload_chunks.ps1
 _upload_log.txt
+_*.py
+_*.json
 _*.png
 *login*.png
 current_state.png
 *.log
 *.out
+verify_report.json
 
 # Node artifacts in root
 /package.json

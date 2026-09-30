@@ -97,9 +97,9 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 
 ## 🎯 The causal finding
 
-> **Districts that cross IMD's −19% rainfall-deficiency threshold see a +₹350 (+24.5%) jump in onion modal prices - statistically significant at p = 0.003, robust across bandwidths, placebo-tested, and confirmed by fixed-effects regression.**
+> **Crossing IMD's −19% rainfall-deficiency threshold does _not_ move onion prices by a detectable amount on the current warehouse: +₹101 (p = 0.28), 0 of 30 specification-curve estimates significant, verdict `fragile`. Earlier revisions of this README reported +₹350 (p = 0.003) from a smaller, pre-repair sample; that number does not reproduce on today's warehouse, so it is no longer the headline.**
 
-This is the heart of MandiIQ: not a dashboard of charts, but a **causally identified effect** with an explicit identification strategy.
+This is the heart of MandiIQ: not a dashboard of charts, but a **causally identified effect** with an explicit identification strategy - reported honestly, including when the honest answer is a null result. Every number below is what the production endpoints return today, not the best run of an earlier semester.
 
 ```
 price = β0 + β1 · D + f(rainfall) + γX + ε
@@ -108,27 +108,29 @@ price = β0 + β1 · D + f(rainfall) + γX + ε
         β1  = causal effect of crossing the drought cutoff
 ```
 
-| Robustness check | Method | Result |
-| :--------------- | :----- | :----- |
-| **Bandwidth sensitivity** | Re-estimated at 10 / 15 / 20 / 25 / 30% | Stable across all windows ✅ |
-| **Placebo cutoffs** | Fake thresholds at −10 / −5 / +5% | No spurious effect ✅ |
-| **McCrary density test** | Continuity of the running variable | No manipulation (p = 0.92) ✅ |
-| **Fixed-effects cross-check** | District + month FE regression | +₹298, p = 0.01 - agrees with RDD ✅ |
+| Robustness check | Method | Live result (this warehouse) |
+| :--------------- | :----- | :--------------------------- |
+| **Main estimate** | Local-linear RDD at the −19% cutoff, bandwidth 20 | **+₹101, p = 0.28 - not significant** |
+| **Bandwidth sensitivity** | Re-estimated at 15 / 20 / 25 / 30 | +₹81 … +₹101, p = 0.42 … 0.27 - null in every window |
+| **Placebo cutoffs** | Fake thresholds in the running variable | 3 of 4 null; one spurious jump at −37% (p = 0.006) - a reminder that a single cutoff is thin evidence |
+| **Specification curve** | 30 bandwidth × kernel × polynomial combinations | **0 of 30 significant**, median +₹50, IQR ₹121, verdict `fragile` |
+| **Multiplicity (BH-FDR)** | Benjamini-Hochberg q-values across the 21 non-degenerate commodity fits | **0 survivors** after correction |
+| **McCrary density test** | Continuity of the running variable | Not available in the current warehouse (`null`) |
 
 <details>
-<summary><b>Primary estimate details (Onion · Nashik, Maharashtra)</b></summary>
+<summary><b>Primary estimate details (Onion, pooled sample - live)</b></summary>
 
 <br/>
 
 | Metric | Value |
 | :----- | :---- |
-| Effect size | **+₹350 (+24.5%)** |
-| P-value | **0.003** |
-| Standard error | 112.4 |
-| Observations (below / above cutoff) | 847 / 912 |
-| Optimal bandwidth | 8 mm departure |
+| Effect size | **+₹101.41** |
+| P-value | **0.277** |
+| Standard error | 93.32 |
+| Observations (below / above cutoff) | 545 / 426 |
+| Bandwidth | 20 (default) |
 | Cutoff | −19% (IMD deficiency threshold) |
-| McCrary test | PASSED (p = 0.92) |
+| Specification curve | 0 / 30 significant · verdict `fragile` |
 
 Full methodology: [`mandi_rdd/analysis/rdd_engine.py`](mandi_rdd/analysis/rdd_engine.py) · [`robustness.py`](mandi_rdd/analysis/robustness.py) · [`fixed_effects.py`](mandi_rdd/analysis/fixed_effects.py) · narrative in [`docs/system_design.md`](docs/system_design.md).
 
@@ -167,7 +169,7 @@ All five run behind one composite endpoint, [`GET /analytics/{commodity}`](#api-
 ### 🧮 Causal RDD engine
 Local-linear regression discontinuity at the IMD drought threshold, with triangular kernel weighting, McCrary density validation, placebo cutoffs and bandwidth sensitivity.
 
-<sub>Onion: **+₹350 (+24.5%)**, p = 0.003</sub>
+<sub>Onion: **+₹101**, p = 0.28 - not significant (spec curve: 0/30, `fragile`)</sub>
 
 </td>
 <td width="33%" valign="top">
@@ -803,12 +805,12 @@ curl -s $BASE/analytics/Onion | python -m json.tool
 ```json
 {
   "commodity": "Onion",
-  "effect": 350.0,
-  "p_value": 0.003,
-  "std_error": 112.4,
-  "n_left": 847,
-  "n_right": 912,
-  "interpretation": "Prices jump by ₹350 (24.5%) when rainfall departure crosses the −19% deficiency threshold.",
+  "effect": 101.41401124582399,
+  "p_value": 0.27742043057183086,
+  "std_error": 93.31906926634296,
+  "n_left": 545,
+  "n_right": 426,
+  "interpretation": "No statistically significant discontinuity detected (p=0.2774). Estimated effect: ₹101.41 at cutoff. Rainfall deficiency alone may not drive price jumps for this commodity.",
   "error": null
 }
 ```
@@ -838,7 +840,7 @@ curl -s $BASE/analytics/Onion | python -m json.tool
   "query": "Should I lock in onion procurement in Nashik next month?",
   "commodity": "Onion",
   "district": "Nashik",
-  "answer": "Risk is elevated: the RDD effect at the deficiency threshold is +₹350 …",
+  "answer": "No statistically significant rainfall-threshold effect was detected for onion (+₹101, p = 0.28). Risk should be read from the forecast and volatility stack rather than the threshold discontinuity.",
   "model_used": "gemini-2.5-flash",
   "endpoints_used": ["/rdd-result/Onion", "/forecast/Onion", "/risk-score/Onion"],
   "error": null
@@ -1063,7 +1065,7 @@ ruff check mandi_rdd/
 
 **Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
 
-**134 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
+**143 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
 
 **Suite layout** (`mandi_rdd/tests/`):
 
@@ -1077,6 +1079,7 @@ ruff check mandi_rdd/
 | `test_analytics.py` | 14 | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
 | `test_orchestrator.py` | 13 | `/ask` commodity-detection regressions plus tool-fallback behaviour |
 | `test_freshness_contract.py` | 7 | `/health` may not call two-month-old prices fresh; the external freshness gate must fail a run that ingested nothing |
+| `test_consumer_check.py` | 9 | Staleness attribution: upstream publication lag is a warning; a failed ingest or divergent commodity dates is a blocker |
 | `test_analytics_db.py` | 6 | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_dashboard_boot.py` | 5 | Runs the real Streamlit app headlessly and checks every page imports and renders |
 | `test_verification.py` | 4 | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
@@ -1269,7 +1272,7 @@ It checks, in order:
 1. **Pages** - the landing page, the GitHub Pages hero, the Live Data Console, the Streamlit cockpit and the repository are fetched and must return something a browser can render. A private Streamlit app is reported as a warning with the fix; an unreachable page is a blocker.
 2. **API** - 20 routes that consumer surfaces actually call, each with the keys that surface requires. `/spec-curve/Onion` missing its `summary`, or `/data-quality` missing `days_behind`, fails here instead of rendering a blank in front of a visitor.
 3. **Links** - every link found on those pages is followed, so a CTA pointing at a dead page fails in the check rather than in front of a visitor.
-4. **Provenance** - the product's own freshness reporting is cross-examined: a future arrival date, a failed or degraded last run, a self-refresh loop that has never succeeded, or `/health` and `/data-quality` disagreeing about impossible dates are all blockers. The primary and mirror instances disagreeing about row counts is a warning.
+4. **Provenance** - the product's own freshness reporting is cross-examined, and staleness is *attributed* before it is graded: a future arrival date, a failed or degraded last run, a self-refresh loop that has never succeeded, or `/health` and `/data-quality` disagreeing about impossible dates are all blockers. When the newest arrival date is old, the check asks why: if every commodity in `/freshness` stops on the same date and the refresh loop is clean, that is **upstream publication lag** (data.gov.in has not published yet) and it is reported as a warning; if the refresh counters show failures, or commodities stop on *different* dates, rows exist upstream that we failed to ingest and the check fails. The primary and mirror instances disagreeing about row counts is a warning.
 
 Exit status is 0 only when nothing is blocking. It is the same measurement used for the published status rows above, so the README and the product cannot drift apart silently.
 

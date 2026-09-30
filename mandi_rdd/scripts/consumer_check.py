@@ -13,6 +13,16 @@ repository is organised:
   4. the visible copy is scanned for placeholders and for claims that the
      measurement contradicts (an "always-on" badge over an unreachable API).
 
+Staleness is split into two different things, because they need different
+responses:
+
+  * **upstream publication lag** - data.gov.in simply has not published newer
+    arrivals, so every commodity stops on the same date. This is a warning:
+    nothing in the pipeline can close the gap.
+  * **pipeline ingest failure** - our own runs are failing, or commodities
+    stop on *different* dates, so published rows are missing. This is a
+    blocker, and it remains one even while upstream is also quiet.
+
 Exit status is 0 only when no *blocker* was found. Warnings - a private
 Streamlit app, an endpoint that only exists after the next deploy - are
 reported and do not fail the run, because they are states a consumer can still
@@ -235,21 +245,72 @@ def check_api(base: str) -> dict:
                                      "falls back, but the build is behind")
         elif status >= 400:
             entry["problems"].append(f"HTTP {status}")
-        elif required:
+        else:
             try:
                 payload = json.loads(body)
-                entry["payload"] = payload
-                missing = [key for key in required if key not in payload]
-                if missing:
-                    entry["problems"].append(f"missing keys: {missing}")
-            except Exception as exc:
-                entry["problems"].append(f"not JSON: {exc}")
+            except Exception:
+                payload = None
+            entry["payload"] = payload
+            if required:
+                if not isinstance(payload, dict):
+                    entry["problems"].append("not a JSON object")
+                else:
+                    missing = [key for key in required if key not in payload]
+                    if missing:
+                        entry["problems"].append(f"missing keys: {missing}")
         routes.append(entry)
     return {"base": base, "routes": routes}
 
 
-def check_provenance(health: dict, data_quality: dict) -> list[dict]:
-    """Does the product's own freshness reporting agree with itself?"""
+def upstream_lag_signature(freshness, data_max_date) -> dict | None:
+    """Recognise the shape of *upstream* lag: one arrival date for everything.
+
+    When data.gov.in has not published a new day yet, every commodity's newest
+    row is the same date, and that date equals /health's ``data_max_date``.
+    That is a source-publication fact, not a defect in this pipeline. When the
+    dates differ, some commodities are ahead of others - rows exist upstream
+    that we failed to ingest - and the caller treats it as a pipeline problem.
+    """
+    if not isinstance(freshness, list) or not freshness:
+        return None
+    dates = [row.get("latest_date") for row in freshness
+             if isinstance(row, dict) and row.get("latest_date")]
+    if not dates:
+        return None
+    unique = set(dates)
+    if len(unique) != 1:
+        return None
+    (only,) = unique
+    if data_max_date and only != data_max_date:
+        return None
+    return {"n_commodities": len(dates), "latest_date": only}
+
+
+def pipeline_failure_signals(health: dict) -> list[str]:
+    """Evidence that *our* ingest is failing, independent of upstream."""
+    signals = []
+    if health.get("last_outcome") == "failure":
+        signals.append("the last ingest run failed")
+    error = health.get("last_refresh_error")
+    if error:
+        signals.append("last refresh error: " + str(error).replace("\n", " ")[:160])
+    runs = health.get("refresh_runs")
+    if runs is not None:
+        runs, failures = int(runs or 0), int(health.get("refresh_failures") or 0)
+        if runs > 0 and failures >= runs:
+            signals.append(f"every self-refresh attempt has failed ({failures}/{runs})")
+    return signals
+
+
+def check_provenance(health: dict, data_quality: dict, freshness=None) -> list[dict]:
+    """Does the product's own freshness reporting agree with itself?
+
+    Staleness is attributed before it is graded. ``days_behind`` alone cannot
+    say whether the source has published nothing (upstream publication lag,
+    a warning) or whether rows exist upstream that our pipeline missed
+    (an ingest failure, a blocker). The /freshness catalogue and the refresh
+    counters are what separate the two.
+    """
     findings = []
 
     def add(level, message):
@@ -268,7 +329,23 @@ def check_provenance(health: dict, data_quality: dict) -> list[dict]:
             f"newest arrival date {health.get('data_max_date')} is {-behind} days in "
             f"the future - the month/day mis-parse is present")
     elif behind > 4:
-        add("blocker", f"newest arrival date is {behind} days old")
+        failures = pipeline_failure_signals(health)
+        lag = upstream_lag_signature(freshness, health.get("data_max_date"))
+        if failures:
+            add("blocker",
+                f"newest arrival date is {behind} days old and our ingest is itself "
+                f"failing - {failures[0]}. This is a pipeline stall, not upstream "
+                f"lag, and it will not close without a fix")
+        elif lag:
+            add("warning",
+                f"newest arrival date is {behind} days old, but all "
+                f"{lag['n_commodities']} commodities in /freshness stop on the same "
+                f"date ({lag['latest_date']}): upstream publication lag, not a "
+                f"pipeline failure - data.gov.in has not published newer arrivals")
+        else:
+            add("blocker",
+                f"newest arrival date is {behind} days old and commodities do not "
+                f"share one latest date - our ingest is behind upstream")
     else:
         add("ok", f"data is {behind} day(s) behind today")
 
@@ -321,6 +398,7 @@ def run(api_base: str = DEFAULT_API, mirror_base: str = DEFAULT_MIRROR) -> dict:
     primary = check_api(api_base)
     health_entry = next((r for r in primary["routes"] if r["path"] == "/health"), {})
     quality_entry = next((r for r in primary["routes"] if r["path"] == "/data-quality"), {})
+    freshness_entry = next((r for r in primary["routes"] if r["path"] == "/freshness"), {})
 
     _status, mirror_body, _elapsed = _get(mirror_base + "/health", timeout=30)
     mirror_health = {}
@@ -329,7 +407,11 @@ def run(api_base: str = DEFAULT_API, mirror_base: str = DEFAULT_MIRROR) -> dict:
     except Exception:
         pass
 
-    provenance = check_provenance(health_entry.get("payload") or {}, quality_entry.get("payload") or {})
+    provenance = check_provenance(
+        health_entry.get("payload") or {},
+        quality_entry.get("payload") or {},
+        freshness_entry.get("payload"),
+    )
 
     broken_links = [link for link in links if not link["ok"]]
     page_problems = [f"{p['name']}: {'; '.join(p['problems'])}" for p in pages if p["problems"]]

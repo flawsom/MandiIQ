@@ -1,11 +1,11 @@
 # 🌾 MandiIQ - Mandi Price Intelligence System
 
-> **Districts crossing IMD's −19% rainfall-deficiency threshold see a ₹350 (+24.5%) jump in onion modal prices (p=0.003, robust across 4 bandwidths, placebo-tested, cross-checked by fixed-effects regression).** Fully automated: `data.gov.in` → DuckDB → RDD → FastAPI → dashboard, refreshed hourly by the API's own scheduler plus a nightly GitHub Actions run, with zero manual intervention.
+> **On the current warehouse, the onion discontinuity at IMD's −19% rainfall-deficiency threshold is not statistically significant (+₹101, p = 0.28; 0 of 30 specification-curve estimates significant, verdict `fragile`).** Earlier revisions reported ₹350 (p=0.003) from a smaller, pre-repair sample; that figure does not reproduce and has been replaced. Fully automated: `data.gov.in` → DuckDB → RDD → FastAPI → dashboard, refreshed hourly by the API's own scheduler plus a nightly GitHub Actions run, with zero manual intervention.
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 [![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
-[![Tests](https://img.shields.io/badge/tests-134%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-143%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -37,15 +37,16 @@ Live services (auto-checks via shields.io - badges turn green when services resp
 
 ## 🎯 The Finding at a Glance
 
-*The RDD discontinuity plot visualizes binned scatter of onion modal prices by rainfall departure. The **−19% cutoff** (IMD's official "deficient" classification) shows a clear price jump of **₹350 (+24.5%)** with fitted regression lines on each side. Open the [interactive dashboard](#-dashboard-pages) to explore live data, or visit the [Netlify landing page](https://github.com/flawsom/Margin-Intelligence-System/blob/master/landing/mandi-iq/index.html) for the static visualization.*
+*The RDD discontinuity plot visualizes binned scatter of onion modal prices by rainfall departure. At the **−19% cutoff** (IMD's official "deficient" classification) the live estimate is **+₹101 with p = 0.28 - no statistically significant jump** - and the 30-combination specification curve returns 0 significant estimates. The repository reports the current value rather than the earlier ₹350. Open the [interactive dashboard](#-dashboard-pages) to explore live data, or visit the [landing page](https://mandiiq.unifies.codes) for the static visualization.*
 
-| Finding | Detail |
+| Finding | Detail (live) |
 |---|---|
-| **RDD discontinuity (Onion, −19% cutoff)** | **+₹350 / +24.5%** (p=0.003) |
-| Fixed-effects cross-check | +₹298 (p=0.01) - *two methods agree* |
-| Bandwidth sensitivity (10–30%) | **Robust** - effect stable across all bandwidths |
-| Placebo tests (fake cutoffs) | **No effect** - confirms real cutoff isn't artifact |
-| McCrary density test | **No manipulation** - districts not sorting around threshold |
+| **RDD discontinuity (Onion, −19% cutoff)** | **+₹101, p = 0.28 - not significant** |
+| Specification curve (30 combos) | **0 / 30 significant** - median +₹50, verdict `fragile` |
+| BH-FDR across 21 commodity fits | **0 survivors** after multiplicity correction |
+| Bandwidth sensitivity (15–30%) | +₹81 … +₹101, p = 0.42 … 0.27 - null in every window |
+| Placebo tests (fake cutoffs) | 3 of 4 null; one spurious jump at −37% - no clean pass |
+| McCrary density test | Not available in the current warehouse (`null`) |
 | Forecast MAPE (Prophet winner) | **11.2%** - beats LSTM on this data |
 | Classifier ROC-AUC (XGBoost) | **0.81** - predicts price-spike risk before it materializes |
 | Pipeline freshness | **Nightly auto-refresh** - zero manual intervention |
@@ -173,7 +174,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**134 tests passing** (1 skipped = warehouse-dependent check):
+**143 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -187,6 +188,7 @@ pytest mandi_rdd/tests/ -v
 | `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
 | `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
+| `test_consumer_check.py` (9 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
 
@@ -255,7 +257,7 @@ pytest mandi_rdd/tests/ -v
 
 ### Layer 5: Prescriptive (Procurement Risk Advisor)
 - Combines the RDD effect size (how much prices jump at cutoff), the classifier's risk score (how likely a jump is next month), and the Prophet forecast (expected price path) into one recommendation
-- Example output: *"Moderate risk (32%) of a deficiency-driven price jump in Nashik next month. Based on the historical effect size (₹350), consider locking procurement now rather than waiting."*
+- Example output: *"Moderate risk (32%) of a price spike in Nashik next month. The rainfall-threshold discontinuity is not significant on the current warehouse (+₹101, p = 0.28), so this call leans on the forecast and volatility stack rather than the cutoff effect."*
 - Confidence levels: HIGH (all 3 sources agree), MODERATE (2 of 3), LOW (1 or fewer)
 
 ### Layer 6: Automation
@@ -277,11 +279,11 @@ pytest mandi_rdd/tests/ -v
 
 | Metric | Target | Status |
 |---|---|---|
-| Causal finding robust across all 4 checks | Bandwidth stable, placebo flat, density flat, covariate balanced | **✅ All 4 passing** |
+| RDD finding reported honestly | Live: +₹101 (p = 0.28); spec curve 0/30 significant, verdict `fragile`; BH-FDR 0 survivors | **✅ Null reported as null** |
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **134 passing, 1 skipped ✅** |
+| Tests passing | ≥ 25 | **143 passing, 1 skipped ✅** |
 | API endpoints | ≥ 10 | **38 documented endpoints (47 routes) ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |

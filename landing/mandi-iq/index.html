@@ -576,12 +576,14 @@
                     <line x1="50" y1="95" x2="50" y2="100" />
                 </svg>
                 <div class="hero-tagline">MandiIQ - Mandi Price Intelligence System v1.0</div>
-                <h1>Rainfall crosses <span class="hl-loss">−19%</span> →<br>onion prices <span class="hl">jump ₹350</span></h1>
+                <h1>Rainfall crosses <span class="hl-loss">−19%</span> →<br>onion prices <span class="hl">show no jump (p = 0.28)</span></h1>
                 <p class="hero-desc">
                     Automated causal inference + predictive ML + prescriptive recommendations + AI orchestration
                     on Indian mandi prices. Data sourced daily from <code>data.gov.in</code>
                     and IMD rainfall records. RDD cutoff at <strong>−19% rainfall deficiency</strong>
-                    (official IMD classification). Fully automated, nightly, zero manual intervention.
+                    (official IMD classification) returns <strong>+₹101, p = 0.28</strong> on the current
+                    warehouse - no statistically significant discontinuity, and the 30-specification
+                    curve agrees (0/30 significant, verdict <em>fragile</em>). Fully automated, nightly, zero manual intervention.
                     Powered by <strong>OpenRouter</strong> free-tier multi-model AI routing.
                     <a href="#ask">Ask MandiIQ →</a>
                 </p>
@@ -613,7 +615,9 @@
             <p class="section-sub">
                 Average onion modal price (₹/quintal) by rainfall departure from normal.
                 The <strong>−19% threshold</strong> is IMD's official classification for
-                "deficient" rainfall - where prices abruptly jump +₹350 (<em>p</em> = 0.003).
+                "deficient" rainfall - and on the current warehouse the live estimate
+                there is <strong>+₹101 with <em>p</em> = 0.28</strong>: no statistically
+                significant jump, with 0 of 30 specifications significant.
             </p>
             <div class="chart-card">
                 <svg viewBox="0 0 700 280" role="img" aria-label="RDD discontinuity plot">
@@ -645,7 +649,7 @@
                     <line class="rdd-line l-0" x1="85" y1="148" x2="305" y2="142" stroke="#8FAE89" stroke-width="2.5" stroke-linecap="round"/>
                     <line class="rdd-line l-1" x1="305" y1="95" x2="600" y2="52" stroke="#D9663B" stroke-width="2.5" stroke-linecap="round"/>
                     <line x1="290" y1="142" x2="290" y2="95" stroke="#d7ff00" stroke-width="2" stroke-dasharray="3,3"/>
-                    <text x="165" y="112" fill="#d7ff00" font-size="11" font-family="IBM Plex Mono, monospace" font-weight="600">⬆ Jump: ₹350</text>
+                    <text x="165" y="112" fill="#d7ff00" font-size="11" font-family="IBM Plex Mono, monospace" font-weight="600">⚠ No sig. jump: ₹101</text>
                     <text x="275" y="250" fill="#d7ff00" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">Cutoff: −19%</text>
                     <text x="55" y="68" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹2,000</text>
                     <text x="55" y="108" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹1,600</text>
@@ -658,8 +662,8 @@
                     <text x="545" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">+10%</text>
                     <text x="10" y="130" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle" transform="rotate(-90,10,130)">Avg Modal Price (₹/qtl)</text>
                     <text x="350" y="262" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">Rainfall Departure from Normal (%)</text>
-                    <text x="610" y="68" fill="#8FAE89" font-size="9" font-family="IBM Plex Mono, monospace" font-weight="500" text-anchor="end">p = 0.003</text>
-                    <text x="610" y="82" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace" text-anchor="end">robust ✓</text>
+                    <text x="610" y="68" fill="#8FAE89" font-size="9" font-family="IBM Plex Mono, monospace" font-weight="500" text-anchor="end">p = 0.277</text>
+                    <text x="610" y="82" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace" text-anchor="end">not significant</text>
                     <rect x="460" y="8" width="12" height="3" rx="1.5" fill="#8FAE89"/>
                     <text x="478" y="13" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace">Normal rainfall</text>
                     <rect x="565" y="8" width="12" height="3" rx="1.5" fill="#D9663B"/>
@@ -681,12 +685,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td>RDD discontinuity effect (Onion at −19% cutoff)</td><td class="profit">+₹350 (p=0.003)</td></tr>
-                        <tr><td>As percentage of base price</td><td class="warm">+24.5%</td></tr>
-                        <tr><td>Bandwidth sensitivity (15–30%)</td><td class="profit">Robust ✓</td></tr>
-                        <tr><td>Placebo tests (fake cutoffs)</td><td class="profit">No effect ✓</td></tr>
-                        <tr><td>McCrary density test</td><td class="profit">No manipulation ✓</td></tr>
-                        <tr><td>Fixed-effects cross-check</td><td class="profit">Agrees (₹298, p=0.01)</td></tr>
+                        <tr><td>RDD discontinuity effect (Onion at −19% cutoff)</td><td class="warm">+₹101 (p = 0.28) - not significant</td></tr>
+                        <tr><td>Specification curve (30 combos)</td><td class="warm">0 / 30 significant - verdict: fragile</td></tr>
+                        <tr><td>BH-FDR across 21 commodity fits</td><td class="warm">0 survivors after correction</td></tr>
+                        <tr><td>Bandwidth sensitivity (15–30%)</td><td class="muted">+₹81…+₹101, p = 0.42…0.27 - null in every window</td></tr>
+                        <tr><td>Placebo tests (fake cutoffs)</td><td class="muted">3 of 4 null; one spurious jump at −37%</td></tr>
+                        <tr><td>McCrary density test</td><td class="muted">Not available on the current warehouse</td></tr>
                         <tr><td>Forecast MAPE (Prophet winner)</td><td class="profit">11.2%</td></tr>
                         <tr><td>Classifier ROC-AUC</td><td class="profit">0.81</td></tr>
                         <tr><td>Data sources</td><td class="muted">data.gov.in + IMD rainfall</td></tr>
@@ -702,29 +706,30 @@
             <span class="section-label">03 / Validation Suite</span>
             <h2 class="section-title">Statistical Robustness Checks</h2>
             <p class="section-sub">
-                Every RDD estimate is tested against all four checks before it reaches
-                the dashboard. This separates a defensible causal claim from a toy model.
+                Every RDD estimate is tested against the full battery before it reaches
+                the dashboard. These are the live results, including the ones that cut
+                against the finding.
             </p>
             <div class="robustness-grid">
                 <div class="robo-card">
                     <div class="robo-title">Bandwidth Sensitivity</div>
-                    <div class="robo-status profit">✅ Robust (15–30%)</div>
-                    <div class="robo-desc">Effect does not flip sign or lose significance across 4 bandwidths. Re-run at 10%, 15%, 20%, 25% - same conclusion.</div>
+                    <div class="robo-status warm">⚠ Null at 15 / 20 / 25 / 30</div>
+                    <div class="robo-desc">Point estimate stays positive (+₹81 … +₹101) but p ranges 0.42 … 0.27 - not significant in any window.</div>
                 </div>
                 <div class="robo-card">
                     <div class="robo-title">Placebo / Falsification</div>
-                    <div class="robo-status profit">✅ No effect at fake cutoffs</div>
-                    <div class="robo-desc">Identical RDD at −10%, −5%, +5% cutoff produces near-zero, insignificant "effects" - the −19% result isn't an artifact.</div>
+                    <div class="robo-status warm">⚠ 1 of 4 spurious at −37%</div>
+                    <div class="robo-desc">Three fake cutoffs are null, but the −37% placebo returns a significant +₹297 (p = 0.006) - single-cutoff evidence is thin.</div>
                 </div>
                 <div class="robo-card">
-                    <div class="robo-title">McCrary Density Test</div>
-                    <div class="robo-status profit">✅ No manipulation detected</div>
-                    <div class="robo-desc">No discontinuity in the density of the running variable at cutoff - districts aren't sorting around the classification threshold.</div>
+                    <div class="robo-title">Specification Curve</div>
+                    <div class="robo-status warm">⚠ Fragile (0 / 30)</div>
+                    <div class="robo-desc">Across bandwidth × kernel × polynomial combinations, 0 of 30 estimates are significant; median +₹50, sign not stable. Verdict: fragile.</div>
                 </div>
                 <div class="robo-card">
                     <div class="robo-title">Covariate Balance</div>
-                    <div class="robo-status profit">✅ Pre-treatment balance</div>
-                    <div class="robo-desc">Observable pre-treatment characteristics (prior prices, market count) don't jump at the cutoff - valid identification.</div>
+                    <div class="robo-status warm">⚠ Not clean</div>
+                    <div class="robo-desc">log(observations) jumps at the cutoff (p = 0.04), so a clean pre-treatment balance cannot be claimed.</div>
                 </div>
             </div>
         </section>
@@ -749,7 +754,7 @@
                     <div style="border-top:1px solid var(--hairline);padding-top:0.8rem;color:var(--color-text-med);">
                         <span style="color:var(--color-text-low);">// Response (grounded, never fabricated):</span><br>
                         {<br>
-                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"answer"</span>: <span style="color:var(--color-primary);">"MODERATE RISK (32%): Rainfall deficiency-driven price jump of ₹120–180 expected in Nashik next month. Consider locking procurement now."</span>,<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"answer"</span>: <span style="color:var(--color-primary);">"MODERATE RISK (32%): The rainfall-threshold discontinuity is not significant on the current warehouse (+₹101, p = 0.28). Spike risk comes from the forecast and volatility stack; consider staggering procurement."</span>,<br>
                         &nbsp;&nbsp;<span style="color:var(--color-warm);">"model_used"</span>: <span style="color:var(--color-primary);">"google/gemini-2.0-flash-exp:free"</span>,<br>
                         &nbsp;&nbsp;<span style="color:var(--color-warm);">"endpoints_used"</span>: [<span style="color:var(--color-primary);">"get_rdd_result"</span>, <span style="color:var(--color-primary);">"get_forecast"</span>, <span style="color:var(--color-primary);">"get_risk_score"</span>]<br>
                         }<br>

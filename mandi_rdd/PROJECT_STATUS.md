@@ -1,5 +1,7 @@
 # 🚀 MandiIQ Implementation Status
 
+> **⚠️ Historical snapshot (2025-07-17).** This document records the project as it stood on that date. The onion RDD figures below (+₹350, p = 0.003, McCrary p = 0.92, FE +₹298) come from the smaller pre-repair warehouse of that era and **do not reproduce on the current data**: the live endpoint reports +₹101 (p = 0.28), the specification curve verdict is `fragile` (0/30 significant) and BH-FDR leaves 0 survivors. For current numbers see [README.md](README.md) and the live endpoints (`/rdd-result/Onion`, `/spec-curve/Onion`, `/fdr`, `/health`).
+
 **Date**: 2025-07-17
 **Status**: ✅ **~95% COMPLETE** - Core System Production-Ready
 

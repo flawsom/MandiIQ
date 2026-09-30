@@ -836,6 +836,7 @@
         .commodity-dot.tomato { background-color: var(--color-commodity-tomato); }
         .commodity-dot.wheat  { background-color: var(--color-commodity-wheat); }
         .commodity-dot.potato { background-color: var(--color-commodity-potato); }
+        .commodity-dot.grapes { background-color: #7C9A5A; }
 
         .stat-badge {
             font-family: var(--font-mono);
@@ -1290,17 +1291,17 @@
                 <div class="kpi-grid">
                     <div class="glass-card">
                         <div class="label">Database Coverage</div>
-                        <div class="value accent">26,994</div>
-                        <div class="meta">Live transaction records</div>
+                        <div class="value accent">1,605,944</div>
+                        <div class="meta">Live price records</div>
                     </div>
                     <div class="glass-card">
                         <div class="label">Commodity Scope</div>
-                        <div class="value">268</div>
+                        <div class="value">436</div>
                         <div class="meta">Unique agricultural commodities</div>
                     </div>
                     <div class="glass-card">
                         <div class="label">Temporal Window</div>
-                        <div class="value">2018–25</div>
+                        <div class="value">1994–2026</div>
                         <div class="meta">Joined IMD weather reports</div>
                     </div>
                     <div class="glass-card">
@@ -1327,20 +1328,20 @@
                             Does the IMD declaring a region as "rain-deficient" drive agricultural market behavior, or is price movement merely a continuous function of physical precipitation?
                         </p>
                         <p>
-                            We test this by placing rain departure on the horizontal axis and modeling the discontinuity at the official <strong>-20% deficit cutoff</strong>. If the policy declaration drives market sentiment, we should observe a sharp discontinuous jump (discontinuity) in prices at the boundary, holding all physical parameters constant.
+                            We test this by placing rain departure on the horizontal axis and modeling the discontinuity at the official <strong>−19% deficit cutoff</strong>. If the policy declaration drives market sentiment, we should observe a sharp discontinuous jump (discontinuity) in prices at the boundary, holding all physical parameters constant.
                         </p>
                         <h3>Causal RDD Specification</h3>
                         <p>
-                            We estimate local linear regressions on both sides of the -20% threshold:
+                            We estimate local linear regressions on both sides of the −19% threshold:
                         </p>
                         <code style="display: block; padding: 1rem; margin-bottom: 1.5rem; text-align: center; font-size: 0.95rem;">
                             Y<sub>it</sub> = α + β D<sub>it</sub> + γ<sub>1</sub> (X<sub>it</sub> - c) + γ<sub>2</sub> D<sub>it</sub>(X<sub>it</sub> - c) + ε<sub>it</sub>
                         </code>
                         <p>
-                            Where <code>Y<sub>it</sub></code> is the log market price, <code>X<sub>it</sub></code> is the actual rainfall departure percentage, <code>c = -20%</code> is the threshold, and <code>D<sub>it</sub></code> is the indicator binary equal to 1 if rainfall departure is below -20% (deficit territory).
+                            Where <code>Y<sub>it</sub></code> is the log market price, <code>X<sub>it</sub></code> is the actual rainfall departure percentage, <code>c = −19%</code> is the threshold, and <code>D<sub>it</sub></code> is the indicator binary equal to 1 if rainfall departure is below −19% (deficit territory).
                         </p>
                         <p>
-                            Our findings suggest that while physical rainfall levels strongly affect yields and continuous pricing, the administrative -20% declaration itself produces statistically insignificant jumps in most crops, with the notable exception of <strong>Onions</strong> which show active hoarding signals.
+                            Our findings suggest that while physical rainfall levels strongly affect yields and continuous pricing, the administrative −19% declaration itself produces statistically insignificant jumps in every crop we can fit. Onion, the traditional headline candidate, returns <strong>+₹101 (p = 0.28)</strong>; a 30-combination specification curve finds <strong>0 of 30 significant</strong>; and Benjamini–Hochberg correction across 21 commodity fits leaves <strong>zero survivors</strong>. The threshold story is a null result on this warehouse, and the repository reports it as one.
                         </p>
                     </div>
 
@@ -1364,8 +1365,8 @@
                                                     <span>Onion</span>
                                                 </div>
                                             </td>
-                                            <td style="color: var(--color-primary); font-family: var(--font-mono);">+0.142</td>
-                                            <td><span class="stat-badge significant">p < 0.05</span></td>
+                                            <td style="font-family: var(--font-mono);">+₹101.41</td>
+                                            <td><span class="stat-badge insignificant">p = 0.277</span></td>
                                         </tr>
                                         <tr>
                                             <td>
@@ -1374,18 +1375,18 @@
                                                     <span>Tomato</span>
                                                 </div>
                                             </td>
-                                            <td style="font-family: var(--font-mono);">-0.024</td>
-                                            <td><span class="stat-badge insignificant">p = 0.74</span></td>
+                                            <td style="font-family: var(--font-mono);">+₹39.62</td>
+                                            <td><span class="stat-badge insignificant">p = 0.170</span></td>
                                         </tr>
                                         <tr>
                                             <td>
                                                 <div class="commodity-chip">
-                                                    <span class="commodity-dot wheat"></span>
-                                                    <span>Wheat</span>
+                                                    <span class="commodity-dot grapes"></span>
+                                                    <span>Grapes</span>
                                                 </div>
                                             </td>
-                                            <td style="font-family: var(--font-mono);">+0.009</td>
-                                            <td><span class="stat-badge insignificant">p = 0.89</span></td>
+                                            <td style="font-family: var(--font-mono);">+₹126.04</td>
+                                            <td><span class="stat-badge insignificant">p = 0.162</span></td>
                                         </tr>
                                         <tr>
                                             <td>
@@ -1394,8 +1395,8 @@
                                                     <span>Potato</span>
                                                 </div>
                                             </td>
-                                            <td style="font-family: var(--font-mono);">+0.053</td>
-                                            <td><span class="stat-badge insignificant">p = 0.31</span></td>
+                                            <td style="font-family: var(--font-mono);">+₹12.18</td>
+                                            <td><span class="stat-badge insignificant">p = 0.353</span></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1405,7 +1406,7 @@
                         <div class="doc-widget">
                             <div class="doc-widget-title">McCrary Density Check</div>
                             <p style="font-size: 0.8rem; color: var(--color-text-med); margin: 0;">
-                                We run a McCrary Density Test to examine manipulation of the running variable. The test verifies that rainfall measurements are not artificially sorted or modified around the -20% cutoff boundary, ensuring the validity of our causal estimates.
+                                We run a McCrary Density Test to examine manipulation of the running variable. The test verifies that rainfall measurements are not artificially sorted or modified around the −19% cutoff boundary. On the current warehouse the density statistic returns <code>null</code>, so this page does not claim a pass.
                             </p>
                         </div>
                     </div>
