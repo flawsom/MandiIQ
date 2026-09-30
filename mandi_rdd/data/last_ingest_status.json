@@ -1,10 +1,10 @@
 {
-  "last_run_utc": "2026-09-30T16:06:48.461164Z",
-  "outcome": "success",
-  "status": "ok",
+  "last_run_utc": "2026-09-30T16:44:22.504443Z",
+  "outcome": "degraded",
+  "status": "degraded",
   "new_price_rows": 0,
-  "duration_s": 36.6,
-  "error": null,
+  "duration_s": 224.7,
+  "error": "price source unavailable: <urlopen error timed out>",
   "data_max_date": null,
   "days_behind": null,
   "n_future_dates": 0
