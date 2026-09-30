@@ -1,8 +1,8 @@
 """
-MandiIQ — Causal Explorer page.
+MandiIQ - Causal Explorer page.
 
 RDD discontinuity plot, bandwidth sensitivity, placebo tests,
-density check, fixed-effects cross-check — the full causal story.
+density check, fixed-effects cross-check - the full causal story.
 
 Design: crosshair-panel glass cards, section labels,
 glass KPI strip, interpretation boxes, consistent monochrome-lime palette.
@@ -55,7 +55,7 @@ def render(**kwargs):
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
               Discontinuity plot, bandwidth sensitivity, placebo tests, density check,
-              and fixed-effects cross-check — the full causal story for every commodity.
+              and fixed-effects cross-check - the full causal story for every commodity.
             </p>
           </div>
         </div>

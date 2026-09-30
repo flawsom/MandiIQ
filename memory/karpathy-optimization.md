@@ -1,12 +1,12 @@
-# Karpathy/CLAUDE.md Optimization — MandiIQ Codebase
+# Karpathy/CLAUDE.md Optimization - MandiIQ Codebase
 
 ## Summary
-Applied the Karpathy editorial skill patterns (from CLAUDE.md) to the MandiIQ Python/Streamlit codebase — 3 surgical simplifications that remove redundant imports with zero behavioral change.
+Applied the Karpathy editorial skill patterns (from CLAUDE.md) to the MandiIQ Python/Streamlit codebase - 3 surgical simplifications that remove redundant imports with zero behavioral change.
 
 ## Principles Applied
-- **Simplicity First** — Removed duplicate/redundant import statements. Every line not written is a line that can't break.
-- **Surgical Changes** — Each change touched exactly one construct per file. No scope creep.
-- **Goal-Driven Execution** — Each file verified with `py_compile` and `importlib` after change. All pass.
+- **Simplicity First** - Removed duplicate/redundant import statements. Every line not written is a line that can't break.
+- **Surgical Changes** - Each change touched exactly one construct per file. No scope creep.
+- **Goal-Driven Execution** - Each file verified with `py_compile` and `importlib` after change. All pass.
 
 ## Changes Made (2026-07-20)
 
@@ -21,15 +21,15 @@ Applied the Karpathy editorial skill patterns (from CLAUDE.md) to the MandiIQ Py
 - **Net**: -1 line of code
 
 ### 3. `mandi_rdd/dashboard/pages/executive_overview.py`
-- **Before**: `get_api_base` imported on a separate line (line 27) from `inject_theme, commodity_color` (line 17) — same module
+- **Before**: `get_api_base` imported on a separate line (line 27) from `inject_theme, commodity_color` (line 17) - same module
 - **After**: Merged into single import: `from mandi_rdd.dashboard.theme import inject_theme, commodity_color, get_api_base`
 - **Net**: -1 line of code
 
 ## Verification
 - All 3 files pass `python -m py_compile` (syntax validation)
 - All 3 modules load via `importlib.util.spec_from_file_location`
-- No behavioral changes — same functions, same imports, same execution path
+- No behavioral changes - same functions, same imports, same execution path
 - Temp scripts (`_opt_*.py`) cleaned up
 
 ## CLAUDE.md Source
-Downloaded from `https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md` — Karpathy-style editorial principles.
+Downloaded from `https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md` - Karpathy-style editorial principles.

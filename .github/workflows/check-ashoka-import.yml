@@ -8,7 +8,7 @@ on:
   push:
     branches: [master]
   schedule:
-    # Every 3 hours — check if Ashoka import completed
+    # Every 3 hours - check if Ashoka import completed
     - cron: "0 */3 * * *"
   workflow_dispatch: {}   # manual trigger
 
@@ -50,18 +50,13 @@ jobs:
           # Check if we already opened an issue for this completion
           EXISTING=$(gh issue list --label "ashoka-import" --state all --json number --jq 'length' 2>/dev/null || echo 0)
           if [ "$EXISTING" -eq 0 ]; then
+            BODY=$(printf "The autonomous Ashoka CEDA historical price import has finished.\n\n- Cells processed: %s\n- Rows written: %s\n- Progress: %s\n\nThe imported data has been backfilled into DuckDB and is available for RDD analysis, forecasts, and classifier runs. Run the 'Nightly Ingestion' workflow to process it into the dashboard." "${{ steps.status.outputs.cells_done }}" "${{ steps.status.outputs.rows }}" "${{ steps.status.outputs.progress }}")
             gh issue create \
               --title "Ashoka CEDA historical import completed" \
               --label "ashoka-import" \
-              --body "The autonomous Ashoka CEDA historical price import has finished.
-
-- Cells processed: ${{ steps.status.outputs.cells_done }}
-- Rows written: ${{ steps.status.outputs.rows }}
-- Progress: ${{ steps.status.outputs.progress }}
-
-The imported data has been backfilled into DuckDB and is available for RDD analysis, forecasts, and classifier runs. Run the 'Nightly Ingestion' workflow to process it into the dashboard."
+              --body "$BODY"
           else
-            echo "Issue already exists — skipping duplicate."
+            echo "Issue already exists - skipping duplicate."
           fi
 
       - name: Warn if import errored
@@ -72,4 +67,4 @@ The imported data has been backfilled into DuckDB and is available for RDD analy
           gh issue create \
             --title "Ashoka import encountered an error" \
             --label "ashoka-import" \
-            --body "The Ashoka CEDA import failed with error state. Check the server logs at Render dashboard.\n\nStatus: ${{ steps.status.outputs.progress }}"
+            --body "The Ashoka CEDA import failed with error state. Check the server logs at Render dashboard. Status: ${{ steps.status.outputs.progress }}"

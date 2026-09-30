@@ -1,8 +1,8 @@
 """
-MandiIQ — Satellite View (NDVI) page.
+MandiIQ - Satellite View (NDVI) page.
 
 District map colored by NDVI anomaly.
-Side-by-side NDVI trend vs. rainfall trend — the cross-check from the system PRD.
+Side-by-side NDVI trend vs. rainfall trend - the cross-check from the system PRD.
 
 Design: glass cards, interpretation boxes, glass KPI strip,
 section labels, consistent monochrome-lime palette.
@@ -49,11 +49,11 @@ def render():
               Satellite Imagery
             </div>
             <h1 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:300;font-size:clamp(1.6rem,3vw,2.4rem);color:#ffffff;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:0.5rem;">
-              Satellite View — <span style="font-weight:600;color:#d7ff00;">NDVI Analysis</span>
+              Satellite View - <span style="font-weight:600;color:#d7ff00;">NDVI Analysis</span>
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
                 Vegetation health from Sentinel-2 satellite imagery. NDVI (Normalized Difference
-                Vegetation Index) measures crop vigor — lower values indicate stress, potentially
+                Vegetation Index) measures crop vigor - lower values indicate stress, potentially
                 from drought or disease. Cross-check against rainfall to distinguish causes.
             </p>
           </div>
@@ -85,7 +85,7 @@ def render():
         st.markdown("""
             <div class="glass" style="padding:1.5rem;text-align:center;border-color:#D9663B;">
                 <p style="color:#bababa;margin:0;font-size:0.9rem;">
-                    ⚠ Data source unavailable — unable to load district list.
+                    ⚠ Data source unavailable - unable to load district list.
                     Check the pipeline status on the Settings page.
                 </p>
             </div>
@@ -171,15 +171,15 @@ def render():
     col1, col2, col3 = st.columns(3)
     with col1:
         latest_ndvi = ndvi_df.iloc[-1]["ndvi"] if len(ndvi_df) > 0 else None
-        st.metric("Current NDVI", f"{latest_ndvi:.2f}" if latest_ndvi else "—")
+        st.metric("Current NDVI", f"{latest_ndvi:.2f}" if latest_ndvi else "-")
     with col2:
         latest_anomaly = ndvi_df.iloc[-1]["anomaly"] if len(ndvi_df) > 0 else None
         anomaly_color = "inverse" if latest_anomaly and latest_anomaly < 0 else "normal"
-        st.metric("NDVI Anomaly", f"{latest_anomaly:+.2f}" if latest_anomaly else "—",
+        st.metric("NDVI Anomaly", f"{latest_anomaly:+.2f}" if latest_anomaly else "-",
                   delta_color=anomaly_color)
     with col3:
         avg_ndvi = ndvi_df["ndvi"].mean()
-        st.metric("Avg NDVI (Historical)", f"{avg_ndvi:.2f}" if avg_ndvi else "—")
+        st.metric("Avg NDVI (Historical)", f"{avg_ndvi:.2f}" if avg_ndvi else "-")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ── NDVI Trend Chart ──

@@ -1,5 +1,5 @@
 """
-MandiRDD — daily ingestion scheduler.
+MandiRDD - daily ingestion scheduler.
 
 Runs once daily (matching the API's own update cadence):
 1. Pulls fresh mandi prices from data.gov.in
@@ -383,7 +383,7 @@ def run_ingestion(
             try:
                 from mandi_rdd.ai.orchestrator import generate_nightly_narrative
             except ImportError:
-                logger.warning("AI orchestrator not available — install openai and pyyaml")
+                logger.warning("AI orchestrator not available - install openai and pyyaml")
                 generate_nightly_narrative = None
 
             for commodity in target_commodities:
@@ -409,7 +409,7 @@ def run_ingestion(
                 except Exception as e:
                     logger.warning(f"  Narrative failed for {commodity}: {e}")
         else:
-            logger.info("No LLM provider key set (GEMINI_API_KEY or OPENROUTER_API_KEY) — skipping nightly narratives")
+            logger.info("No LLM provider key set (GEMINI_API_KEY or OPENROUTER_API_KEY) - skipping nightly narratives")
 
     summary["steps"]["narratives"] = {"generated": len(narrative_results), "commodities": narrative_results}
     summary["duration_seconds"] = round(time.time() - start, 1)

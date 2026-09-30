@@ -1,8 +1,8 @@
-"""SEO utilities for MandiIQ — implements the claude-seo methodology.
+"""SEO utilities for MandiIQ - implements the claude-seo methodology.
 
 Design rules (Karpathy minimalism + defensive coding):
   * Pure, dependency-free, no network calls at import or render time.
-  * Every public function is wrapped so it can NEVER raise — SEO must
+  * Every public function is wrapped so it can NEVER raise - SEO must
     never be able to break page rendering.
   * No changes to existing page render() logic are required; the app
     injects these tags centrally via `inject_page_seo(url_path)`.
@@ -338,19 +338,19 @@ def proxy_landing_html() -> str:
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MandiIQ — Indian Mandi Price Intelligence System</title>
+<title>MandiIQ - Indian Mandi Price Intelligence System</title>
 <meta name="description" content="{desc}" />
 <meta name="robots" content="index,follow" />
 <link rel="canonical" href="{APP_URL}/" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="{SITE_NAME}" />
-<meta property="og:title" content="MandiIQ — Indian Mandi Price Intelligence System" />
+<meta property="og:title" content="MandiIQ - Indian Mandi Price Intelligence System" />
 <meta property="og:description" content="{desc}" />
 <meta property="og:url" content="{APP_URL}/" />
 <meta property="og:image" content="{PROXY_OG_IMAGE}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@MandiIQ" />
-<meta name="twitter:title" content="MandiIQ — Indian Mandi Price Intelligence System" />
+<meta name="twitter:title" content="MandiIQ - Indian Mandi Price Intelligence System" />
 <meta name="twitter:description" content="{desc}" />
 <meta name="twitter:image" content="{PROXY_OG_IMAGE}" />
 <script type="application/ld+json">{ld}</script>

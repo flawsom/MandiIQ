@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>MandiIQ &mdash; Heartbeat &amp; Dashboard Monitor</title>
+<title>MandiIQ - Heartbeat &amp; Dashboard Monitor</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -75,10 +75,10 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 </div>
 <div class="error-banner" id="errorBanner"><span id="errorMessage">Failed to fetch data.</span><button class="retry" onclick="refreshAll()">Retry</button></div>
 <div class="summary-bar" id="summaryBar">
-<div class="summary-card"><div class="label">Dashboard Cache</div><div class="value" id="cacheStatus">&mdash;</div><div class="sub" id="cacheSub">loading...</div></div>
-<div class="summary-card"><div class="label">md5 Hash</div><div class="value" id="hashDisplay" style="font-size:.9rem;font-family:var(--font-mono);word-break:break-all;">&mdash;</div><div class="sub" id="hashSub">loading...</div></div>
-<div class="summary-card"><div class="label">Last Refresh</div><div class="value" id="lastRefresh">&mdash;</div><div class="sub" id="refreshSub">loading...</div></div>
-<div class="summary-card"><div class="label">File Age</div><div class="value" id="fileAge">&mdash;</div><div class="sub" id="ageSub">loading...</div></div>
+<div class="summary-card"><div class="label">Dashboard Cache</div><div class="value" id="cacheStatus">-</div><div class="sub" id="cacheSub">loading...</div></div>
+<div class="summary-card"><div class="label">md5 Hash</div><div class="value" id="hashDisplay" style="font-size:.9rem;font-family:var(--font-mono);word-break:break-all;">-</div><div class="sub" id="hashSub">loading...</div></div>
+<div class="summary-card"><div class="label">Last Refresh</div><div class="value" id="lastRefresh">-</div><div class="sub" id="refreshSub">loading...</div></div>
+<div class="summary-card"><div class="label">File Age</div><div class="value" id="fileAge">-</div><div class="sub" id="ageSub">loading...</div></div>
 </div>
 <div class="section"><div class="section-title"><span>&#128202; md5 Hash Stability</span><span class="count" id="hashCount"></span></div>
 <div class="hash-timeline" id="hashTimeline"><div class="empty">&#9203; Waiting for data...</div></div></div>
@@ -92,10 +92,10 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <div style="background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);font-size:.85rem;color:var(--color-text-med);line-height:1.8;">
 <p>This page fetches live data from the MandiIQ API and GitHub Actions API every 30 seconds.</p>
 <ul style="margin-top:var(--space-sm);padding-left:var(--space-lg);">
-<li><strong>Dashboard Cache</strong> &mdash; Status of the in-memory Grafana dashboard JSON cache (fresh / stale / error).</li>
-<li><strong>md5 Hash</strong> &mdash; Hash of the loaded dashboard JSON. Changes when the file on disk is updated.</li>
-<li><strong>Last Refresh</strong> &mdash; When the cache was last cleared and reloaded via webhook or admin endpoint.</li>
-<li><strong>File Age</strong> &mdash; How long since the dashboard JSON file was last modified on disk.</li>
+<li><strong>Dashboard Cache</strong> - Status of the in-memory Grafana dashboard JSON cache (fresh / stale / error).</li>
+<li><strong>md5 Hash</strong> - Hash of the loaded dashboard JSON. Changes when the file on disk is updated.</li>
+<li><strong>Last Refresh</strong> - When the cache was last cleared and reloaded via webhook or admin endpoint.</li>
+<li><strong>File Age</strong> - How long since the dashboard JSON file was last modified on disk.</li>
 </ul>
 <p style="margin-top:var(--space-sm);"><strong>Data sources:</strong> <code style="color:var(--color-text-high);">GET /admin/dashboard-status</code> and <code>GET /repos/flawsom/MandiIQ/actions/workflows/dashboard-heartbeat.yml/runs</code>.</p>
 <p style="margin-top:var(--space-sm);">&#8902; A green dot means the last heartbeat checked in within 70 minutes.<br>&#8902; The hash timeline shows stability: repeated identical hashes = no changes; a new hash = dashboard was updated.</p>

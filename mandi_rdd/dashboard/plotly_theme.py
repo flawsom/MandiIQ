@@ -1,5 +1,5 @@
 """
-MandiIQ — Shared Plotly theming helper (PRD §6).
+MandiIQ - Shared Plotly theming helper (PRD §6).
 
 All 5 pages that render Plotly charts should call make_themed_figure()
 instead of hand-declaring layout properties inline. This is the single
@@ -10,7 +10,7 @@ grid colors, and margin defaults.
 import plotly.graph_objects as go
 
 # Palette shorthand (duplicated from theme.py to avoid circular imports
-# if theme.py ever grows heavy — these are tiny constants).
+# if theme.py ever grows heavy - these are tiny constants).
 INK   = "#000000"
 PAPER = "#ffffff"
 MUTED = "#bababa"

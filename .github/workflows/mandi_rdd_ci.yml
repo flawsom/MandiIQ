@@ -9,7 +9,7 @@ on:
     paths:
       - 'mandi_rdd/**'
   workflow_dispatch:
-  # schedule removed — Northflank handles hourly ingestion internally
+  # schedule removed - Northflank handles hourly ingestion internally
 
 jobs:
   test:
@@ -110,7 +110,7 @@ jobs:
           print("Wrote status:", status)
           PY
 
-      - name: Upload DuckDB to external store (if configured) — Phase 6 (A)
+      - name: Upload DuckDB to external store (if configured) - Phase 6 (A)
         if: always()
         env:
           PYTHONPATH: .
@@ -124,7 +124,7 @@ jobs:
             rclone config create r2 s3 provider Cloudflare access_key_id "$R2_ACCESS_KEY_ID" secret_access_key "$R2_SECRET_ACCESS_KEY" endpoint "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" || true
             rclone copyto mandi_rdd/data/mandi_iq.duckdb r2:$R2_BUCKET/mandi_iq.duckdb && echo "DB uploaded to R2" || echo "R2 upload failed; falling back to git commit"
           else
-            echo "R2_BUCKET not set — falling back to committing DB to git (see README Phase 6)."
+            echo "R2_BUCKET not set - falling back to committing DB to git (see README Phase 6)."
           fi
 
       - name: Commit & push updated DuckDB / status (if changed)
@@ -142,7 +142,7 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master
           fi
 
-      - name: Alert on failure (open/update GitHub Issue) — Phase 3
+      - name: Alert on failure (open/update GitHub Issue) - Phase 3
         if: failure() || steps.ingest.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +151,7 @@ jobs:
           BODY="Nightly ingestion failed at $(date -u). Check the Actions run for details."
           EXISTING=$(gh issue list --repo "${{ github.repository }}" --search "$TITLE" --state open --json number --jq '.[0].number' || echo "")
           if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "Another failure at $(date -u). Consecutive failures detected — escalate." || true
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "Another failure at $(date -u). Consecutive failures detected - escalate." || true
           else
             gh issue create --repo "${{ github.repository }}" --title "$TITLE" --body "$BODY" --label "ingestion" || true
           fi

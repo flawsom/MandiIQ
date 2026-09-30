@@ -1,10 +1,10 @@
 """
-MandiRDD — Forecasting Layer.
+MandiRDD - Forecasting Layer.
 
 Reuses Superstore's Prophet + LSTM comparison pattern, repointed at
 modal_price time series per commodity/market.
 
-Implementation is lightweight — just Prophet for the MVP, matching the
+Implementation is lightweight - just Prophet for the MVP, matching the
 Superstore finding that classical models outperform deep learning on
 smaller datasets.
 """
@@ -253,7 +253,7 @@ def compare_forecast_models(
     """
     Run both Prophet and LSTM on the same data and return an honest comparison.
     
-    Reports both MAPEs, picks the winner, and explains why — the same
+    Reports both MAPEs, picks the winner, and explains why - the same
     honest-comparison discipline Superstore pioneered.
     
     Args:

@@ -1,4 +1,4 @@
-# MandiIQ — Makefile
+# MandiIQ - Makefile
 # Quick commands for local development, testing, and deployment.
 
 .PHONY: help install test test-watch coverage lint dev-api dev-dash docker-build docker-up docker-down docker-logs clean

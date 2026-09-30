@@ -6,7 +6,7 @@
 # does it POST to /webhook/grafana-dashboard-update.
 #
 # This avoids unnecessary cache clears (and Render deploys) when a commit
-# touches the file but its content hasn't actually changed — e.g. a merge
+# touches the file but its content hasn't actually changed - e.g. a merge
 # conflict resolution, a revert, or a workflow_dispatch with no real diff.
 #
 # SETUP (optional):
@@ -86,12 +86,12 @@ jobs:
           echo "remote_hash=${REMOTE}" >> "$GITHUB_OUTPUT"
 
           if [ "$REMOTE" = "UNKNOWN" ]; then
-            # API call failed — still refresh to be safe
+            # API call failed - still refresh to be safe
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "API unreachable — forcing refresh to be safe."
+            echo "API unreachable - forcing refresh to be safe."
           elif [ "$LOCAL" = "$REMOTE" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Hashes match — dashboard unchanged. Skipping webhook call."
+            echo "Hashes match - dashboard unchanged. Skipping webhook call."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Hash MISMATCH: local=${LOCAL} remote=${REMOTE}. Refreshing."
@@ -120,7 +120,7 @@ jobs:
             echo "Dashboard cache refresh succeeded."
             cat /tmp/webhook_response.txt
           else
-            echo "::warning::Webhook returned HTTP $HTTP_CODE — the API may be down or unreachable."
+            echo "::warning::Webhook returned HTTP $HTTP_CODE - the API may be down or unreachable."
             cat /tmp/webhook_response.txt
           fi
 

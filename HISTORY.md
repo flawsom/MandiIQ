@@ -1,7 +1,7 @@
 # Historical Price Data (Backfill)
 
 The live `data.gov.in` mandi-prices API (`9ef84268-...`) is a **daily snapshot
-feed** — it only ever returns the *current day's* records. That means the
+feed** - it only ever returns the *current day's* records. That means the
 nightly GitHub Action can append one day at a time but can **never create
 months/years of history on its own**.
 
@@ -13,7 +13,7 @@ Two KPIs on the Executive Overview need real history to compute:
 | **Forecast MAPE** | Prophet needs >= 20 daily points for a train/test split (ideally months). |
 
 `Avg Price` and `Districts` work from even a single day, so they populate
-immediately. The other two stay `—` until history exists.
+immediately. The other two stay `-` until history exists.
 
 ## How to backfill (one-time, then automatic)
 
@@ -49,7 +49,7 @@ immediately. The other two stay `—` until history exists.
    mandi_rdd/data/historical/<any-name>.csv
    ```
    (the folder is tracked via `.gitkeep`; do NOT commit the CSV itself
-   unless you intend to — see step 3).
+   unless you intend to - see step 3).
 
 3. **Push it** so the online pipeline ingests it:
    ```bash

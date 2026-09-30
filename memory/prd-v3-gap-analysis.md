@@ -4,7 +4,7 @@ description: Complete gap analysis of MandiIQ codebase against PRD-1 v3 specific
 type: reference
 ---
 
-# MandiIQ PRD v3 — Gap Analysis
+# MandiIQ PRD v3 - Gap Analysis
 
 ## Architecture Status
 - Current: 5-tab layout via `st.tabs()` in `app.py`
@@ -17,7 +17,7 @@ type: reference
 | Sitemap Routes | 0 | 14 | 0 (files exist, none routed via st.navigation) |
 | Global Shell (Part B) | 0 | 0 | 4 (sidebar, topbar, footer, breadcrumb ALL missing) |
 | Component Lib (Part C) | 0 | 0 | 10 (all categories need implementation) |
-| Page Content (Part D) | 8 | 4 | 2 (pages largely complete — risk_map, satellite, etc. well-implemented) |
+| Page Content (Part D) | 8 | 4 | 2 (pages largely complete - risk_map, satellite, etc. well-implemented) |
 | Motion (Part E) | 1 | 1 | 8 (atmosphere blobs done) |
 | Responsive Grid (Part F) | 0 | 0 | 1 |
 | Build Directives (Part G) | 1 | 2 | 5 (RDD robustness done) |

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MandiRDD — Phase 1 Static Proof (go/no-go gate).
+MandiRDD - Phase 1 Static Proof (go/no-go gate).
 
 Pulls a sample of data from data.gov.in for one commodity, runs the RDD,
 and prints the result. This is the validation gate BEFORE building any
@@ -61,7 +61,7 @@ def run_static_proof(
     This is the Phase 1 go/no-go gate. Returns a summary dict.
     """
     print("=" * 60)
-    print(f"🌾 MandiRDD — Phase 1 Static Proof")
+    print(f"🌾 MandiRDD - Phase 1 Static Proof")
     print(f"   Commodity: {commodity}")
     print(f"   State:     {state or 'All India'}")
     print(f"   Cutoff:    {cutoff}% (IMD deficient rainfall)")
@@ -129,7 +129,7 @@ def run_static_proof(
     conn.close()
 
     if len(merged) < 20:
-        print(f"\n❌ Only {len(merged)} matched observations — insufficient for RDD")
+        print(f"\n❌ Only {len(merged)} matched observations - insufficient for RDD")
         return {"status": "fail", "reason": f"Insufficient data: {len(merged)} obs"}
 
     x = merged["departure_pct"].values
@@ -161,7 +161,7 @@ def run_static_proof(
     if p_value is not None:
         if p_value < 0.05:
             print(f"\n   ✅ STATISTICALLY SIGNIFICANT (p={p_value:.4f})")
-            print(f"   ⬆  GO decision — proceed to Phase 2 (automation)")
+            print(f"   ⬆  GO decision - proceed to Phase 2 (automation)")
         elif p_value < 0.1:
             print(f"\n   ⚠️  MARGINALLY SIGNIFICANT (p={p_value:.4f})")
             print(f"   → Proceed with caution. Consider expanding to more commodities.")

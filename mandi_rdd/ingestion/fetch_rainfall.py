@@ -1,7 +1,7 @@
 """
-MandiRDD — rainfall departure data fetcher.
+MandiRDD - rainfall departure data fetcher.
 
-Primary source: Open-Meteo (free, no API key) — fetches daily precipitation
+Primary source: Open-Meteo (free, no API key) - fetches daily precipitation
 for representative districts, aggregates to monthly sub-division totals,
 computes departure from normal using rolling climatology.
 
@@ -52,7 +52,7 @@ RAINFALL_CANDIDATE_IDS = [
     "a4b2e5f6-c7d8-9012-3456-7890abcdef12",
 ]
 
-# Deprecated — Datameet rainfall repo has been restructured.
+# Deprecated - Datameet rainfall repo has been restructured.
 FALLBACK_CSV_URL = "https://raw.githubusercontent.com/datameet/rainfall/master/data/rainfall_monthly_subdivisions.csv"
 
 # ── API key helpers ────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ def fetch_rainfall_from_open_meteo() -> list[dict]:
     dmap = load_district_subdivision_map()
     coords = _load_district_coords()
     if not coords or not dmap:
-        logger.warning("Missing district mapping or coordinates — cannot use Open-Meteo")
+        logger.warning("Missing district mapping or coordinates - cannot use Open-Meteo")
         return []
 
     # Build state|district keys (same format as coords dict)
@@ -300,7 +300,7 @@ def fetch_rainfall_from_github() -> list[dict]:
     """Fetch rainfall data from Datameet's maintained CSV on GitHub.
 
     NOTE: This dataset URL is stale (404). Kept for backward compatibility
-    — Open-Meteo is the primary source now.
+    - Open-Meteo is the primary source now.
     """
     logger.info("Fetching rainfall data from Datameet GitHub...")
 
@@ -712,7 +712,7 @@ def fetch_and_store_all_rainfall() -> list[dict]:
     Never raises: if every source fails, returns [] so the nightly ingestion can
     still commit prices + precomputed RDD results.
     """
-    # Step 0: Primary source — Open-Meteo (free, no API key, always works)
+    # Step 0: Primary source - Open-Meteo (free, no API key, always works)
     try:
         records = fetch_rainfall_from_open_meteo()
         if records:

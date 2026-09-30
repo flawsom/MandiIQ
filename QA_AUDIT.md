@@ -1,4 +1,4 @@
-# MandiIQ — QA Audit Report
+# MandiIQ - QA Audit Report
 
 **Date:** 2026-07-20 17:00 UTC
 **Scope:** App (10 routes) + Documentation site + README + .env.example
@@ -14,18 +14,18 @@
 | 1 | **Settings "Not configured"** | `settings.py` | Replaced env-var check with DuckDB row-count queries (`SELECT COUNT(*) FROM prices/rainfall/ndvi`) | ✅ |
 | 2 | **About page raw HTML** | `about.py` | Added `unsafe_allow_html=True` to all 12 `st.markdown()` blocks containing HTML tags | ✅ |
 | 3 | **Breadcrumb stuck on Executive Overview** | `app.py` | Removed old `st.query_params` logic; new top bar renders after `st.navigation()` using `pg.title` | ✅ |
-| 4 | **Risk Map all 0.0% deficit** | `risk_map.py` | Fixed 3-way join via `district_map` table (was doing `p.district = r.sub_division` — 0 matches); removed `COALESCE(..., 0)` so unmapped districts show NULL | ✅ |
+| 4 | **Risk Map all 0.0% deficit** | `risk_map.py` | Fixed 3-way join via `district_map` table (was doing `p.district = r.sub_division` - 0 matches); removed `COALESCE(..., 0)` so unmapped districts show NULL | ✅ |
 | 5 | **Risk Map "No Data" shown as "Low Risk"** | `risk_map.py` | Added NaN/None guard to `get_tier()` → returns `"No Data"` tier with MUTED color badge; updated table formatting and legend | ✅ |
-| 6 | **Forecast duplicate rows** | `forecast.py` | Added `.sort_values("modal_price").drop_duplicates(subset=["district"], keep="last")` — Pudukkottai no longer tripled | ✅ |
-| 7 | **Discontinuity "undefined" label** | `discontinuity.py` | Removed `title=None` from `dens_fig.update_layout()` — this caused Plotly to render "undefined" as a chart title element | ✅ |
+| 6 | **Forecast duplicate rows** | `forecast.py` | Added `.sort_values("modal_price").drop_duplicates(subset=["district"], keep="last")` - Pudukkottai no longer tripled | ✅ |
+| 7 | **Discontinuity "undefined" label** | `discontinuity.py` | Removed `title=None` from `dens_fig.update_layout()` - this caused Plotly to render "undefined" as a chart title element | ✅ |
 | 8 | **Discontinuity empty-yearly crash** | `discontinuity.py` | Added guard: if `yearly` is empty, shows info message instead of chart with NaN hline | ✅ |
 
 ### Post-Deployment Hotfixes
 
 | # | Bug | File | Fix | Status |
 |---|-----|------|-----|--------|
-| 9 | **Streamlit Cloud NameError crash** | `discontinuity.py` | Removed `@st.cache_data(ttl=300, show_spinner=False)` from `load_rainfall(conn)` — `conn` (DuckDB connection) is not hashable, causing `st.cache_data` hashing to fail at module import time | ✅ |
-| 10 | **About page partial HTML fix** | `about.py` | Extended `unsafe_allow_html=True` to all remaining HTML-bearing `st.markdown()` blocks — initial fix only caught one of ~12 blocks | ✅ |
+| 9 | **Streamlit Cloud NameError crash** | `discontinuity.py` | Removed `@st.cache_data(ttl=300, show_spinner=False)` from `load_rainfall(conn)` - `conn` (DuckDB connection) is not hashable, causing `st.cache_data` hashing to fail at module import time | ✅ |
+| 10 | **About page partial HTML fix** | `about.py` | Extended `unsafe_allow_html=True` to all remaining HTML-bearing `st.markdown()` blocks - initial fix only caught one of ~12 blocks | ✅ |
 
 **Total: 10 bugs fixed across 7 files**
 
@@ -38,8 +38,8 @@
 ```
 
 **All 10 failures are pre-existing**, caused by:
-- `ModuleNotFoundError: No module named 'src'` (7 tests) — missing `src` package setup
-- `FileNotFoundError: models/loss_classifier.pkl` (3 tests) — model file not committed
+- `ModuleNotFoundError: No module named 'src'` (7 tests) - missing `src` package setup
+- `FileNotFoundError: models/loss_classifier.pkl` (3 tests) - model file not committed
 
 **No regressions from any of the 10 code fixes.** The 16 skipped tests are UI/dashboard tests that require a running Streamlit instance.
 
@@ -66,7 +66,7 @@ All 4 data points verified against direct DuckDB queries on 2026-07-20:
 |------|-------------|--------|
 | Executive Overview | Breadcrumb: "Executive Overview", flip-board shows degraded state (no pipeline run) | ✅ |
 | Discontinuity Explorer | Breadcrumb: "Discontinuity Explorer", McCrary chart w/ correct labels, no "undefined", deficit-by-year chart, commodity dropdown | ✅ |
-| About | Breadcrumb: "About", blockquote renders, model comparison table, data sources table, citations — no raw HTML tags | ✅ |
+| About | Breadcrumb: "About", blockquote renders, model comparison table, data sources table, citations - no raw HTML tags | ✅ |
 | Forecast Explorer | Breadcrumb: "Forecast Explorer", commodity selector (Onion), 54 districts, ₹3,625 median, priciest/cheapest tables deduped | ✅ |
 | Risk Map | Breadcrumb: "Risk Map", 7,919 districts, district ledger with real data (Mandya/Gur, Hassan/Copra), pagination 1/396 | ✅ |
 | Satellite View | Breadcrumb: "Satellite View", NDVI 0.20 current / 0.29 historical (Adilabad), NDVI trend chart Feb–May 2026 | ✅ |
@@ -81,12 +81,12 @@ All 4 data points verified against direct DuckDB queries on 2026-07-20:
 - **Loading state:** Skeleton shimmer animation while fetch is pending
 - **Success:** Stats update with real values + formatted timestamp
 - **Failure with cache:** Uses `localStorage` cached values labeled "(cached)"
-- **Failure without cache:** Shows "offline — live refresh unavailable"
-- **No fabricated values ever shown:** Initial state is "—", never a fake number
+- **Failure without cache:** Shows "offline - live refresh unavailable"
+- **No fabricated values ever shown:** Initial state is "-", never a fake number
 - **Live verification at http://mandiiq.unifies.codes/:** All stats match (26,994 / 268 / 511 / 1,620 / 2,385 / 18)
-- **HTTPS cert:** Still provisioning — accessible over HTTP only
+- **HTTPS cert:** Still provisioning - accessible over HTTP only
 
-**Verdict:** ✅ PASS — all displayed stats reflect real current DuckDB state
+**Verdict:** ✅ PASS - all displayed stats reflect real current DuckDB state
 
 ---
 
@@ -94,13 +94,13 @@ All 4 data points verified against direct DuckDB queries on 2026-07-20:
 
 ### 4.1 Single Design-Tokens File
 
-- **Source of truth:** `mandi_rdd/styles/design.css` — CSS custom properties
-- **Python mirror:** `mandi_rdd/dashboard/theme.py` — variables match CSS exactly
+- **Source of truth:** `mandi_rdd/styles/design.css` - CSS custom properties
+- **Python mirror:** `mandi_rdd/dashboard/theme.py` - variables match CSS exactly
 - **Both files reference**: `#0B0F1E` (INK), `#2E3A55` (SLATE), `#F2EFE6` (PAPER), `#8B96A3` (MUTED), `#5B6572` (FAINT), `#E8B14D` (TURMERIC), `#D9663B` (RUST), `#8FAE89` (SAGE)
 
 ### 4.2 Leftover Old-Palette Check
 
-Scanned all `**/*.py` and `**/*.css` in `mandi_rdd/` for old hex values. **No old-palette leftovers found.** The only non-palette hex codes are Plotly chart trace colors (`#8B6BC4`, `#B98354`, etc.) — these are distinct from design tokens.
+Scanned all `**/*.py` and `**/*.css` in `mandi_rdd/` for old hex values. **No old-palette leftovers found.** The only non-palette hex codes are Plotly chart trace colors (`#8B6BC4`, `#B98354`, etc.) - these are distinct from design tokens.
 
 ### 4.3 Typography Parity
 
@@ -128,9 +128,9 @@ Sidebar navigation uses unicode emoji as page icons (📊, 📈, 🔮, 🗺, �
 ### 4.7 Atmosphere Parity
 
 - **App:** Dot grid (`radial-gradient` 24px 24px) + animated blobs
-- **Docs page:** Dot grid (`radial-gradient` 24px 24px) — no animated blobs (intentional: docs page is lighter-weight)
+- **Docs page:** Dot grid (`radial-gradient` 24px 24px) - no animated blobs (intentional: docs page is lighter-weight)
 
-**Verdict:** ✅ PASS — design system is applied consistently across both surfaces
+**Verdict:** ✅ PASS - design system is applied consistently across both surfaces
 
 ---
 
@@ -155,9 +155,9 @@ Sidebar navigation uses unicode emoji as page icons (📊, 📈, 🔮, 🗺, �
 **Flagged issues:**
 - **INK/FAINT (3.22:1):** FAINT is used for metadata/tertiary text. Fails for small text. Consider lightening FAINT to `#7A8A99` (estimated 4.5:1 target) if all text tiers need to pass strict WCAG AA.
 - **SLATE/MUTED (3.77:1):** MUTED on SLATE is used for card descriptions. Fails for small body text but passes for large text (≥18px / ≥14px bold).
-- **RUST/PAPER (3.09:1):** RUST background is used for warning badges/labels — typically brief, bold text in larger sizes.
+- **RUST/PAPER (3.09:1):** RUST background is used for warning badges/labels - typically brief, bold text in larger sizes.
 
-**Risk:** Low — the flagged pairs are used for decorative, brief, or large-text contexts, not body copy.
+**Risk:** Low - the flagged pairs are used for decorative, brief, or large-text contexts, not body copy.
 
 ### 5.2 Focus States
 
@@ -167,7 +167,7 @@ Streamlit provides default focus outlines for interactive elements. No custom CS
 
 Verified: both surfaces respect the user preference. No CSS animation runs when the flag is set. ✅
 
-**Verdict:** ⚠️ PASS WITH NOTES — three contrast pairs fail AA Normal but pass AA Large; risk is low given usage context
+**Verdict:** ⚠️ PASS WITH NOTES - three contrast pairs fail AA Normal but pass AA Large; risk is low given usage context
 
 ---
 
@@ -216,7 +216,7 @@ Scanned README, docs/index.html, and all code comments.
 | Required vars documented | `DATA_GOV_IN_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `SENTINEL_CLIENT_ID`, `SENTINEL_CLIENT_SECRET`, `DUCKDB_PATH`, `PORT` |
 | Optional vars documented | `RAINFALL_RESOURCE_ID` (added this session: "Optional: custom data.gov.in rainfall resource IDs") |
 | Stale vars removed | All removed in prior session |
-| Real secrets included | None — all placeholders |
+| Real secrets included | None - all placeholders |
 | **Verdict** | ✅ PASS |
 
 ---
@@ -238,7 +238,7 @@ The documentation page (`docs/index.html`) was fully rewritten to match the app'
 | Footer links | GitHub only | GitHub + Instagram + API Health |
 | License | Not shown | MIT (in footer) |
 
-**Verdict:** ✅ PASS — visitor moving between app and docs page perceives one consistent identity
+**Verdict:** ✅ PASS - visitor moving between app and docs page perceives one consistent identity
 
 ---
 
@@ -247,7 +247,7 @@ The documentation page (`docs/index.html`) was fully rewritten to match the app'
 ### README Changes (this session)
 - **Stat line updated:** `1,525` → `1,620` rainfall observations (was stale)
 - **Added live-source reference:** "(Counts reflect the latest pipeline run; see the live status page for current numbers.)"
-- **Data sources table updated:** Removed inaccurate "np.random demo values" and "placeholder constants" descriptions — replaced with current live-fetch behavior
+- **Data sources table updated:** Removed inaccurate "np.random demo values" and "placeholder constants" descriptions - replaced with current live-fetch behavior
 - **No superlatives, recruiter references, or internal doc mentions** verified clean
 
 ### .env.example Changes (this session)
@@ -259,7 +259,7 @@ The documentation page (`docs/index.html`) was fully rewritten to match the app'
 
 ## 11. Layout / Responsiveness (Browser Audit)
 
-### Streamlit App — 10 Routes
+### Streamlit App - 10 Routes
 
 All pages verified live at https://mandiiq.streamlit.app/ across 5 responsive breakpoints:
 
@@ -278,7 +278,7 @@ All pages verified live at https://mandiiq.streamlit.app/ across 5 responsive br
 
 **Responsive behavior verified:**
 - 375px: Sidebar auto-collapses via Streamlit; single-column; no horizontal scroll; breadcrumb text at 0.75rem
-- 430px: Same mobile layout — works on iPhone Pro Max screens
+- 430px: Same mobile layout - works on iPhone Pro Max screens
 - 768px: Sidebar in icon-only collapsed mode; content fills width
 - 1280px: Standard full layout with sidebar expanded
 - 1920px: Max-width constrained layout; all components scale properly
@@ -301,10 +301,10 @@ All pages verified live at https://mandiiq.streamlit.app/ across 5 responsive br
 | Buttons (cta, clear) | ✅ | ✅ | ✅ | ✅ | |
 | Dropdowns (commodity) | ✅ | ✅ | ✅ | ✅ | Streamlit native |
 | Chart plots | ✅ | ✅ (hover) | ✅ | N/A | Plotly native |
-| Flip-board | ✅ | N/A | N/A | N/A | Custom component — shows degraded "—" state |
+| Flip-board | ✅ | N/A | N/A | N/A | Custom component - shows degraded "-" state |
 | Loading skeletons | ✅ | N/A | N/A | ✅ | Shows on initial load |
 
-**Verdict:** ✅ PASS — all 10 routes render correctly at all 5 breakpoints
+**Verdict:** ✅ PASS - all 10 routes render correctly at all 5 breakpoints
 
 ---
 
@@ -312,13 +312,13 @@ All pages verified live at https://mandiiq.streamlit.app/ across 5 responsive br
 
 | Issue | Status | Impact |
 |-------|--------|--------|
-| **HTTPS cert for `mandiiq.unifies.codes`** | Still provisioning — GitHub Pages auto-provisions after DNS resolves; may take 24-48h | Docs page fetch to HTTPS API blocked on HTTP; JS fallback uses localStorage cache |
+| **HTTPS cert for `mandiiq.unifies.codes`** | Still provisioning - GitHub Pages auto-provisions after DNS resolves; may take 24-48h | Docs page fetch to HTTPS API blocked on HTTP; JS fallback uses localStorage cache |
 | **Full NDVI run incomplete** | 2,385 records / 475 districts cached; remaining 39 districts on next scheduled run | Minor coverage gap |
-| **Price-outcome RDD** | All 18 results have null effect — 3-day price window insufficient for multi-year backtest | Core feature limitation |
-| **FAINT contrast ratio** | #5B6572 on #0B0F1E = 3.22:1 — fails WCAG AA for small text | Metadata/tertiary text only; low risk |
-| **SLATE/MUTED contrast ratio** | #8B96A3 on #2E3A55 = 3.77:1 — fails WCAG AA for normal text | Card description text; passes for large text |
-| **MAPE/MAE not in API** | The `/health` endpoint doesn't return model accuracy metrics | Docs page and README show "—" for these values |
-| **Risk Map percentages** | Values like `0.0005555555555549845%` instead of clean display formatting | Cosmetic — decimal display needs rounding |
+| **Price-outcome RDD** | All 18 results have null effect - 3-day price window insufficient for multi-year backtest | Core feature limitation |
+| **FAINT contrast ratio** | #5B6572 on #0B0F1E = 3.22:1 - fails WCAG AA for small text | Metadata/tertiary text only; low risk |
+| **SLATE/MUTED contrast ratio** | #8B96A3 on #2E3A55 = 3.77:1 - fails WCAG AA for normal text | Card description text; passes for large text |
+| **MAPE/MAE not in API** | The `/health` endpoint doesn't return model accuracy metrics | Docs page and README show "-" for these values |
+| **Risk Map percentages** | Values like `0.0005555555555549845%` instead of clean display formatting | Cosmetic - decimal display needs rounding |
 
 ---
 
@@ -345,8 +345,8 @@ All pages verified live at https://mandiiq.streamlit.app/ across 5 responsive br
 | README accuracy | ✅ Updated (stale rainfall count fixed, data sources corrected) |
 | Layout / Responsiveness | ✅ All 10 routes pass at 375/430/768/1280/1920px |
 
-**Overall:** ✅ AUDIT PASSED — no blocking issues. 10 verified fixes, full design parity, live-data pipeline confirmed correct, accessibility gaps are low-risk and documented. All changes pushed to `master` and deployed.
+**Overall:** ✅ AUDIT PASSED - no blocking issues. 10 verified fixes, full design parity, live-data pipeline confirmed correct, accessibility gaps are low-risk and documented. All changes pushed to `master` and deployed.
 
 ---
 
-*Generated at 2026-07-20 17:00 UTC — 10 code fixes applied, all 10 routes verified live at 5 breakpoints, docs page confirmed with live API data.*
+*Generated at 2026-07-20 17:00 UTC - 10 code fixes applied, all 10 routes verified live at 5 breakpoints, docs page confirmed with live API data.*

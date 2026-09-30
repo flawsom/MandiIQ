@@ -1,5 +1,5 @@
 """
-MandiIQ — AI Orchestrator with Tool-Calling.
+MandiIQ - AI Orchestrator with Tool-Calling.
 
 Turns five separate outputs (RDD, robustness, forecast, risk score, NDVI)
 into one coherent, grounded answer.
@@ -8,7 +8,7 @@ Design principles:
 1. Tool results are provided as context to the LLM; the system prompt forbids
    stating a number not returned by a tool call this turn.
 2. The _build_structured_answer() fallback enforces code-level grounding
-   when the entire model chain is exhausted — constructs an answer directly
+   when the entire model chain is exhausted - constructs an answer directly
    from tool outputs without any LLM involvement.
 3. Every answer shows which endpoints were used and which model served it.
 4. If the fallback chain is exhausted, returns structured data without narrative.
@@ -16,11 +16,12 @@ Design principles:
 
 import json
 import logging
+import re
 from typing import Optional
 
 import numpy as np
 
-from mandi_rdd.ai.router import call_llm, get_api_key
+from mandi_rdd.ai.router import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,12 @@ SYSTEM_PROMPT = """You are MandiIQ's AI procurement assistant. You analyze agric
 CORE RULES (never violate these):
 1. You have access to the following tools. You MUST use them before answering.
 2. NEVER state a number, statistic, or price that was NOT returned by a tool call this turn. If you didn't retrieve it, don't say it.
-3. If a tool returns an error or no data, say so honestly — don't make up a number.
+3. If a tool returns an error or no data, say so honestly - don't make up a number.
 4. Keep answers concise (3-5 sentences). The user is a commodity buyer who wants a fast, actionable answer.
 5. Always specify the commodity and district you're referring to.
 6. If you don't have enough data to answer confidently, say so rather than guessing.
 
-TOOLS (call these via the orchestrator — never fabricate their outputs):
+TOOLS (call these via the orchestrator - never fabricate their outputs):
 - get_rdd_result(commodity): Causal effect of crossing the -19% rainfall threshold
 - get_forecast(commodity, district): Prophet price forecast for next 3-6 months
 - get_risk_score(commodity, district): XGBoost price-spike risk probability (0-100)
@@ -45,7 +46,7 @@ TOOLS (call these via the orchestrator — never fabricate their outputs):
 
 NIGHTLY NARRATIVE MODE:
 When asked to summarize "what changed" or provide a "nightly update", structure your response as:
-1. Headline finding (1 sentence — the most important change)
+1. Headline finding (1 sentence - the most important change)
 2. Price movement summary (1-2 sentences)
 3. Risk outlook (1 sentence)
 4. Recommendation (1 sentence)
@@ -192,8 +193,9 @@ def answer_question(
     Returns:
         dict with answer, model_used, endpoints_used, error, tool_results
     """
-    # 1. Detect commodity from query if not provided
-    detected_commodity = commodity or _detect_commodity(query)
+    # 1. Detect commodity from query if not provided. The live commodity list
+    #    is preferred so the analysis tools receive exact database spellings.
+    detected_commodity = commodity or _detect_commodity(query, _load_db_commodities())
     detected_district = district or _detect_district(query)
 
     # 2. Determine which tools to call based on query content
@@ -226,7 +228,22 @@ def answer_question(
             tool_results[name] = {"note": f"Error: {e}"}
             endpoints_used.append(f"{name} (error)")
 
-    # 4. Build the context string from tool results (GROUNDING — this is the
+    # 3b. If every selected tool failed (for example no trained model exists
+    #     for the detected commodity yet), widen the net to the always-available
+    #     tools so /ask still returns grounded context instead of an empty reply.
+    if not any("note" not in r for r in tool_results.values()):
+        for name in ("get_rdd_result", "get_forecast"):
+            if name in tool_results:
+                continue
+            try:
+                result = TOOLS[name]["func"](commodity=detected_commodity)
+                if result and "error" not in result:
+                    tool_results[name] = result
+                    endpoints_used.append(f"{name} (fallback)")
+            except Exception as e:
+                logger.warning(f"Fallback tool {name} failed: {e}")
+
+    # 4. Build the context string from tool results (GROUNDING - this is the
     #    only data the LLM sees; it cannot interpolate anything else)
     context_parts = []
     for name, result in tool_results.items():
@@ -240,15 +257,20 @@ def answer_question(
     # If no tools produced useful results, return structured fallback
     if not any(r for r in tool_results.values() if "note" not in r):
         # Build a minimal structured response from whatever we have
+        tried = ", ".join(endpoints_used) if endpoints_used else "no tools"
         fallback = {
             "query": query,
             "commodity": detected_commodity,
             "district": detected_district or "All",
-            "answer": "I don't have enough data to answer that question yet. "
-                       "The pipeline needs to run first to populate the database. "
-                       "Try running the scheduler: python -m mandi_rdd.ingestion.scheduler",
+            "answer": (
+                f"No analysis data is available for {detected_commodity} yet. "
+                f"Tools tried: {tried}. The commodity may not be covered by the "
+                f"current warehouse snapshot, or the monthly pipeline has not run "
+                f"for it. Try Onion, Tomato, Potato, Cabbage or Cauliflower, which "
+                f"have trained models today."
+            ),
             "model_used": None,
-            "endpoints_used": endpoints_used or ["No data available"],
+            "endpoints_used": endpoints_used or ["No tools returned data"],
             "error": "No tool results available",
         }
         return fallback
@@ -260,7 +282,7 @@ def answer_question(
         f"Query: {query}\n\n"
         f"Commodity: {detected_commodity}\n"
         f"District: {detected_district or 'All'}\n\n"
-        f"Tool results (only use these numbers — never make up data):\n{context}"
+        f"Tool results (only use these numbers - never make up data):\n{context}"
     )
 
     # 6. Call the LLM through the OpenRouter fallback chain
@@ -320,40 +342,174 @@ def generate_nightly_narrative(
 
 # ── Helpers ──
 
-def _detect_commodity(query: str) -> str:
-    """Detect commodity from query text. Falls back to 'Onion'."""
-    # Comprehensive list of commodities from actual market data
-    known = [
-        "paddy", "wheat", "rice", "maize", "bajra", "jowar", "ragi",
-        "onion", "tomato", "potato", "cabbage", "cauliflower",
-        "brinjal", "ladyfinger", "chilli", "garlic", "ginger",
-        "turmeric", "coriander", "cumin", "mustard", "pepper",
-        "chana", "arhar", "moong", "urad", "masoor", "gram",
-        "groundnut", "sesame", "sunflower", "soybean", "coconut",
-        "cotton", "sugarcane", "banana", "mango", "apple", "orange",
-        "grapes", "guava", "papaya", "lemon", "pomegranate",
-        "almond", "cashewnut", "walnut", "raisin",
-        "pea", "beans", "carrot", "radish", "beetroot", "spinach",
-        "milk", "egg", "fish", "mutton", "chicken",
-    ]
+_DEFAULT_COMMODITY = "Onion"
+
+# Common words users type, mapped to the exact commodity spellings used by the
+# production imports. Matching is word-boundary aware, so "price-spike" can
+# never match "rice" (regression: /ask once answered onion questions with Rice).
+_COMMODITY_ALIASES: dict[str, str] = {
+    "onion": "Onion",
+    "tomato": "Tomato",
+    "potato": "Potato",
+    "cabbage": "Cabbage",
+    "cauliflower": "Cauliflower",
+    "green chilli": "Green Chilli",
+    "green chilly": "Green Chilli",
+    "chilli": "Chili Red",
+    "chilly": "Chili Red",
+    "chili": "Chili Red",
+    "paddy": "Paddy(Common)",
+    "rice": "Paddy(Common)",
+    "dhan": "Paddy(Common)",
+    "wheat": "Wheat",
+    "maize": "Maize",
+    "corn": "Maize",
+    "bajra": "Bajra(Pearl Millet/Cumbu)",
+    "jowar": "Jowar(Sorghum)",
+    "ragi": "Ragi(Finger Millet)",
+    "finger millet": "Ragi(Finger Millet)",
+    "soyabean": "Soyabean",
+    "soybean": "Soyabean",
+    "groundnut": "Groundnut",
+    "mustard": "Mustard",
+    "ginger": "Ginger(Green)",
+    "garlic": "Garlic",
+    "turmeric": "Turmeric",
+    "coriander": "Coriander(Leaves)",
+    "cumin": "Cumin Seed",
+    "bhindi": "Bhindi(Ladies Finger)",
+    "ladyfinger": "Bhindi(Ladies Finger)",
+    "lady finger": "Bhindi(Ladies Finger)",
+    "okra": "Bhindi(Ladies Finger)",
+    "brinjal": "Brinjal",
+    "eggplant": "Brinjal",
+    "carrot": "Carrot",
+    "radish": "Raddish",
+    "beetroot": "Beetroot",
+    "spinach": "Spinach",
+    "beans": "Beans",
+    "drumstick": "Drumstick",
+    "pumpkin": "Pumpkin",
+    "coconut": "Coconut",
+    "banana": "Banana",
+    "mango": "Mango",
+    "apple": "Apple",
+    "orange": "Orange",
+    "grapes": "Grapes",
+    "guava": "Guava",
+    "papaya": "Papaya",
+    "lemon": "Lemon",
+    "pomegranate": "Pomegranate",
+    "chana": "Bengal Gram(Gram)(Whole)",
+    "gram": "Bengal Gram(Gram)(Whole)",
+    "arhar": "Arhar (Tur/Red Gram)(Whole)",
+    "tur": "Arhar (Tur/Red Gram)(Whole)",
+    "moong": "Green Gram (Moong)(Whole)",
+    "urad": "Black Gram (Urd Beans)(Whole)",
+    "masoor": "Lentil (Masur)(Whole)",
+    "sesame": "Sesamum(Sesame,Gingelly,Til)",
+    "sunflower": "Sunflower",
+    "cotton": "Cotton",
+    "sugarcane": "Sugarcane",
+    "jaggery": "Gur(Jaggery)",
+    "gur": "Gur(Jaggery)",
+    "almond": "Almond(Badam)",
+    "cashew": "Cashewnut",
+    "walnut": "Walnut",
+    "raisin": "Raisin",
+    "milk": "Milk",
+    "egg": "Egg",
+    "fish": "Fish",
+}
+
+_KNOWN_DISTRICTS = [
+    "nashik", "pune", "ahmednagar", "solapur", "mumbai",
+    "bangalore", "belgaum", "bagalkot", "bijapur", "dharwad",
+    "jaipur", "ajmer", "kota", "udaipur", "delhi",
+    "lucknow", "kanpur", "varanasi", "agra", "indore",
+]
+
+
+def _load_db_commodities() -> list[str]:
+    """Return the distinct commodity names in the warehouse (best effort)."""
+    try:
+        from mandi_rdd.storage.duckdb_store import get_connection
+        conn = get_connection(read_only=True)
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT commodity FROM prices WHERE commodity IS NOT NULL"
+            ).fetchall()
+        finally:
+            conn.close()
+        return [r[0] for r in rows if r[0]]
+    except Exception as e:
+        logger.debug(f"Commodity list unavailable, using built-in aliases: {e}")
+        return []
+
+
+def _word_match(needle: str, haystack: str) -> Optional[int]:
+    """Return the start index of a whole-word match, or None."""
+    pattern = r"(?<![a-z0-9])" + re.escape(needle) + r"(?![a-z0-9])"
+    m = re.search(pattern, haystack)
+    return m.start() if m else None
+
+
+def _fuzzy_commodity(query: str, known_commodities: list[str]) -> Optional[str]:
+    """Last-resort fuzzy match of query n-grams against warehouse names."""
+    import difflib
+    lookup = {name.lower(): name for name in known_commodities}
+    words = re.findall(r"[a-z]+", query.lower())
+    for size in (2, 1):
+        for i in range(len(words) - size + 1):
+            gram = " ".join(words[i:i + size])
+            close = difflib.get_close_matches(gram, lookup.keys(), n=1, cutoff=0.85)
+            if close:
+                return lookup[close[0]]
+    return None
+
+
+def _detect_commodity(query: str, known_commodities: Optional[list[str]] = None) -> str:
+    """Detect the commodity a query is about.
+
+    Whole-word matching prevents false positives such as "price-spike" -> rice.
+    The earliest match wins; ties go to the longest alias ("green chilli" beats
+    "chilli"). When the live commodity list is available, the winner is
+    normalised to the exact name used in the prices table, with a fuzzy-match
+    fallback, because the analysis tools key off exact commodity names.
+    """
+    aliases = dict(_COMMODITY_ALIASES)
+    if known_commodities:
+        for name in known_commodities:
+            base = name.split("(")[0].strip().lower()
+            if base:
+                aliases.setdefault(base, name)
+            aliases.setdefault(name.lower(), name)
+
     q_lower = query.lower()
-    for k in known:
-        if k in q_lower:
-            return k.upper() if k in ["arhar", "urad"] else k.capitalize()
-    return "Onion"
+    best: Optional[tuple[int, int, str]] = None  # (position, -alias_len, canonical)
+    for alias, canonical in aliases.items():
+        pos = _word_match(alias, q_lower)
+        if pos is None:
+            continue
+        candidate = (pos, -len(alias), canonical)
+        if best is None or candidate < best:
+            best = candidate
+    if best:
+        return best[2]
+
+    if known_commodities:
+        fuzzy = _fuzzy_commodity(query, known_commodities)
+        if fuzzy:
+            return fuzzy
+    return _DEFAULT_COMMODITY
 
 
 def _detect_district(query: str) -> Optional[str]:
-    """Detect district from query text."""
-    # Common mandi districts in Maharashtra, Karnataka, etc.
-    known = ["nashik", "pune", "ahmednagar", "solapur", "mumbai",
-             "bangalore", "belgaum", "bagalkot", "bijapur", "dharwad",
-             "jaipur", "ajmer", "kota", "udaipur", "delhi",
-             "lucknow", "kanpur", "varanasi", "agra", "indore"]
+    """Detect district from query text using whole-word matching."""
     q_lower = query.lower()
-    for k in known:
-        if k in q_lower:
-            return k.capitalize()
+    for d in _KNOWN_DISTRICTS:
+        if _word_match(d, q_lower) is not None:
+            return d.capitalize()
     return None
 
 
@@ -400,9 +556,9 @@ def _build_structured_answer(
     """
     Build a plain-text answer from tool results directly (no LLM).
 
-    This is the graceul degradation path when all models are exhausted.
+    This is the graceful degradation path when all models are exhausted.
     """
-    parts = [f"📊 {commodity} — Procurement Intelligence Report"]
+    parts = [f"📊 {commodity} - Procurement Intelligence Report"]
 
     if district:
         parts.append(f"📍 District: {district}")

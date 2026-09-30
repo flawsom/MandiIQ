@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MandiIQ — Causal Price Intelligence Platform</title>
+    <title>MandiIQ - Causal Price Intelligence Platform</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ═══════════════════════════════════════════════════════════
-           1. DESIGN TOKENS — MandiIQ
+           1. DESIGN TOKENS - MandiIQ
            ═══════════════════════════════════════════════════════════ */
         :root {
             --bg-base: #000000;
@@ -575,7 +575,7 @@
                     <line x1="50" y1="0" x2="50" y2="5" />
                     <line x1="50" y1="95" x2="50" y2="100" />
                 </svg>
-                <div class="hero-tagline">MandiIQ — Mandi Price Intelligence System v1.0</div>
+                <div class="hero-tagline">MandiIQ - Mandi Price Intelligence System v1.0</div>
                 <h1>Rainfall crosses <span class="hl-loss">−19%</span> →<br>onion prices <span class="hl">jump ₹350</span></h1>
                 <p class="hero-desc">
                     Automated causal inference + predictive ML + prescriptive recommendations + AI orchestration
@@ -613,7 +613,7 @@
             <p class="section-sub">
                 Average onion modal price (₹/quintal) by rainfall departure from normal.
                 The <strong>−19% threshold</strong> is IMD's official classification for
-                "deficient" rainfall — where prices abruptly jump +₹350 (<em>p</em> = 0.003).
+                "deficient" rainfall - where prices abruptly jump +₹350 (<em>p</em> = 0.003).
             </p>
             <div class="chart-card">
                 <svg viewBox="0 0 700 280" role="img" aria-label="RDD discontinuity plot">
@@ -709,22 +709,22 @@
                 <div class="robo-card">
                     <div class="robo-title">Bandwidth Sensitivity</div>
                     <div class="robo-status profit">✅ Robust (15–30%)</div>
-                    <div class="robo-desc">Effect does not flip sign or lose significance across 4 bandwidths. Re-run at 10%, 15%, 20%, 25% — same conclusion.</div>
+                    <div class="robo-desc">Effect does not flip sign or lose significance across 4 bandwidths. Re-run at 10%, 15%, 20%, 25% - same conclusion.</div>
                 </div>
                 <div class="robo-card">
                     <div class="robo-title">Placebo / Falsification</div>
                     <div class="robo-status profit">✅ No effect at fake cutoffs</div>
-                    <div class="robo-desc">Identical RDD at −10%, −5%, +5% cutoff produces near-zero, insignificant "effects" — the −19% result isn't an artifact.</div>
+                    <div class="robo-desc">Identical RDD at −10%, −5%, +5% cutoff produces near-zero, insignificant "effects" - the −19% result isn't an artifact.</div>
                 </div>
                 <div class="robo-card">
                     <div class="robo-title">McCrary Density Test</div>
                     <div class="robo-status profit">✅ No manipulation detected</div>
-                    <div class="robo-desc">No discontinuity in the density of the running variable at cutoff — districts aren't sorting around the classification threshold.</div>
+                    <div class="robo-desc">No discontinuity in the density of the running variable at cutoff - districts aren't sorting around the classification threshold.</div>
                 </div>
                 <div class="robo-card">
                     <div class="robo-title">Covariate Balance</div>
                     <div class="robo-status profit">✅ Pre-treatment balance</div>
-                    <div class="robo-desc">Observable pre-treatment characteristics (prior prices, market count) don't jump at the cutoff — valid identification.</div>
+                    <div class="robo-desc">Observable pre-treatment characteristics (prior prices, market count) don't jump at the cutoff - valid identification.</div>
                 </div>
             </div>
         </section>
@@ -736,7 +736,7 @@
             <p class="section-sub">
                 Ask free-text procurement questions in plain English. The AI orchestrator routes
                 across <strong>multiple free-tier OpenRouter models</strong> with automatic
-                circuit-breaker fallback — if one model is rate-limited, the next in the chain
+                circuit-breaker fallback - if one model is rate-limited, the next in the chain
                 serves the request. Answers are grounded in live tool-call results (never fabricated).
             </p>
             <div class="chart-card">
@@ -816,7 +816,7 @@ flowchart LR
         class Scrambler {
             constructor(el) {
                 this.el = el;
-                this.chars = '!<>-_\\/[]{}—=+*^?#________';
+                this.chars = '!<>-_\\/[]{}-=+*^?#________';
                 this.update = this.update.bind(this);
             }
             setText(newText) {

@@ -179,7 +179,7 @@ def _refresh_and_push() -> None:
 def _push_loop() -> NoReturn:
     """Background loop."""
     logger.info(
-        "Grafana Cloud push enabled — every %s s to %s",
+        "Grafana Cloud push enabled - every %s s to %s",
         _PUSH_INTERVAL,
         _PROM_URL,
     )
@@ -195,7 +195,7 @@ def _push_loop() -> NoReturn:
 def start_push_thread() -> None:
     """Start the daemon push thread (called once from main.py startup)."""
     if not _PUSH_ENABLED:
-        logger.info("Grafana Cloud push disabled — set GRAFANA_CLOUD_PROM_* env vars")
+        logger.info("Grafana Cloud push disabled - set GRAFANA_CLOUD_PROM_* env vars")
         return
     t = threading.Thread(target=_push_loop, daemon=True)
     t.start()

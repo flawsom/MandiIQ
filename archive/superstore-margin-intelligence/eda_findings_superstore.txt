@@ -91,7 +91,7 @@ STEP 4: KEY BUSINESS INSIGHTS
 ======================================================================
 1. Technology generates the most revenue ($835,760, 36.4% of total sales).
 2. 'Furniture' has the weakest category margin (2.5%), dragged down by loss-making sub-categories: ['Tables', 'Bookcases', 'Supplies'].
-3. Discounts above 20% flip several segments unprofitable — margin falls from 29.5% at 0% discount to -77.4% at 41%+ discount.
+3. Discounts above 20% flip several segments unprofitable - margin falls from 29.5% at 0% discount to -77.4% at 41%+ discount.
 4. West is the top-performing region by sales ($725,355), while Central has the thinnest margin (7.9%).
 5. Consumer is the leading customer segment, contributing $1,161,013 in sales.
 6. Same Day shipping has the shortest average delay (0.0 days) vs Standard Class (5.0 days).

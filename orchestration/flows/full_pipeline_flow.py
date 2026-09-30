@@ -169,7 +169,7 @@ def task_validate():
     
     if result.returncode != 0:
         logger.error(f"Validation FAILED: {result.stderr}")
-        raise RuntimeError("Data validation failed — pipeline aborted")
+        raise RuntimeError("Data validation failed - pipeline aborted")
     
     logger.info("All data validation tests passed")
 

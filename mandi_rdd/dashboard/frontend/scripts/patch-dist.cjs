@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Post-build script — patches absolute asset paths in the Vite-built index.html
+ * Post-build script - patches absolute asset paths in the Vite-built index.html
  * to relative paths so Streamlit's declare_component can serve them correctly.
  *
  * Vite 6 ignores `base: "./"` for module scripts and emits
@@ -20,7 +20,7 @@ const path = require("path");
 const distHtml = path.resolve(__dirname, "..", "dist", "index.html");
 
 if (!fs.existsSync(distHtml)) {
-  console.error("  [patch-dist] dist/index.html not found — skipping");
+  console.error("  [patch-dist] dist/index.html not found - skipping");
   process.exit(0);
 }
 
@@ -34,7 +34,7 @@ html = html.replace(/["']\/(assets\/)/g, (match) => {
 });
 
 if (html === before) {
-  console.log("  [patch-dist] No absolute paths found — nothing to patch");
+  console.log("  [patch-dist] No absolute paths found - nothing to patch");
 } else {
   fs.writeFileSync(distHtml, html, "utf8");
   console.log("  [patch-dist] Patched absolute paths → relative paths in dist/index.html");

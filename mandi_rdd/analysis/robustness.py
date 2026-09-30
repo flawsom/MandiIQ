@@ -1,11 +1,11 @@
 """
-MandiRDD — robustness check implementations.
+MandiRDD - robustness check implementations.
 
 Implements all four robustness checks from the PRD §7:
-1. Bandwidth sensitivity — re-run at 3-5 bandwidths
-2. Placebo/falsification test — run RDD at fake cutoffs
-3. McCrary-style density check — check for running variable manipulation
-4. Covariate balance — check pre-treatment covariates don't jump
+1. Bandwidth sensitivity - re-run at 3-5 bandwidths
+2. Placebo/falsification test - run RDD at fake cutoffs
+3. McCrary-style density check - check for running variable manipulation
+4. Covariate balance - check pre-treatment covariates don't jump
 
 Each function is independent and surfaces results in the dashboard.
 """

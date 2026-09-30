@@ -1,6 +1,6 @@
 """
 FastAPI serving layer for the Superstore Margin Intelligence System.
-Decoupled from the dashboard — real API endpoints with auto-generated OpenAPI docs.
+Decoupled from the dashboard - real API endpoints with auto-generated OpenAPI docs.
 """
 
 import sys
@@ -82,7 +82,7 @@ def load_all_models():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load models on startup, clean up on shutdown."""
-    logger.info("Starting up — loading models...")
+    logger.info("Starting up - loading models...")
     load_all_models()
     yield
     logger.info("Shutting down")
@@ -94,11 +94,11 @@ app = FastAPI(
     API for the Superstore Margin Intelligence System.
     
     **Endpoints:**
-    * `/predict/loss-risk` — Predict whether an order will be unprofitable
-    * `/predict/max-discount` — Get safe discount ceiling for a configuration
-    * `/predict/crop-risk` — Predict yield-collapse risk (Crop Yield Intelligence)
-    * `/forecast` — Get monthly sales forecast
-    * `/health` — Liveness check with model status
+    * `/predict/loss-risk` - Predict whether an order will be unprofitable
+    * `/predict/max-discount` - Get safe discount ceiling for a configuration
+    * `/predict/crop-risk` - Predict yield-collapse risk (Crop Yield Intelligence)
+    * `/forecast` - Get monthly sales forecast
+    * `/health` - Liveness check with model status
     
     The dashboard at `/docs` provides interactive testing.
     """,
@@ -119,7 +119,7 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health():
-    """Liveness check — returns model loading status."""
+    """Liveness check - returns model loading status."""
     return HealthResponse(
         status="healthy" if state.loaded else "degraded",
         model_loaded=state.artifacts is not None,

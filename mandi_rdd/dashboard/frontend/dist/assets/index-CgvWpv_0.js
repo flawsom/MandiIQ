@@ -83,7 +83,7 @@ Error generating stack: `+c.message+`
                       border-color 0.35s ease;
         }
 
-        /* Crosshair corner markers — Alche active-target pattern */
+        /* Crosshair corner markers - Alche active-target pattern */
         .flip-kpi-card::before {
           content: '';
           position: absolute;

@@ -1,4 +1,4 @@
-# MandiIQ — Handoff Document
+# MandiIQ - Handoff Document
 
 ## Project Overview
 
@@ -10,9 +10,9 @@ MandiIQ is an agricultural market intelligence dashboard. It ingests price data 
 
 | Service | URL | Hosting | Purpose |
 |---------|-----|---------|---------|
-| **API** | `https://mandiiq-api-lnd7.onrender.com` | Render | FastAPI — data ingestion, RDD analysis, dashboard JSON serving, metrics push |
-| **Dashboard** | `https://mandiiq.streamlit.app` | Streamlit Cloud | Streamlit UI — pages: Dashboard, RDD Explorer, Price Trends, Commodity Health, About |
-| **GitHub Pages** | `https://flawsom.github.io/MandiIQ` | GitHub Pages | Static assets — heartbeat monitor, docs |
+| **API** | `https://mandiiq-api-lnd7.onrender.com` | Render | FastAPI - data ingestion, RDD analysis, dashboard JSON serving, metrics push |
+| **Dashboard** | `https://mandiiq.streamlit.app` | Streamlit Cloud | Streamlit UI - pages: Dashboard, RDD Explorer, Price Trends, Commodity Health, About |
+| **GitHub Pages** | `https://flawsom.github.io/MandiIQ` | GitHub Pages | Static assets - heartbeat monitor, docs |
 | **Custom Domain** | `https://mandiiq.unifies.codes` | Vercel rewrite → GitHub Pages | Vercel rewrite proxy (in `flawsom/mandiiq-redirect` repo) |
 | **GitHub Repo** | `https://github.com/flawsom/MandiIQ` | GitHub | Source code + DuckDB data (LFS) |
 
@@ -80,12 +80,12 @@ ALL_INDIA_RAINFALL_API_KEY = "<set>"
 ```
 mandi_rdd/
 ├── api/
-│   ├── main.py              # FastAPI app — endpoints, pipeline, cache
+│   ├── main.py              # FastAPI app - endpoints, pipeline, cache
 │   └── metrics_push.py       # Grafana Cloud pushgateway thread
 ├── dashboard/
-│   ├── app.py                # Streamlit app — pages, navigation, CSS, topbar, footer
+│   ├── app.py                # Streamlit app - pages, navigation, CSS, topbar, footer
 │   └── pages/
-│       ├── about.py          # About page — methodology, data sources
+│       ├── about.py          # About page - methodology, data sources
 │       ├── rdd_explorer.py   # RDD analysis explorer
 │       ├── price_trends.py   # Price trend charts
 │       └── commodity_health.py # Per-commodity freshness
@@ -103,17 +103,17 @@ docs/
 ## Current State (Fixed This Session)
 
 ### ✅ Fully Working
-- **API** — Healthy, responds at `mandiiq-api-lnd7.onrender.com`
-- **Dashboard cache** — Auto-warms on boot (`cache_size: 1`), heartbeat shows "Fresh"
-- **GitHub proxy** — `GH_TOKEN` set, `/proxy/github/` returns data (no 403)
-- **Grafana Cloud push** — `PROM_PASS` env var name fixed, thread starts on boot
-- **Footer** — Uses `st.html()` with inline styles, no more raw HTML code
-- **Topbar + CSS** — All HTML rendered via `st.html()` (no Markdown code-block issue)
-- **Custom domain** — `mandiiq.unifies.codes` rewrites to GitHub Pages via Vercel
-- **Daily ingest** — Runs on schedule, auto-commits DuckDB via LFS
-- **Heartbeat monitor** — Runs hourly, shows live cache status
-- **About page** — Citation code block removed, URL updated to `flawsom/MandiIQ`
-- **Secrets** — All set on GitHub, Render, and Streamlit Cloud
+- **API** - Healthy, responds at `mandiiq-api-lnd7.onrender.com`
+- **Dashboard cache** - Auto-warms on boot (`cache_size: 1`), heartbeat shows "Fresh"
+- **GitHub proxy** - `GH_TOKEN` set, `/proxy/github/` returns data (no 403)
+- **Grafana Cloud push** - `PROM_PASS` env var name fixed, thread starts on boot
+- **Footer** - Uses `st.html()` with inline styles, no more raw HTML code
+- **Topbar + CSS** - All HTML rendered via `st.html()` (no Markdown code-block issue)
+- **Custom domain** - `mandiiq.unifies.codes` rewrites to GitHub Pages via Vercel
+- **Daily ingest** - Runs on schedule, auto-commits DuckDB via LFS
+- **Heartbeat monitor** - Runs hourly, shows live cache status
+- **About page** - Citation code block removed, URL updated to `flawsom/MandiIQ`
+- **Secrets** - All set on GitHub, Render, and Streamlit Cloud
 
 ### 🔄 Pipeline (Runs on boot, takes 5-15 min)
 - Prices: loading from data.gov.in
@@ -126,19 +126,19 @@ docs/
 
 ## Known Issues / TODOs
 
-1. **Render redeploy resets pipeline** — Every push triggers a redeploy, resetting the in-memory data. The pipeline re-runs on boot but takes 5-15 minutes. Consider separating the API and pipeline into different services, or use persistent volume.
+1. **Render redeploy resets pipeline** - Every push triggers a redeploy, resetting the in-memory data. The pipeline re-runs on boot but takes 5-15 minutes. Consider separating the API and pipeline into different services, or use persistent volume.
 
-2. **DuckDB in LFS** — The 150MB DuckDB file is tracked by LFS. GitHub LFS has bandwidth limits (1GB/month free). The daily-ingest workflow re-creates the DB daily.
+2. **DuckDB in LFS** - The 150MB DuckDB file is tracked by LFS. GitHub LFS has bandwidth limits (1GB/month free). The daily-ingest workflow re-creates the DB daily.
 
-3. **Vercel SSL** — The `mandiiq.unifies.codes` domain had SSL issues during setup. Currently redirects via rewrite. If SSL cert is pending, it may need manual domain verification on Vercel.
+3. **Vercel SSL** - The `mandiiq.unifies.codes` domain had SSL issues during setup. Currently redirects via rewrite. If SSL cert is pending, it may need manual domain verification on Vercel.
 
-4. **Streamlit rendering** — All HTML content converted from `st.markdown()` to `st.html()` to avoid Markdown code-block issues. Streamlit 1.35+ required for `st.html()`.
+4. **Streamlit rendering** - All HTML content converted from `st.markdown()` to `st.html()` to avoid Markdown code-block issues. Streamlit 1.35+ required for `st.html()`.
 
-5. **Temp files in repo root** — Several `_fix_*.py`, `_check_*.py`, and other temp scripts were created during this session. Verify they're all deleted (`git clean -fd` to check).
+5. **Temp files in repo root** - Several `_fix_*.py`, `_check_*.py`, and other temp scripts were created during this session. Verify they're all deleted (`git clean -fd` to check).
 
-6. **Grafana Cloud dashboard** — The Grafana dashboard JSON at `docs/mandi_dashboard.json` should be deployed to Grafana Cloud for live metrics visualization.
+6. **Grafana Cloud dashboard** - The Grafana dashboard JSON at `docs/mandi_dashboard.json` should be deployed to Grafana Cloud for live metrics visualization.
 
-7. **Vercel redirect repo** — The `mandiiq-redirect` Vercel project was created in `flawsom/mandiiq-redirect` repo. The `vercel.json` with rewrite rules may have been pushed to `main` instead of `master` branch. Verify.
+7. **Vercel redirect repo** - The `mandiiq-redirect` Vercel project was created in `flawsom/mandiiq-redirect` repo. The `vercel.json` with rewrite rules may have been pushed to `main` instead of `master` branch. Verify.
 
 ---
 

@@ -1,5 +1,5 @@
 """
-MandiRDD — paginated mandi price ingestion from data.gov.in API.
+MandiRDD - paginated mandi price ingestion from data.gov.in API.
 
 Features:
 - Server-side filtering by state/commodity
@@ -198,11 +198,11 @@ def fetch_all_prices(
     Returns:
         List of record dicts, each with a ``_source`` metadata key.
     """
-    # Graceful skip if no API key — allows pipeline to run RDD on existing data
+    # Graceful skip if no API key - allows pipeline to run RDD on existing data
     try:
         _get_api_key()
     except RuntimeError:
-        logger.info("DATA_GOV_IN_API_KEY not set — skipping price fetch. RDD analysis can still run on existing data.")
+        logger.info("DATA_GOV_IN_API_KEY not set - skipping price fetch. RDD analysis can still run on existing data.")
         return []
 
     all_records = []

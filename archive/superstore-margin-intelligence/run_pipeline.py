@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Superstore Margin Intelligence System — End-to-End Pipeline.
+Superstore Margin Intelligence System - End-to-End Pipeline.
 
 Run with: python run_pipeline.py
 This executes: data cleaning -> feature engineering -> causal analysis -> model training -> forecasting -> optimization

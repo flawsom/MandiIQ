@@ -1,5 +1,5 @@
 """
-MandiRDD — Price-spike risk classifier.
+MandiRDD - Price-spike risk classifier.
 
 XGBoost + SHAP predicting whether a district-month will cross into
 a price-spike regime *next* month, using lagged rainfall trend,

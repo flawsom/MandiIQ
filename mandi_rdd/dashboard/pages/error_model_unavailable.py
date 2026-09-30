@@ -1,5 +1,5 @@
 """
-MandiIQ — Error: Model Unavailable page.
+MandiIQ - Error: Model Unavailable page.
 
 Shown when all orchestrator models are exhausted.
 Degraded view with explanation and last-known data.
@@ -23,7 +23,7 @@ def render():
                 border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0;">
         <p style="color: #ffffff; margin: 0;">
             The AI model chain is currently busy. This affects <strong>Ask MandiIQ</strong> 
-            and automated summaries — but all numbers below are live and unaffected.
+            and automated summaries - but all numbers below are live and unaffected.
         </p>
     </div>
     """, unsafe_allow_html=True)

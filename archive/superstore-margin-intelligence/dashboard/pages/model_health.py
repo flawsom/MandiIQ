@@ -2,7 +2,7 @@
 Model Health monitoring page for the Margin Intelligence Dashboard.
 
 Shows request volume, prediction distributions, drift flags, and latency.
-All traffic shown is simulated — labeled clearly as such.
+All traffic shown is simulated - labeled clearly as such.
 """
 
 import streamlit as st

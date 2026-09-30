@@ -5,11 +5,11 @@ import FlipBoard from "./FlipBoard";
 import type { KpiData } from "./FlipBoard";
 
 /**
- * Entry point — Streamlit custom component wiring.
+ * Entry point - Streamlit custom component wiring.
  *
  * FlipBoard receives KPI data from the Python backend via Streamlit
  * render events. The React tree persists across Streamlit script reruns,
- * so useRef values survive — this is why the flip animation lives here
+ * so useRef values survive - this is why the flip animation lives here
  * and not in injected CSS.
  */
 

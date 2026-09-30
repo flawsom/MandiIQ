@@ -15,11 +15,11 @@ LABELS = [
     ("enhancement",   "A2EEEF", "New feature or improvement request"),
     ("documentation", "0075CA", "Documentation changes or additions"),
     ("question",      "D876E3", "Further information is requested"),
-    ("good first issue", "7057FF", "Good for newcomers — smaller scope, clear instructions"),
-    ("help wanted",   "008672", "Extra attention is needed — maintainer could use assistance"),
-    ("wontfix",       "FFFFFF", "This will not be worked on — closed without action"),
+    ("good first issue", "7057FF", "Good for newcomers - smaller scope, clear instructions"),
+    ("help wanted",   "008672", "Extra attention is needed - maintainer could use assistance"),
+    ("wontfix",       "FFFFFF", "This will not be worked on - closed without action"),
     ("duplicate",     "CFD3D7", "This issue or discussion already exists"),
-    ("invalid",       "E4E669", "This doesn't seem right — not actionable"),
+    ("invalid",       "E4E669", "This doesn't seem right - not actionable"),
 ]
 
 

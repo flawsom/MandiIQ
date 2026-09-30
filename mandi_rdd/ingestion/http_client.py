@@ -1,17 +1,17 @@
 """
-MandiIQ — Shared HTTP client for ingestion pipelines.
+MandiIQ - Shared HTTP client for ingestion pipelines.
 
 Consolidates URL open, SSL context, retry, API key resolution, and
 safe-float parsing so every fetch_*.py module uses the same logic
 instead of duplicating SSL/retry/error-handling code.
 
 Exports:
-  SSL_CTX          — permissive SSL context for data.gov.in HTTPS
-  safe_float(val)  — parse a value to float or return None
-  get_api_key()    — resolve DATA_GOV_IN_API_KEY from env or .env
-  http_get()       — raw HTTP GET with retry → HTTPResponse
-  http_get_json()  — HTTP GET → parsed JSON
-  http_get_text()  — HTTP GET → decoded text
+  SSL_CTX          - permissive SSL context for data.gov.in HTTPS
+  safe_float(val)  - parse a value to float or return None
+  get_api_key()    - resolve DATA_GOV_IN_API_KEY from env or .env
+  http_get()       - raw HTTP GET with retry → HTTPResponse
+  http_get_json()  - HTTP GET → parsed JSON
+  http_get_text()  - HTTP GET → decoded text
 """
 
 import json

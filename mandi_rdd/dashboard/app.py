@@ -1,20 +1,20 @@
 """
 
-MandiIQ — Route-based Navigation Dashboard with Global Shell
+MandiIQ - Route-based Navigation Dashboard with Global Shell
 
 
 
 Entry point for Streamlit. Uses st.navigation() for proper URL routing,
 
-deep linking, and error page handling — replaces the old 5-tab layout.
+deep linking, and error page handling - replaces the old 5-tab layout.
 
 
 
-Sitemap (14 routes):
+Sitemap (15 routes):
 
   /  /discontinuity  /forecast  /risk-map  /satellite
 
-  /discount-simulator  /ask  /settings  /about
+  /discount-simulator  /analyst-lab  /ask  /settings  /about
 
   /onboarding  /loading  /404  /error/model-unavailable  /error/no-data
 
@@ -68,7 +68,7 @@ from mandi_rdd.dashboard.theme import (
 
 # ═══════════════════════════════════════════════════════════
 
-# SVG Icons — from shared icon library
+# SVG Icons - from shared icon library
 
 # ═══════════════════════════════════════════════════════════
 
@@ -116,7 +116,7 @@ from mandi_rdd.dashboard.pages.error_no_data import render as render_no_data
 
 
 
-# Orphan pages — previously unregistered in the nav
+# Orphan pages - previously unregistered in the nav
 
 from mandi_rdd.dashboard.pages.deep_dive import render as render_deep_dive
 
@@ -125,6 +125,8 @@ from mandi_rdd.dashboard.pages.causal_explorer import render as render_causal_ex
 from mandi_rdd.dashboard.pages.risk_forecast import render as render_risk_forecast
 
 from mandi_rdd.dashboard.pages.procurement_advisor import render as render_procurement_advisor
+
+from mandi_rdd.dashboard.pages.analyst_lab import render as render_analyst_lab
 
 
 
@@ -208,7 +210,7 @@ inject_atmosphere()
 
 # history.replaceState on the previous visit. This eliminates the
 
-# flash-of-wrong-theme — the correct CSS is served on the very first
+# flash-of-wrong-theme - the correct CSS is served on the very first
 
 # render instead of relying on a client-side restore + second rerun.
 
@@ -308,9 +310,9 @@ div[data-testid="stSidebar"] {{
 
 # JavaScript saves the preference to TWO places on every render:
 
-#   1. localStorage — for JavaScript-based reading
+#   1. localStorage - for JavaScript-based reading
 
-#   2. URL query param (?surface=true/false) — for server-side init on next visit
+#   2. URL query param (?surface=true/false) - for server-side init on next visit
 
 # The server reads the query param above to serve the correct CSS on first render,
 
@@ -324,7 +326,7 @@ st.html(
 
 (function(){{
 
-    // 1. Always sync the body class — never blocked by localStorage
+    // 1. Always sync the body class - never blocked by localStorage
 
     document.body.classList.toggle('theme-surface', {_js_val});
 
@@ -924,7 +926,7 @@ section[data-testid="stSidebar"] > div:nth-child(1) {{
 
 /* ── Sidebar responsive states ── */
 
-/* Desktop: expanded sidebar (>=1024px) — default */
+/* Desktop: expanded sidebar (>=1024px) - default */
 
 /* Tablet: collapsed sidebar (760-1024px) */
 
@@ -1122,7 +1124,7 @@ def _latest_pipeline_run():
 
 # ═══════════════════════════════════════════════════════════
 
-# Top Bar — rendered below after st.navigation()
+# Top Bar - rendered below after st.navigation()
 
 
 
@@ -1174,6 +1176,10 @@ _all_pages = [
 
             title="Discount Simulator", icon="\U0001f4b0", url_path="discount-simulator"),
 
+    st.Page(render_analyst_lab,
+
+            title="Analyst Lab", icon="\U0001f52c", url_path="analyst-lab"),
+
     st.Page(render_ask,
 
             title="Ask MandiIQ", icon="\U0001f4ac", url_path="ask"),
@@ -1212,7 +1218,7 @@ pg = st.navigation(_all_pages, position="hidden")
 
 # ═══════════════════════════════════════════════════════════
 
-# Top Bar — uses pg.title from st.navigation() for breadcrumb
+# Top Bar - uses pg.title from st.navigation() for breadcrumb
 
 # ═══════════════════════════════════════════════════════════
 

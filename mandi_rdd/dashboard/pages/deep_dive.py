@@ -1,5 +1,5 @@
 """
-MandiIQ — Deep Dive page.
+MandiIQ - Deep Dive page.
 
 Raw data explorer, analytical SQL query results.
 
@@ -92,7 +92,7 @@ def render(**kwargs):
                 st.markdown(f"*Showing {len(df)} records*")
             else:
                 st.markdown(
-                    '<div class="interpretation-box insig-box">No data — run the ingestion pipeline first.</div>',
+                    '<div class="interpretation-box insig-box">No data - run the ingestion pipeline first.</div>',
                     unsafe_allow_html=True,
                 )
         except Exception as e:
@@ -110,8 +110,8 @@ def render(**kwargs):
               Analytical SQL Queries
             </h2>
             <p style="color:#7e7e7e;font-size:0.85rem;max-width:680px;margin-bottom:1rem;">
-                Five analytical SQL queries mirroring the Superstore pattern —
-                window functions, CTEs, joins — applied to live government API data.
+                Five analytical SQL queries mirroring the Superstore pattern -
+                window functions, CTEs, joins - applied to live government API data.
             </p>
         """, unsafe_allow_html=True)
 

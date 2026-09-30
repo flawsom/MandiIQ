@@ -1,5 +1,5 @@
 """
-MandiIQ — AI Orchestration Layer (Phase 11)
+MandiIQ - AI Orchestration Layer (Phase 11)
 
 Multi-model router on OpenRouter free tier with circuit-breaker fallback,
 tool-calling to every internal endpoint, and no-hallucination grounding.

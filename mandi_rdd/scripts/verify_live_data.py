@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MandiIQ — End-to-End Live Data Verification.
+MandiIQ - End-to-End Live Data Verification.
 
 Checks all 4 production URLs are reachable and validates the API serves
 fresh (non-stale) data. Run daily via GitHub Actions cron.

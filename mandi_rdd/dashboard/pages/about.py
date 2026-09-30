@@ -1,8 +1,8 @@
 """
-MandiIQ — About / Methodology page.
+MandiIQ - About / Methodology page.
 
 Explains the RDD spec, robustness checks, limitations, and data sources.
-No mock data — all references are to real external data sources.
+No mock data - all references are to real external data sources.
 
 Design: glass cards for methodology sections,
 interpretation boxes, section labels, consistent monochrome-lime palette.
@@ -25,10 +25,10 @@ def render():
               Documentation
             </div>
             <h1 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:300;font-size:clamp(1.6rem,3vw,2.4rem);color:#ffffff;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:0.5rem;">
-              About MandiIQ — <span style="font-weight:600;color:#d7ff00;">Methodology</span>
+              About MandiIQ - <span style="font-weight:600;color:#d7ff00;">Methodology</span>
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
-              Causal inference, forecasting, and data sourcing — how every number on every page
+              Causal inference, forecasting, and data sourcing - how every number on every page
               is produced, with no mock data and no corner-cutting.
             </p>
           </div>
@@ -40,7 +40,7 @@ def render():
         <div class="interpretation-box">
             <strong>MandiIQ</strong> is a production-grade analytics platform that detects price
             discontinuities in Indian agricultural markets using <strong>Regression Discontinuity
-            Design (RDD)</strong> — the same causal inference method used in peer-reviewed economics research.
+            Design (RDD)</strong> - the same causal inference method used in peer-reviewed economics research.
         </div>
     """, unsafe_allow_html=True)
 
@@ -67,7 +67,7 @@ def render():
         <p style="color:#bababa;line-height:1.7;">
             By comparing districts <strong>just below</strong> and <strong>just above</strong> the −19%
             rainfall deficit threshold, we isolate the causal effect of drought stress on agricultural
-            prices — controlling for confounding factors that would otherwise bias the estimate.
+            prices - controlling for confounding factors that would otherwise bias the estimate.
         </p>
     """, unsafe_allow_html=True)
 
@@ -159,7 +159,7 @@ def render():
             04 / Data Sources
           </div>
           <h2 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:400;font-size:1.3rem;color:#ffffff;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">
-            All Live — No Mock Data
+            All Live - No Mock Data
           </h2>
         </div>
     """, unsafe_allow_html=True)
@@ -170,7 +170,7 @@ def render():
             <span style="color:#bababa;font-size:0.85rem;">
                 Every number on every page traces to a real fetch from an external API.
                 If a live fetch fails, the dashboard shows a degraded state with the last-known
-                timestamp — never a placeholder number invented to make a chart look populated.
+                timestamp - never a placeholder number invented to make a chart look populated.
             </span>
         </div>
     """, unsafe_allow_html=True)
@@ -212,7 +212,7 @@ def render():
         st.markdown(f"""
             <div class="glass" style="padding:0.8rem 1rem;margin:0.4rem 0;border-left:3px solid {RUST};">
                 <strong style="color:#ffffff;">{title}</strong>
-                <span style="color:#bababa;font-size:0.85rem;"> — {desc}</span>
+                <span style="color:#bababa;font-size:0.85rem;"> - {desc}</span>
             </div>
         """, unsafe_allow_html=True)
 

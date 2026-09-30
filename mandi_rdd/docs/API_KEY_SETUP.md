@@ -48,10 +48,10 @@ The public demo key on the API code is **rate-limited to ~100 requests/day**. Fo
 
 Your API key will be displayed in a single-use popup:
 ```
-Your new key is: <the popup shows it once — copy it now, never commit it>
+Your new key is: <the popup shows it once - copy it now, never commit it>
 ```
 
-**⚠️ Save this key immediately** — it will be hidden after closing.
+**⚠️ Save this key immediately** - it will be hidden after closing.
 
 #### 4. Configure MandiIQ
 
@@ -163,7 +163,7 @@ Your API key will be displayed:
 sk-or-v1-your_generated_key_here (starts with sk-or-v1-)
 ```
 
-**⚠️ Save this key immediately** — similar to data.gov.in.
+**⚠️ Save this key immediately** - similar to data.gov.in.
 
 #### 3. Configure MandiIQ
 

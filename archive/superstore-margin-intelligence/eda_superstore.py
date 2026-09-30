@@ -135,7 +135,7 @@ log(f"1. {top_cat} generates the most revenue (${cat_perf['sales'].iloc[0]:,.0f}
     f"{cat_perf['sales_share_pct'].iloc[0]:.1f}% of total sales).")
 log(f"2. '{worst_margin_cat}' has the weakest category margin ({cat_perf.loc[worst_margin_cat,'margin_pct']:.1f}%), "
     f"dragged down by loss-making sub-categories: {list(loss_making.index)}.")
-log(f"3. Discounts above 20% flip several segments unprofitable — margin falls from "
+log(f"3. Discounts above 20% flip several segments unprofitable - margin falls from "
     f"{disc_margin.iloc[0]:.1f}% at 0% discount to {disc_margin.iloc[-1]:.1f}% at 41%+ discount.")
 log(f"4. {region_perf.index[0]} is the top-performing region by sales (${region_perf['sales'].iloc[0]:,.0f}), "
     f"while {region_perf['margin_pct'].idxmin()} has the thinnest margin ({region_perf['margin_pct'].min():.1f}%).")

@@ -1,7 +1,7 @@
 # 🚀 MandiIQ Implementation Status
 
 **Date**: 2025-07-17
-**Status**: ✅ **~95% COMPLETE** — Core System Production-Ready
+**Status**: ✅ **~95% COMPLETE** - Core System Production-Ready
 
 ---
 
@@ -186,19 +186,19 @@ Circuit-Breaker:
 
 **Q: "What's the causal finding?"**
 
-**A**: Districts crossing IMD's official rainfall deficiency threshold (−19%) see a **consistent, robust price jump** (+₹350, or +24.5%) when multiplying by average product volume, using the `ln(volume)` extraction-feature. This can't be simply correlation — the discontinuity is statistically significant (p=0.003), passes placebo tests, and shows up across bandwidths.
+**A**: Districts crossing IMD's official rainfall deficiency threshold (−19%) see a **consistent, robust price jump** (+₹350, or +24.5%) when multiplying by average product volume, using the `ln(volume)` extraction-feature. This can't be simply correlation - the discontinuity is statistically significant (p=0.003), passes placebo tests, and shows up across bandwidths.
 
 ### Causal Explorer
 
 **Q: "What does the RDD plot show?"**
 
-**A**: Binned scatter plot shows a clear jump at tournament-qualification ~−19% rainfall departure. Prices on the left (below cutoff) average *₹87, price approximate, prices on the right (above cutoff) average *₹121 — difference of 350 rupees. Smoothed regression lines (10%, 15%, 20% bandwidths) all show the same jump direction and size, confirming robustness.
+**A**: Binned scatter plot shows a clear jump at tournament-qualification ~−19% rainfall departure. Prices on the left (below cutoff) average *₹87, price approximate, prices on the right (above cutoff) average *₹121 - difference of 350 rupees. Smoothed regression lines (10%, 15%, 20% bandwidths) all show the same jump direction and size, confirming robustness.
 
 ### Procurement Advisor
 
 **Q: "Should I lock in onion procurement in Nashik next month?"**
 
-**A**: High risk (85%) of a deficiency-driven price spike in Nashik next month. Based on the historical effect size of +₹350 per unit when crossing the deficiency threshold, locking in now is advisable — even with a modest cost of 2400 rupees per ton. Protracting negotiations past the next meteorological cycle increases your margin by at least 24%.
+**A**: High risk (85%) of a deficiency-driven price spike in Nashik next month. Based on the historical effect size of +₹350 per unit when crossing the deficiency threshold, locking in now is advisable - even with a modest cost of 2400 rupees per ton. Protracting negotiations past the next meteorological cycle increases your margin by at least 24%.
 
 ### "Ask MandiIQ" AI Chat
 
@@ -265,7 +265,7 @@ Background includes static **drifting gradient blobs** (monsoon clouds):
     animation: float-down 50s linear infinite reverse;
 }
 
-/* Faint lat/long dot grid — 4% opacity */
+/* Faint lat/long dot grid - 4% opacity */
 .dot-grid {
     background-image:
         radial-gradient(rgba(242, 239, 230, 0.06) 2px, transparent 2.5px);

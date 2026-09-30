@@ -1,5 +1,5 @@
 """
-MandiIQ — Risk & Forecast page.
+MandiIQ - Risk & Forecast page.
 
 Classifier risk scores by district and Prophet forecast chart.
 
@@ -120,13 +120,13 @@ def render(**kwargs):
                 conn.close()
 
                 if "error" not in comp:
-                    winner = comp.get("better_model", "—")
+                    winner = comp.get("better_model", "-")
                     if winner == "Prophet":
-                        st.markdown(f'<div class="interpretation-box" style="border-left-color:#d7ff00;">🏆 <strong>Winner: Prophet</strong> — {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="interpretation-box" style="border-left-color:#d7ff00;">🏆 <strong>Winner: Prophet</strong> - {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
                     elif winner == "LSTM":
-                        st.markdown(f'<div class="interpretation-box" style="border-left-color:#D9663B;">🏆 <strong>Winner: LSTM</strong> — {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="interpretation-box" style="border-left-color:#D9663B;">🏆 <strong>Winner: LSTM</strong> - {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
                     elif winner == "Tie":
-                        st.markdown(f'<div class="interpretation-box">⚖️ <strong>Tie</strong> — {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="interpretation-box">⚖️ <strong>Tie</strong> - {comp.get("explanation", "")}</div>', unsafe_allow_html=True)
                     else:
                         st.markdown(
                             f'<div class="interpretation-box insig-box">Comparison unavailable: {comp.get("explanation", "")}</div>',

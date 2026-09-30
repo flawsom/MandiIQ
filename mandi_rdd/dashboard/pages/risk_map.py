@@ -1,5 +1,5 @@
 """
-MandiIQ — Risk Map page.
+MandiIQ - Risk Map page.
 
 Full district ledger with pagination, sortable by rainfall deficit or price change.
 Optional choropleth-style grid visualization.
@@ -29,7 +29,7 @@ def render():
               District Intelligence
             </div>
             <h1 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:300;font-size:clamp(1.6rem,3vw,2.4rem);color:#ffffff;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:0.5rem;">
-              Risk Map — <span style="font-weight:600;color:#d7ff00;">District Overview</span>
+              Risk Map - <span style="font-weight:600;color:#d7ff00;">District Overview</span>
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
               All districts with rainfall deficit or price anomalies. Sort by risk tier,
@@ -104,7 +104,7 @@ def render():
                     <code style="color:#d7ff00;">python -m mandi_rdd.ingestion.ingest</code>
                 </p>
                 <p style="color:#7e7e7e;font-size:0.75rem;">
-                    Requires <strong>DATA_GOV_IN_API_KEY</strong> — get one free at
+                    Requires <strong>DATA_GOV_IN_API_KEY</strong> - get one free at
                     <a href="https://api.data.gov.in/manage" style="color:#d7ff00;">api.data.gov.in</a>
                 </p>
             </div>
@@ -149,7 +149,7 @@ def render():
         st.metric("High Risk", f"{high_risk}", delta_color="inverse")
     with col3:
         avg_deficit = df["rainfall_deficit"].mean()
-        st.metric("Avg Rainfall Deficit", f"{avg_deficit:.1f}%" if not pd.isna(avg_deficit) else "—")
+        st.metric("Avg Rainfall Deficit", f"{avg_deficit:.1f}%" if not pd.isna(avg_deficit) else "-")
     with col4:
         st.metric("Commodities", f"{df['commodity'].nunique()}")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -223,7 +223,7 @@ def render():
 
     # Format for display
     page_df["rainfall_deficit"] = page_df["rainfall_deficit"].apply(lambda x: "No Data" if pd.isna(x) else f"{x:.1f}%")
-    page_df["avg_price"] = page_df["avg_price"].apply(lambda x: f"₹{x:,.0f}" if pd.notna(x) else "—")
+    page_df["avg_price"] = page_df["avg_price"].apply(lambda x: f"₹{x:,.0f}" if pd.notna(x) else "-")
     page_df = page_df[["district", "commodity", "risk_tier", "rainfall_deficit", "avg_price"]]
     page_df.columns = ["District", "Commodity", "Risk Tier", "Rainfall Deficit", "Avg Price"]
 

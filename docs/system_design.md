@@ -1,4 +1,4 @@
-# System Design Document — Superstore Margin Intelligence Platform
+# System Design Document - Superstore Margin Intelligence Platform
 
 ## 1. Current Architecture
 
@@ -64,8 +64,8 @@ If this system needed to handle 10M orders/day instead of 10K total, the followi
 | SQLite log files | Cloud logging (CloudWatch / Stackdriver) |
 
 **Data warehouse choice:** BigQuery would be preferred for this scale because:
-- Serverless — no cluster management
-- SQL-native — minimal migration from DuckDB patterns
+- Serverless - no cluster management
+- SQL-native - minimal migration from DuckDB patterns
 - Built-in BI integration (Looker Studio)
 - Streaming buffer for real-time inserts
 
@@ -97,7 +97,7 @@ If this system needed to handle 10M orders/day instead of 10K total, the followi
 - **Champion/challenger:** Deploy new candidate model alongside current production, compare on a holdout
 
 **Model architecture at scale:**
-- Segmented models per category (Furniture, Technology, Office Supplies) — captures category-specific discount dynamics better than one global model
+- Segmented models per category (Furniture, Technology, Office Supplies) - captures category-specific discount dynamics better than one global model
 - Lightweight model for real-time inference (ONNX-runtime or TensorFlow Lite)
 - Deep model for batch re-evaluations (e.g., hourly batch scoring)
 
@@ -146,7 +146,7 @@ If this system needed to handle 10M orders/day instead of 10K total, the followi
 | Monitoring (Evidently + Datadog) | $1,000-3,000 |
 | **Total** | **$4,500-12,500/mo** |
 
-This is approximately $0.00015-0.00042 per prediction — within reasonable range for a B2B analytics product.
+This is approximately $0.00015-0.00042 per prediction - within reasonable range for a B2B analytics product.
 
 ---
 
@@ -190,7 +190,7 @@ This is approximately $0.00015-0.00042 per prediction — within reasonable rang
 | Streamlit over custom frontend | React / Next.js | Build speed: one day vs one week. For a portfolio project, Streamlit's simplicity is a feature. The trade-off is UI flexibility. |
 | Local MLflow over hosted | MLflow Cloud / Neptune | Cost: $0 vs $50+/mo. Local file-store is sufficient for a single-developer project. Cloud migration is zero-code (change tracking URI). |
 | Simple z-score drift vs Evidently | Evidently / WhyLabs | Simplicity: 50 lines vs integrating a full monitoring platform. The drift check is functional and correct; Evidently can be added later. |
-| Synthetic monitoring traffic | Real user traffic | Dataset is static — there are no real users. Labeling traffic as "simulated" is honest documentation, not a limitation. |
+| Synthetic monitoring traffic | Real user traffic | Dataset is static - there are no real users. Labeling traffic as "simulated" is honest documentation, not a limitation. |
 | Flat-file prediction logging | Logging database | For a portfolio project, CSV files are inspectable and sufficient. A real production system would use structured logging to CloudWatch/BigQuery. |
 | One global model vs segmented | Per-category models | A single model with categorical features captures category effects via learned embeddings. Segmented models would improve accuracy but add deployment complexity. The trade-off is justified at this data volume. |
 | Render free tier over Railway/Railway | Railway / Fly.io | Render's free tier (512MB RAM, 750 instance-hours/mo) is genuinely free with no card-required upgrades. Railway's free tier as of 2026 is $1/mo minimal-app-only. |
@@ -201,15 +201,15 @@ This is approximately $0.00015-0.00042 per prediction — within reasonable rang
 
 If asked "Tell me about this system and how you'd scale it," the response should cover:
 
-1. **One-sentence pitch:** "A margin intelligence system that predicts unprofitable discounts before approval — deployed as a decoupled API + dashboard with CI/CD and monitoring."
+1. **One-sentence pitch:** "A margin intelligence system that predicts unprofitable discounts before approval - deployed as a decoupled API + dashboard with CI/CD and monitoring."
 
-2. **Architecture walkthrough (60 seconds):** Data pipeline → Feature engineering → MLflow-tracked training → Model registry → FastAPI serving → Streamlit dashboard (point to diagram). Highlight the decoupling: "The dashboard never touches the model file — it calls the API, the same way any external service would."
+2. **Architecture walkthrough (60 seconds):** Data pipeline → Feature engineering → MLflow-tracked training → Model registry → FastAPI serving → Streamlit dashboard (point to diagram). Highlight the decoupling: "The dashboard never touches the model file - it calls the API, the same way any external service would."
 
 3. **Scaling answer (90 seconds):** "At 10M orders/day, DuckDB becomes BigQuery, pandas becomes a feature store, one FastAPI instance becomes auto-scaled behind a load balancer, and flat-file monitoring becomes Datadog with Evidently-based drift detection. The cost would be roughly $0.0002 per prediction."
 
 4. **Failure mode (30 seconds):** "If the model registry is down at startup, the API falls back to the last-known-good model. If drift is detected, it triggers automated retraining with a human-in-the-loop promotion gate."
 
-5. **Trade-off (30 seconds):** "I chose DuckDB over a warehouse because for 10K rows, it's free and functionally equivalent. The SQL queries are identical — migrating to BigQuery later is a config change, not a rewrite."
+5. **Trade-off (30 seconds):** "I chose DuckDB over a warehouse because for 10K rows, it's free and functionally equivalent. The SQL queries are identical - migrating to BigQuery later is a config change, not a rewrite."
 
 The key is demonstrating that you've *thought* about each choice, not that you made the perfect one. Architecture is about trade-offs, and showing that you understand the trade-offs is what interviewers look for.
 

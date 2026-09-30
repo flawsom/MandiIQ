@@ -1,4 +1,4 @@
-# MandiIQ — Daily End-to-End Live Data Verification
+# MandiIQ - Daily End-to-End Live Data Verification
 #
 # Runs daily at 08:00 UTC. Checks all 4 production URLs and validates
 # the API serves fresh (non-stale) data. Files a GitHub issue if any

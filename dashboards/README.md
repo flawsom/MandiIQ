@@ -23,7 +23,7 @@ Expected output (truncated):
 ```
 
 If you see `{"detail":"Dashboard template not found"}`, the dashboard file
-isn't deployed — file an issue at github.com/flawsom/MandiIQ.
+isn't deployed - file an issue at github.com/flawsom/MandiIQ.
 
 **Step 2: Configure Grafana's dashboard provisioning**
 
@@ -84,7 +84,7 @@ datasources:
 sudo systemctl restart grafana-server
 ```
 
-When importing, Grafana prompts for the `${DS_PROMETHEUS}` datasource —
+When importing, Grafana prompts for the `${DS_PROMETHEUS}` datasource -
 select the "MandiIQ Prometheus" datasource you just created.
 
 ### Option 2: Manual Import
@@ -123,7 +123,7 @@ sudo systemctl restart grafana-server
 
 ### Option 5: Full Observability Stack (Docker Compose)
 
-Stand up the entire stack — MandiIQ API + Prometheus + Grafana — in one command.
+Stand up the entire stack - MandiIQ API + Prometheus + Grafana - in one command.
 Prometheus scrapes the API's `/metrics` endpoint, and Grafana auto-provisions the
 dashboard from the `/grafana-dashboard` endpoint.
 
@@ -260,7 +260,7 @@ All dashboard panels reference the template variable **`${DS_PROMETHEUS}`**.
 - When importing manually, Grafana prompts you to select a Prometheus datasource
   to bind to this variable.
 - When using provisioning YAML, the datasource UID from your YAML config is
-  automatically resolved — no manual prompt.
+  automatically resolved - no manual prompt.
 - The variable name `DS_PROMETHEUS` is Grafana's standard convention for
   Prometheus datasource template variables.
 
@@ -321,7 +321,7 @@ mode](https://grafana.com/docs/agent/latest/static/), create
 `agent-config.yaml`:
 
 ```yaml
-# agent-config.yaml — Grafana Agent static mode
+# agent-config.yaml - Grafana Agent static mode
 server:
   log_level: info
 
@@ -390,46 +390,46 @@ docker run -d --name prometheus   -p 9090:9090   -v ./prometheus.yml:/etc/promet
 
 ```bash
 # Check the dashboard API endpoint
-curl -s https://mandiiq-api.onrender.com/grafana-dashboard | python -c "import json,sys; d=json.load(sys.stdin); print(f'Dashboard: {d.get(\"dashboard\",d).get(\"title\",\"?\")} — {len(d.get(\"dashboard\",d).get(\"panels\",[]))} panels')"
+curl -s https://mandiiq-api.onrender.com/grafana-dashboard | python -c "import json,sys; d=json.load(sys.stdin); print(f'Dashboard: {d.get(\"dashboard\",d).get(\"title\",\"?\")} - {len(d.get(\"dashboard\",d).get(\"panels\",[]))} panels')"
 
 # Check the /metrics endpoint
 curl -s https://mandiiq-api.onrender.com/metrics | head -20
 
 # Check the API is alive
-curl -s https://mandiiq-api.onrender.com/health | python -c "import json,sys; d=json.load(sys.stdin); print(f'Status: {d[\"status\"]} — {d[\"n_prices\"]:,} prices, {d[\"n_commodities\"]} commodities')"
+curl -s https://mandiiq-api.onrender.com/health | python -c "import json,sys; d=json.load(sys.stdin); print(f'Status: {d[\"status\"]} - {d[\"n_prices\"]:,} prices, {d[\"n_commodities\"]} commodities')"
 ```
 
 ## Panel Reference
 
 ### Row 1: Pipeline Health (stats)
-- **Pipeline Runs** — total completed runs
-- **Successful** — successful runs count
-- **Failures** — failed runs count
-- **Last Run Duration** — latest run time in seconds (thresholds: >60s yellow, >120s red)
-- **Time Since Last Run** — seconds since last run (thresholds: >10min yellow, >1h red)
-- **Success Rate** — `success / total` as a percentage
+- **Pipeline Runs** - total completed runs
+- **Successful** - successful runs count
+- **Failures** - failed runs count
+- **Last Run Duration** - latest run time in seconds (thresholds: >60s yellow, >120s red)
+- **Time Since Last Run** - seconds since last run (thresholds: >10min yellow, >1h red)
+- **Success Rate** - `success / total` as a percentage
 
 ### Row 2: Pipeline Run Status
-- **Run Status Over Time** — step-before area chart of success/failure cumulative counts
-- **Health Overview** — smoothed time series of last run duration and age
+- **Run Status Over Time** - step-before area chart of success/failure cumulative counts
+- **Health Overview** - smoothed time series of last run duration and age
 
 ### Row 3: Step Durations
-- **Duration by Stage** — horizontal bar gauge showing mean duration per pipeline step
-- **Duration Timeseries** — smoothed time series per step name
-- **Step Duration Summary** — table of mean, max, and count per step (sorted by mean desc)
-- **Step Outcomes** — step-before chart of success/failure per step
-- **Rows Ingested** — horizontal bar gauge of fetched vs new rows per step
+- **Duration by Stage** - horizontal bar gauge showing mean duration per pipeline step
+- **Duration Timeseries** - smoothed time series per step name
+- **Step Duration Summary** - table of mean, max, and count per step (sorted by mean desc)
+- **Step Outcomes** - step-before chart of success/failure per step
+- **Rows Ingested** - horizontal bar gauge of fetched vs new rows per step
 
 ### Row 4: API Calls
-- **API Call Latency** — time series of mean and max (dashed) latency per endpoint
-- **API Error Rate** — step-before area chart of success/failure per endpoint
-- **API Call Volume** — total call count per endpoint as horizontal bar gauge
-- **API Latency Buckets** — mean latency per endpoint as color-thresholded bar gauge
+- **API Call Latency** - time series of mean and max (dashed) latency per endpoint
+- **API Error Rate** - step-before area chart of success/failure per endpoint
+- **API Call Volume** - total call count per endpoint as horizontal bar gauge
+- **API Latency Buckets** - mean latency per endpoint as color-thresholded bar gauge
 
 ### Row 5: Pipeline Summary
-- **Latest Pipeline Snapshot** — stat panel showing latest success and failure counts
-- **API Summary** — stat rows per endpoint (success count, error count)
-- **Row Summary** — stat rows per step (fetched count, new count)
+- **Latest Pipeline Snapshot** - stat panel showing latest success and failure counts
+- **API Summary** - stat rows per endpoint (success count, error count)
+- **Row Summary** - stat rows per step (fetched count, new count)
 
 ## Metric Reference
 
@@ -437,19 +437,19 @@ The `/metrics` endpoint exposes the following Prometheus metrics:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `mandiiq_pipeline_runs_total` | counter | — | Total pipeline runs |
-| `mandiiq_pipeline_success_total` | counter | — | Successful runs |
-| `mandiiq_pipeline_failure_total` | counter | — | Failed runs |
+| `mandiiq_pipeline_runs_total` | counter | - | Total pipeline runs |
+| `mandiiq_pipeline_success_total` | counter | - | Successful runs |
+| `mandiiq_pipeline_failure_total` | counter | - | Failed runs |
 | `mandiiq_step_duration_seconds` | gauge | `step`, `quantile` | Step execution time (mean/max/count) |
 | `mandiiq_step_duration_histogram_seconds` | histogram | `step`, `le` | Step execution time histogram buckets |
 | `mandiiq_step_outcome_total` | counter | `step`, `result` | Step success/failure count |
 | `mandiiq_rows_total` | counter | `step`, `kind` | Rows fetched/new per step |
 | `mandiiq_api_duration_seconds` | gauge | `endpoint`, `quantile` | API call duration (mean/max/count) |
 | `mandiiq_api_calls_total` | counter | `endpoint`, `result` | API call success/failure count |
-| `mandiiq_last_pipeline_duration_seconds` | gauge | — | Latest run duration |
-| `mandiiq_last_pipeline_run_age_seconds` | gauge | — | Seconds since last run |
-| `mandiiq_uptime_seconds` | gauge | — | Server uptime |
-| `mandiiq_health_checks_total` | counter | — | Total health check requests |
+| `mandiiq_last_pipeline_duration_seconds` | gauge | - | Latest run duration |
+| `mandiiq_last_pipeline_run_age_seconds` | gauge | - | Seconds since last run |
+| `mandiiq_uptime_seconds` | gauge | - | Server uptime |
+| `mandiiq_health_checks_total` | counter | - | Total health check requests |
 
 > **Note:** Dots and hyphens in endpoint/step names are sanitized to
 > underscores in Prometheus labels (e.g. `data.gov.in` → `data_gov_in`).
@@ -466,7 +466,7 @@ The `/metrics` endpoint exposes the following Prometheus metrics:
 
 The API exposes a webhook endpoint that Grafana (or any external process) can
 POST to whenever the dashboard JSON changes. On receipt, the server clears its
-LRU cache and re-reads the JSON file from disk — no server restart needed.
+LRU cache and re-reads the JSON file from disk - no server restart needed.
 
 ### Endpoint
 
@@ -594,7 +594,7 @@ Expected response:
 
 This endpoint:
 
-1. **Clears the LRU cache** — the next request with a custom `?datasource=` triggers
+1. **Clears the LRU cache** - the next request with a custom `?datasource=` triggers
    a fresh deepcopy + patch from the newly loaded JSON.
 2. **Re-reads the JSON** from the configured `_dashboard_path` on disk and updates
    both the inner dashboard body and the full export (with `__inputs`/`__requires`).

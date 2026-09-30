@@ -1,7 +1,7 @@
 # Contributing to MandiIQ
 
 Thanks for your interest in MandiIQ. This document covers the things a first-time
-contributor needs to know — especially the repo conventions that aren't obvious
+contributor needs to know - especially the repo conventions that aren't obvious
 from the code alone.
 
 ## Canonical remote
@@ -26,10 +26,10 @@ git remote set-url origin https://github.com/flawsom/MandiIQ.git
 ```
 
 Any other repository (a separate project, a fork you maintain) should use a
-**distinct remote name** such as `margin-intelligence` or `fork` — never leave an
+**distinct remote name** such as `margin-intelligence` or `fork` - never leave an
 unrelated repo as `origin` in a MandiIQ working copy.
 
-## Data storage decision (PRD Phase 6 — external store)
+## Data storage decision (PRD Phase 6 - external store)
 
 The ingestion pipeline writes its DuckDB database to `mandi_rdd/data/mandi_iq.duckdb`
 by default. The path is configurable via the `MANDIIQ_DB_PATH` environment variable
@@ -55,10 +55,10 @@ check) still run against them.
 **Branch protection decision (PRD Phase 8, option A):** when `master` is put behind
 branch protection for external PRs, the ingestion bot's `GITHUB_TOKEN` actor should
 be **exempted** from the protection rules (GitHub supports this). The real gate is the
-data-integrity / no-mock-data check that runs on every bot commit — not human review
+data-integrity / no-mock-data check that runs on every bot commit - not human review
 of automated data commits.
 
-> Turn this on *after* the exemption is configured, not before — enabling protection
+> Turn this on *after* the exemption is configured, not before - enabling protection
 > first will silently break the scheduled workflow.
 
 ## Local setup
@@ -85,10 +85,10 @@ python -m mandi_rdd.run_nightly --max-records 5000
 
 ## API keys & secrets
 
-- `DATA_GOV_IN_API_KEY` — **required** for live price ingestion. A missing or invalid
+- `DATA_GOV_IN_API_KEY` - **required** for live price ingestion. A missing or invalid
   key fails the job loudly; there is **no fallback/default key** in the code.
-- `GEMINI_API_KEY` / `OPENROUTER_API_KEY` — for the LLM narrative + Ask MandiIQ.
-- `OPENMETEO_API_KEY` — optional weather source.
+- `GEMINI_API_KEY` / `OPENROUTER_API_KEY` - for the LLM narrative + Ask MandiIQ.
+- `OPENMETEO_API_KEY` - optional weather source.
 
 Never commit secrets or a fallback API key.
 
@@ -99,8 +99,12 @@ python -m pytest mandi_rdd/tests/ -q
 ```
 
 The suite includes `test_no_mock_data.py` (fails the build if any mock/fabricated
-data appears) and `test_scheduler_integrity.py` (missing-key-fail, idempotency,
-no-`[skip ci]` on the ingest commit).
+data appears), `test_scheduler_integrity.py` (missing-key-fail, idempotency,
+no-`[skip ci]` on the ingest commit), `test_api_contract.py` (documented routes
+and schemas stay stable), `test_orchestrator.py` (`/ask` commodity-detection
+regressions and tool fallbacks) and `test_analytics.py` / `test_analytics_db.py`
+(the conformal, drift, EVT, DML and nowcast estimators on synthetic ground
+truth and an in-memory DuckDB).
 
 ## Authorship & tooling note
 

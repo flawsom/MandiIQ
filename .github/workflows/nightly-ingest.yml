@@ -107,14 +107,14 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::warning::R2 secrets not configured — skipping backup"
+            echo "::warning::R2 secrets not configured - skipping backup"
             exit 0
           fi
           BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
           METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
           gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
           if [ ! -s "$BACKUP_FILE" ]; then
-            echo "::warning::gzip compression failed — skipping backup"
+            echo "::warning::gzip compression failed - skipping backup"
             rm -f "$BACKUP_FILE"
             exit 0
           fi
@@ -136,7 +136,7 @@ jobs:
             if [ -n "$DB_SHA256" ]; then
               python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             else
-              echo "::warning::sha256sum returned empty — writing metrics without integrity hash"
+              echo "::warning::sha256sum returned empty - writing metrics without integrity hash"
               python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             fi
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"
@@ -234,14 +234,14 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::warning::R2 secrets not configured — skipping backup"
+            echo "::warning::R2 secrets not configured - skipping backup"
             exit 0
           fi
           BACKUP_FILE="/tmp/mandi_iq.duckdb.gz"
           METRICS_FILE="mandi_rdd/data/r2_backup_metrics.json"
           gzip -c mandi_rdd/data/mandi_iq.duckdb > "$BACKUP_FILE"
           if [ ! -s "$BACKUP_FILE" ]; then
-            echo "::warning::gzip compression failed — skipping backup"
+            echo "::warning::gzip compression failed - skipping backup"
             rm -f "$BACKUP_FILE"
             exit 0
           fi
@@ -263,7 +263,7 @@ jobs:
             if [ -n "$DB_SHA256" ]; then
               python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'sha256': '${DB_SHA256}', 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             else
-              echo "::warning::sha256sum returned empty — writing metrics without integrity hash"
+              echo "::warning::sha256sum returned empty - writing metrics without integrity hash"
               python3 -c "import json; json.dump({'raw_bytes': ${ORIG_SIZE}, 'compressed_bytes': ${GZ_SIZE}, 'compression_pct': ${PCT}, 'timestamp_utc': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'timestamp_epoch': $(date +%s)}, open('${METRICS_FILE}', 'w'))"
             fi
             echo "::notice::R2 backup metrics written to ${METRICS_FILE}"

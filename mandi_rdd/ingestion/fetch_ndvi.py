@@ -22,7 +22,7 @@ COORDS_CACHE_PATH = (
     Path(__file__).resolve().parent.parent.parent / "data" / "district_coords.json"
 )
 
-# Sentinel-2 L2A evalscript — NDVI (Red=Band4, NIR=Band8) with dataMask
+# Sentinel-2 L2A evalscript - NDVI (Red=Band4, NIR=Band8) with dataMask
 NDVI_EVALSCRIPT = """
 //VERSION=3
 function setup() {
@@ -123,7 +123,7 @@ def geocode_district(district: str, state: str) -> Optional[tuple[float, float]]
         _save_coords_cache(cache)
         return (lat, lng)
 
-    logger.warning("No geocode result for %s — skipping", key)
+    logger.warning("No geocode result for %s - skipping", key)
     return None
 
 
@@ -270,13 +270,13 @@ def fetch_and_store_all_ndvi() -> int:
 
     logger.info("Mapped %d / %d districts", len(coords), len(districts))
     if not coords:
-        logger.error("No geocoded districts — cannot fetch NDVI")
+        logger.error("No geocoded districts - cannot fetch NDVI")
         return 0
 
     # 3. Auth
     client_id, client_secret = _get_client_credentials()
     token = _get_access_token(client_id, client_secret)
-    logger.info("Sentinel Hub authenticated — token valid ~60 min")
+    logger.info("Sentinel Hub authenticated - token valid ~60 min")
 
     # 4. Query NDVI per district
     all_records: list[dict] = []
@@ -301,7 +301,7 @@ def fetch_and_store_all_ndvi() -> int:
                     })
             time.sleep(0.3)
 
-        logger.info("  Batch %d/%d — %d NDVI records",
+        logger.info("  Batch %d/%d - %d NDVI records",
                      i // batch_size + 1, (len(keys) - 1) // batch_size + 1,
                      len(all_records))
 
@@ -364,4 +364,4 @@ if __name__ == "__main__":
     except ImportError:
         pass
     count = fetch_and_store_all_ndvi()
-    print(f"\nDone — stored {count} NDVI records")
+    print(f"\nDone - stored {count} NDVI records")

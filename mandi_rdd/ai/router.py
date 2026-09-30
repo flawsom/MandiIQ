@@ -1,5 +1,5 @@
 """
-MandiIQ — Multi-Provider LLM Router with Circuit Breaker (FREE-FIRST).
+MandiIQ - Multi-Provider LLM Router with Circuit Breaker (FREE-FIRST).
 
 Design:
 - Provider selection is automatic and free-first:
@@ -13,7 +13,7 @@ Design:
 - Logs which model served each call
 - Health check: pings each model once before nightly narrative generation
 
-This keeps the app 100% free and open source — Gemini's free tier needs no
+This keeps the app 100% free and open source - Gemini's free tier needs no
 paid subscription and no OpenRouter middleman.
 """
 
@@ -76,9 +76,9 @@ def _detect_provider() -> tuple[Optional[str], Optional[str]]:
     Detect which LLM provider to use. Free-first ordering.
 
     Returns (provider, api_key):
-        ("gemini", key)     — Google Gemini direct (free tier)
-        ("openrouter", key) — OpenRouter (free-tier models)
-        (None, None)       — no provider configured
+        ("gemini", key)     - Google Gemini direct (free tier)
+        ("openrouter", key) - OpenRouter (free-tier models)
+        (None, None)       - no provider configured
     """
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if gemini_key:
@@ -144,7 +144,7 @@ def _load_models(provider: Optional[str]) -> list[dict]:
     try:
         import yaml as _yaml
     except ImportError:
-        logger.warning("pyyaml not installed — using default model list")
+        logger.warning("pyyaml not installed - using default model list")
         return _default_models(provider)
 
     models_path = Path(__file__).resolve().parent / "models.yaml"
@@ -250,12 +250,12 @@ def call_llm(
         model_max_tokens = model_cfg.get("max_tokens", 2048)
 
         if _is_cooling_down(model_id):
-            logger.debug(f"Skipping {model_id} — cooling down")
+            logger.debug(f"Skipping {model_id} - cooling down")
             continue
 
         # Global deadline check
         if time.time() > _call_llm_deadline:
-            logger.warning("Global timeout reached — stopping model chain")
+            logger.warning("Global timeout reached - stopping model chain")
             break
 
         logger.info(f"Trying model: {model_id} ({model_name}) via {provider}")
@@ -298,7 +298,7 @@ def call_llm(
                 last_error = f"Rate limited on {model_id}: {e}"
                 logger.warning(last_error)
                 _mark_cooling_down(model_id, cool_min)
-                break  # Don't retry — move to next model
+                break  # Don't retry - move to next model
 
             except openai.APIStatusError as e:
                 if e.status_code >= 500:

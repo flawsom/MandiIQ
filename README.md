@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="docs/assets/svg/banner.svg" width="100%" alt="MandiIQ — causal price intelligence for India's agricultural mandis" />
+  <img src="docs/assets/svg/banner.svg" width="100%" alt="MandiIQ - causal price intelligence for India's agricultural mandis" />
 </div>
 
 <div align="center">
 
 ### Open-source agricultural price intelligence for India 🇮🇳
 
-**MandiIQ turns India's public mandi, rainfall and satellite data into causal market intelligence.** A regression-discontinuity engine measures how drought thresholds move prices, ML models forecast and score spike risk, and an hourly-refreshed DuckDB warehouse serves it all through FastAPI and a 14-route Streamlit cockpit.
+**MandiIQ turns India's public mandi, rainfall and satellite data into causal market intelligence.** A regression-discontinuity engine measures how drought thresholds move prices, ML models forecast and score spike risk, and an hourly-refreshed DuckDB warehouse serves it all through FastAPI and a 15-route Streamlit cockpit.
 
 <br/>
 
@@ -24,12 +24,12 @@
 <a href="https://github.com/flawsom/MandiIQ/pulls"><img src="https://img.shields.io/github/issues-pr/flawsom/MandiIQ?style=for-the-badge&label=PRs&color=7C8AA0&logo=github" alt="Pull requests" /></a>
 <a href="https://github.com/flawsom/MandiIQ/commits/master"><img src="https://img.shields.io/github/last-commit/flawsom/MandiIQ?style=for-the-badge&label=Last%20commit&color=5B6572&logo=git" alt="Last commit" /></a>
 
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=API&style=for-the-badge&color=2E7D32&cacheSeconds=600" alt="API health — auto-updating" /></a>
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.last_outcome&label=pipeline&style=for-the-badge&color=2E3A55&cacheSeconds=3600" alt="Pipeline outcome — auto-updating" /></a>
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_prices&label=price%20rows&style=for-the-badge&color=E8B14D&cacheSeconds=3600" alt="Price rows — auto-updating" /></a>
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_commodities&label=commodities&style=for-the-badge&color=D9663B&cacheSeconds=3600" alt="Commodities — auto-updating" /></a>
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_districts&label=districts&style=for-the-badge&color=7C8AA0&cacheSeconds=3600" alt="Districts — auto-updating" /></a>
-<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_rdd_results&label=RDD%20estimates&style=for-the-badge&color=5B8C6E&cacheSeconds=3600" alt="RDD estimates — auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=API&style=for-the-badge&color=2E7D32&cacheSeconds=600" alt="API health - auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.last_outcome&label=pipeline&style=for-the-badge&color=2E3A55&cacheSeconds=3600" alt="Pipeline outcome - auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_prices&label=price%20rows&style=for-the-badge&color=E8B14D&cacheSeconds=3600" alt="Price rows - auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_commodities&label=commodities&style=for-the-badge&color=D9663B&cacheSeconds=3600" alt="Commodities - auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_districts&label=districts&style=for-the-badge&color=7C8AA0&cacheSeconds=3600" alt="Districts - auto-updating" /></a>
+<a href="#live-status"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_rdd_results&label=RDD%20estimates&style=for-the-badge&color=5B8C6E&cacheSeconds=3600" alt="RDD estimates - auto-updating" /></a>
 
 <br/>
 
@@ -41,7 +41,7 @@
 
 <br/>
 
-<sub>Live counters above are rendered from the production <code>/health</code> endpoint and refresh hourly — this file never drifts from the running system.</sub>
+<sub>Live counters above are rendered from the production <code>/health</code> endpoint and refresh hourly - this file never drifts from the running system.</sub>
 
 </div>
 
@@ -49,7 +49,7 @@
 
 <div align="center">
 
-📡 [Live status](#live-status) &nbsp;·&nbsp; 🎯 [The causal finding](#the-causal-finding) &nbsp;·&nbsp; ✨ [Features](#features) &nbsp;·&nbsp; 🏗 [Architecture](#architecture) &nbsp;·&nbsp; 🛠 [Tech stack](#tech-stack) &nbsp;·&nbsp; ⚡ [Quick start](#quick-start) &nbsp;·&nbsp; 📁 [Structure](#project-structure) &nbsp;·&nbsp; 🔐 [Env vars](#environment-variables) &nbsp;·&nbsp; 📖 [API](#api-documentation) &nbsp;·&nbsp; 🎯 [Usage](#usage-examples) &nbsp;·&nbsp; 📸 [Screenshots](#screenshots) &nbsp;·&nbsp; 🎥 [Demo](#demo) &nbsp;·&nbsp; 📊 [Performance](#performance) &nbsp;·&nbsp; 🧪 [Testing](#testing) &nbsp;·&nbsp; 🚀 [Deploy](#deployment) &nbsp;·&nbsp; 🤝 [Contributing](#contributing) &nbsp;·&nbsp; 🗺 [Roadmap](#roadmap) &nbsp;·&nbsp; ❓ [FAQ](#faq) &nbsp;·&nbsp; 🙌 [Credits](#acknowledgements) &nbsp;·&nbsp; 📜 [License](#license) &nbsp;·&nbsp; ❤️ [Support](#support)
+📡 [Live status](#live-status) &nbsp;·&nbsp; 🎯 [The causal finding](#the-causal-finding) &nbsp;·&nbsp; 🧪 [Analytics](#analytics-engine) &nbsp;·&nbsp; ✨ [Features](#features) &nbsp;·&nbsp; 🏗 [Architecture](#architecture) &nbsp;·&nbsp; 🛠 [Tech stack](#tech-stack) &nbsp;·&nbsp; ⚡ [Quick start](#quick-start) &nbsp;·&nbsp; 📁 [Structure](#project-structure) &nbsp;·&nbsp; 🔐 [Env vars](#environment-variables) &nbsp;·&nbsp; 📖 [API](#api-documentation) &nbsp;·&nbsp; 🎯 [Usage](#usage-examples) &nbsp;·&nbsp; 📸 [Screenshots](#screenshots) &nbsp;·&nbsp; 🎥 [Demo](#demo) &nbsp;·&nbsp; 📊 [Performance](#performance) &nbsp;·&nbsp; 🧪 [Testing](#testing) &nbsp;·&nbsp; 🚀 [Deploy](#deployment) &nbsp;·&nbsp; 🤝 [Contributing](#contributing) &nbsp;·&nbsp; 🗺 [Roadmap](#roadmap) &nbsp;·&nbsp; ❓ [FAQ](#faq) &nbsp;·&nbsp; 🙌 [Credits](#acknowledgements) &nbsp;·&nbsp; 📜 [License](#license) &nbsp;·&nbsp; ❤️ [Support](#support)
 
 </div>
 
@@ -57,12 +57,12 @@
 
 ## 📡 Live status
 
-Everything below is real, public and **automatically refreshed** — no mock data, no screenshots pretending to be infrastructure.
+Everything below is real, public and **automatically refreshed** - no mock data, no screenshots pretending to be infrastructure.
 
 | Service | What it is | Status |
 | :------ | :--------- | :----- |
 | **Landing page** | Product tour, live KPIs, pipeline explainer | [![Landing](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.unifies.codes&style=flat-square&label=mandiiq.unifies.codes&up_color=2E7D32)](https://mandiiq.unifies.codes) |
-| **Streamlit cockpit** | 14 routes — overview, discontinuity, forecast, risk map, satellite, advisor, ask. Currently access-restricted on Streamlit Cloud (login) — run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
+| **Streamlit cockpit** | 14 routes - overview, discontinuity, forecast, risk map, satellite, advisor, ask. Currently access-restricted on Streamlit Cloud (login) - run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
 | **FastAPI (primary)** | 29 endpoints + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
 | **FastAPI (NDVI instance)** | Second Northflank instance carrying satellite NDVI rows | [![API mirror](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--zbvjrztgjqgw.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--zbvjrztgjqgw.code.run/docs) |
 | **GitHub Pages** | Static docs, SEO surface and heartbeat monitor | [![Pages](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2F&style=flat-square&label=flawsom.github.io%2FMandiIQ&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/) |
@@ -81,7 +81,7 @@ Everything below is real, public and **automatically refreshed** — no mock dat
 | Cached RDD estimates | ![RDD](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.n_rdd_results&label=RDD%20estimates&style=flat-square&color=5B8C6E&cacheSeconds=3600) |
 
 > [!NOTE]
-> **Freshness is a feature, not an afterthought.** The production API keeps a full ingestion pipeline running **in-process on a 1-hour loop** (`mandi_rdd/api/main.py`) and auto-heals an empty warehouse on boot. GitHub Actions layers on the scheduled jobs — nightly ingestion (05:30 UTC), NDVI/daily cycle (06:00 UTC), Ashoka import polling (every 3 h), dashboard heartbeat (every 6 h), freshness alerts (daily) and live-endpoint verification (daily). See [Data cadence](#data-cadence) for the full table.
+> **Freshness is a feature, not an afterthought.** The production API keeps a full ingestion pipeline running **in-process on a 1-hour loop** (`mandi_rdd/api/main.py`) and auto-heals an empty warehouse on boot. GitHub Actions layers on the scheduled jobs - nightly ingestion (05:30 UTC), NDVI/daily cycle (06:00 UTC), Ashoka import polling (every 3 h), dashboard heartbeat (every 6 h), freshness alerts (daily) and live-endpoint verification (daily). See [Data cadence](#data-cadence) for the full table.
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -89,7 +89,7 @@ Everything below is real, public and **automatically refreshed** — no mock dat
 
 ## 🎯 The causal finding
 
-> **Districts that cross IMD's −19% rainfall-deficiency threshold see a +₹350 (+24.5%) jump in onion modal prices — statistically significant at p = 0.003, robust across bandwidths, placebo-tested, and confirmed by fixed-effects regression.**
+> **Districts that cross IMD's −19% rainfall-deficiency threshold see a +₹350 (+24.5%) jump in onion modal prices - statistically significant at p = 0.003, robust across bandwidths, placebo-tested, and confirmed by fixed-effects regression.**
 
 This is the heart of MandiIQ: not a dashboard of charts, but a **causally identified effect** with an explicit identification strategy.
 
@@ -105,7 +105,7 @@ price = β0 + β1 · D + f(rainfall) + γX + ε
 | **Bandwidth sensitivity** | Re-estimated at 10 / 15 / 20 / 25 / 30% | Stable across all windows ✅ |
 | **Placebo cutoffs** | Fake thresholds at −10 / −5 / +5% | No spurious effect ✅ |
 | **McCrary density test** | Continuity of the running variable | No manipulation (p = 0.92) ✅ |
-| **Fixed-effects cross-check** | District + month FE regression | +₹298, p = 0.01 — agrees with RDD ✅ |
+| **Fixed-effects cross-check** | District + month FE regression | +₹298, p = 0.01 - agrees with RDD ✅ |
 
 <details>
 <summary><b>Primary estimate details (Onion · Nashik, Maharashtra)</b></summary>
@@ -125,6 +125,24 @@ price = β0 + β1 · D + f(rainfall) + γX + ε
 Full methodology: [`mandi_rdd/analysis/rdd_engine.py`](mandi_rdd/analysis/rdd_engine.py) · [`robustness.py`](mandi_rdd/analysis/robustness.py) · [`fixed_effects.py`](mandi_rdd/analysis/fixed_effects.py) · narrative in [`docs/system_design.md`](docs/system_design.md).
 
 </details>
+
+<img src="docs/assets/svg/divider.svg" width="100%" alt="" />
+
+<a name="analytics-engine"></a>
+
+## 🧪 The analytics engine
+
+Beyond the headline result, MandiIQ ships a full quantitative work-packet for every commodity. Each method answers one question a practitioner actually asks, and every estimator has synthetic ground-truth tests in CI:
+
+| Layer | Method | Question it answers |
+| :---- | :----- | :------------------ |
+| **Uncertainty** | Split conformal prediction + Adaptive Conformal Inference (Gibbs & Candès, 2021) | How wide is the honest band around the forecast, without assuming a noise distribution? |
+| **Reliability** | PSI · KS two-sample test · Page-Hinkley · EWMA control chart · 0-100 data-quality score | Has the market regime or the warehouse itself drifted under the models? |
+| **Tail risk** | Historical VaR/CVaR + peaks-over-threshold GPD fits (EVT) | How bad can a bad day get, including losses beyond the observed sample? |
+| **Causal sensitivity** | Cross-fitted partially-linear debiased ML (Chernozhukov et al.) | How much does the *whole* rainfall distribution move prices, away from the threshold? |
+| **Nowcasting** | Kalman local-linear-trend filter + RTS smoother (maximum-likelihood parameters) | What is this month's price level while mandi reporting is still incomplete? |
+
+All five run behind one composite endpoint, [`GET /analytics/{commodity}`](#api-documentation), and render on the **Analyst Lab** page of the cockpit. The estimators are implemented from first principles on NumPy/SciPy/scikit-learn, so every number is inspectable in the repository.
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -153,7 +171,7 @@ Prophet forecasts with volatility envelopes, an honest Prophet-vs-LSTM benchmark
 <td width="33%" valign="top">
 
 ### 🌦 Rainfall + satellite signals
-IMD sub-division rainfall departures and Sentinel Hub NDVI imagery joined to mandi prices at district/month grain — two independent stress signals, not one.
+IMD sub-division rainfall departures and Sentinel Hub NDVI imagery joined to mandi prices at district/month grain - two independent stress signals, not one.
 
 <sub>1,200+ rainfall rows · NDVI for 600+ districts on the mirror instance</sub>
 
@@ -163,7 +181,7 @@ IMD sub-division rainfall departures and Sentinel Hub NDVI imagery joined to man
 <td width="33%" valign="top">
 
 ### 🧠 Grounded AI orchestrator
-`/ask` detects commodity + district, calls the internal analysis tools, then routes the grounded result through a multi-provider chain — Gemini → NVIDIA NIM → OpenRouter — with circuit breakers and cooldowns.
+`/ask` detects commodity + district, calls the internal analysis tools, then routes the grounded result through a multi-provider chain - Gemini → NVIDIA NIM → OpenRouter - with circuit breakers and cooldowns.
 
 <sub>Answers cite the exact endpoints used; no numbers invented</sub>
 
@@ -173,12 +191,12 @@ IMD sub-division rainfall departures and Sentinel Hub NDVI imagery joined to man
 ### 🗄 DuckDB warehouse with lineage
 A single-file analytical warehouse (~1.6M price rows on the primary instance) with idempotent upserts, per-commodity freshness tracking and batch-level data lineage.
 
-<sub>Builds in minutes from public APIs — no external DB service needed</sub>
+<sub>Builds in minutes from public APIs - no external DB service needed</sub>
 
 </td>
 <td width="33%" valign="top">
 
-### 🖥 14-route Streamlit cockpit
+### 🖥 15-route Streamlit cockpit
 A designed product, not a demo: global shell, sidebar + breadcrumbs, flip-board KPIs, commodity colour system, error states and a dark turmeric/ink theme.
 
 <sub>`st.navigation()` routing · reduced-motion support</sub>
@@ -189,7 +207,7 @@ A designed product, not a demo: global shell, sidebar + breadcrumbs, flip-board 
 <td width="33%" valign="top">
 
 ### ⏱ Hourly, autonomous freshness
-The API runs the full ingestion pipeline on a 1-hour loop and re-runs it on boot when the warehouse is empty — data is never more than an hour behind the source.
+The API runs the full ingestion pipeline on a 1-hour loop and re-runs it on boot when the warehouse is empty - data is never more than an hour behind the source.
 
 <sub>Plus 16 GitHub Actions workflows for CI, ingest and monitoring</sub>
 
@@ -197,7 +215,7 @@ The API runs the full ingestion pipeline on a 1-hour loop and re-runs it on boot
 <td width="33%" valign="top">
 
 ### 💾 Offsite durability
-Compressed DuckDB snapshots push to Cloudflare R2 (`/admin/backup-to-r2`) and restore on demand (`/admin/restore-from-r2`) — volume loss is recoverable.
+Compressed DuckDB snapshots push to Cloudflare R2 (`/admin/backup-to-r2`) and restore on demand (`/admin/restore-from-r2`) - volume loss is recoverable.
 
 <sub>Nightly backup path wired into the ingest workflow</sub>
 
@@ -208,6 +226,32 @@ Compressed DuckDB snapshots push to Cloudflare R2 (`/admin/backup-to-r2`) and re
 Prometheus metrics at `/metrics`, a Grafana provisioning stack, per-commodity `/freshness`, a heartbeat monitor and a drift detector that compares production dashboards against the repo.
 
 <sub>Staleness > 48 h opens an automatic issue</sub>
+
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+
+### 🎯 Distribution-free uncertainty
+Split conformal intervals with the finite-sample (n+1)/n correction, plus adaptive conformal inference that tracks regime shifts online.
+
+<sub>Target coverage with no distributional assumptions</sub>
+
+</td>
+<td width="33%" valign="top">
+
+### 🧪 Drift + data-quality monitor
+PSI, KS, Page-Hinkley and EWMA monitors over prices, plus a 0-100 quality score built from completeness, freshness, stale quotes and outliers.
+
+<sub>Catches bad inputs before they become bad estimates</sub>
+
+</td>
+<td width="33%" valign="top">
+
+### 🌊 EVT tail risk + nowcasts
+GPD tail fits for VaR beyond the sample, drawdown and volatility stats, and Kalman nowcasts that project incomplete reporting months to month-end with an uncertainty band.
+
+<sub>Five research modules, all tested on synthetic ground truth</sub>
 
 </td>
 </tr>
@@ -319,7 +363,7 @@ flowchart TB
 <a name="data-cadence"></a>
 
 <details open>
-<summary><b>⏱ Data cadence — how the autonomous loop actually looks</b></summary>
+<summary><b>⏱ Data cadence - how the autonomous loop actually looks</b></summary>
 
 <br/>
 
@@ -375,6 +419,9 @@ flowchart TB
 <img src="https://img.shields.io/badge/XGBoost-FF6600?style=for-the-badge&logo=xgboost&logoColor=white" alt="XGBoost" />
 <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
 <img src="https://img.shields.io/badge/SHAP-9A7FBF?style=for-the-badge" alt="SHAP" />
+<img src="https://img.shields.io/badge/Conformal_prediction-E8B14D?style=for-the-badge" alt="Conformal prediction" />
+<img src="https://img.shields.io/badge/EVT_tail_risk-2E3A55?style=for-the-badge" alt="EVT tail risk" />
+<img src="https://img.shields.io/badge/Kalman_nowcasting-0B0F1E?style=for-the-badge" alt="Kalman nowcasting" />
 <img src="https://img.shields.io/badge/Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google Gemini" />
 <img src="https://img.shields.io/badge/NVIDIA_NIM-76B900?style=for-the-badge&logo=nvidia&logoColor=white" alt="NVIDIA NIM" />
 <img src="https://img.shields.io/badge/OpenRouter-000000?style=for-the-badge&logo=openai&logoColor=white" alt="OpenRouter" />
@@ -466,7 +513,7 @@ cp .env.example .env
 #   GEMINI_API_KEY=<free key from aistudio.google.com>
 ```
 
-**4 · Build the warehouse** — a fresh clone starts empty by design (no stale binaries in git):
+**4 · Build the warehouse** - a fresh clone starts empty by design (no stale binaries in git):
 
 ```bash
 python run_ingest.py
@@ -496,7 +543,7 @@ curl -s "http://localhost:8000/prices?commodity=Onion&limit=3" | python -m json.
 </details>
 
 <details>
-<summary><b>🐳 Docker — full stack in one command</b></summary>
+<summary><b>🐳 Docker - full stack in one command</b></summary>
 
 <br/>
 
@@ -521,19 +568,19 @@ The compose file builds both services from `mandi_rdd/Dockerfile` and wires the 
 ## 📁 Project structure
 
 <details>
-<summary><b>Repository map</b> — click to expand</summary>
+<summary><b>Repository map</b> - click to expand</summary>
 
 <br/>
 
 ```text
 MandiIQ/
 ├── mandi_rdd/                     # ── Python package (the product) ──
-│   ├── api/                       # FastAPI app — 29 endpoints, metrics push
+│   ├── api/                       # FastAPI app - 29 endpoints, metrics push
 │   ├── ai/                        # LLM router (circuit breaker) + orchestrator + models.yaml
 │   ├── analysis/                  # RDD engine, robustness, fixed effects,
 │   │                              #   Prophet / LSTM forecasts, XGBoost, prescriptive
 │   ├── core/                      # Shared metrics / utilities
-│   ├── dashboard/                 # Streamlit shell — 14 routes, design system
+│   ├── dashboard/                 # Streamlit shell - 14 routes, design system
 │   │   ├── pages/                 #   executive overview, discontinuity, forecast,
 │   │   │                          #   risk map, satellite, advisor, ask, settings, errors
 │   │   └── frontend/              #   React + TS flip-board KPI component (built dist/)
@@ -569,7 +616,7 @@ MandiIQ/
 ## 🔐 Environment variables
 
 <details>
-<summary><b>Full reference</b> — copy <code>.env.example</code> → <code>.env</code> and fill what you need</summary>
+<summary><b>Full reference</b> - copy <code>.env.example</code> → <code>.env</code> and fill what you need</summary>
 
 <br/>
 
@@ -623,7 +670,7 @@ MandiIQ/
 | `CORS_ORIGINS` | No | Allowed origins (comma-separated) |
 
 > [!WARNING]
-> **Never commit real keys.** All secrets belong in `.env` (git-ignored), platform secret stores or GitHub Secrets — not in config files or docs. See [SECURITY.md](SECURITY.md).
+> **Never commit real keys.** All secrets belong in `.env` (git-ignored), platform secret stores or GitHub Secrets - not in config files or docs. See [SECURITY.md](SECURITY.md).
 
 </details>
 
@@ -648,6 +695,12 @@ MandiIQ/
 | `GET` | `/forecast/{commodity}` | Prophet forecast with volatility envelope (`?compare=true` adds LSTM) |
 | `GET` | `/risk-score/{commodity}` | XGBoost spike-risk probability (`?district=` optional) |
 | `GET` | `/recommendation/{commodity}` | Procurement advice from RDD + forecast + risk (`?district=` optional) |
+| `GET` | `/analytics/{commodity}` | Composite deep-dive: conformal, drift, tail risk, DML, nowcast |
+| `GET` | `/conformal/{commodity}` | Distribution-free prediction intervals around the forecast |
+| `GET` | `/drift/{commodity}` | PSI / KS / Page-Hinkley / EWMA + data-quality score |
+| `GET` | `/tail-risk/{commodity}` | Historical VaR/CVaR, EVT GPD tail fit, max drawdown |
+| `GET` | `/dml/{commodity}` | Cross-fitted debiased rainfall-price sensitivity |
+| `GET` | `/nowcast/{commodity}` | Kalman month-end nowcast for incomplete reporting |
 | `POST` | `/ask` | Tool-grounded AI answer across the analysis stack |
 
 </details>
@@ -720,6 +773,9 @@ curl -s "$BASE/risk-score/Onion?district=Nashik" | python -m json.tool
 curl -s -X POST $BASE/ask \
   -H "Content-Type: application/json" \
   -d '{"query":"Should I lock in onion procurement in Nashik next month?"}' | python -m json.tool
+
+# Composite analytics deep-dive (conformal + drift + tail risk + DML + nowcast)
+curl -s $BASE/analytics/Onion | python -m json.tool
 ```
 
 <details>
@@ -786,7 +842,7 @@ curl -s -X POST $BASE/ask \
 ## 🎯 Usage examples
 
 <details open>
-<summary><b>Scenario 1 — “Is it a drought year for my onion sourcing district?”</b></summary>
+<summary><b>Scenario 1 - “Is it a drought year for my onion sourcing district?”</b></summary>
 
 <br/>
 
@@ -800,7 +856,7 @@ curl -s "$BASE/robustness/Onion" | python -m json.tool
 </details>
 
 <details>
-<summary><b>Scenario 2 — “How much risk is in next month's potato price?”</b></summary>
+<summary><b>Scenario 2 - “How much risk is in next month's potato price?”</b></summary>
 
 <br/>
 
@@ -814,7 +870,7 @@ curl -s "$BASE/recommendation/Potato?district=Agra" | python -m json.tool
 </details>
 
 <details>
-<summary><b>Scenario 3 — “Ask MandiIQ” in plain language</b></summary>
+<summary><b>Scenario 3 - “Ask MandiIQ” in plain language</b></summary>
 
 <br/>
 
@@ -824,12 +880,12 @@ curl -s -X POST "$BASE/ask" -H "Content-Type: application/json" -d '{
 }'
 ```
 
-The orchestrator detects commodity/district, calls `/rdd-result`, `/forecast`, `/risk-score` and friends, then answers **only from the tool outputs** — the response includes `model_used` and `endpoints_used` so every claim is traceable.
+The orchestrator detects commodity/district, calls `/rdd-result`, `/forecast`, `/risk-score` and friends, then answers **only from the tool outputs** - the response includes `model_used` and `endpoints_used` so every claim is traceable.
 
 </details>
 
 <details>
-<summary><b>Scenario 4 — Python client (as the dashboard does it)</b></summary>
+<summary><b>Scenario 4 - Python client (as the dashboard does it)</b></summary>
 
 <br/>
 
@@ -860,7 +916,7 @@ print(healthy(), get_forecast("Onion")["commodity"])
 
 <div align="center">
 
-**Executive overview — live Streamlit cockpit**
+**Executive overview - live Streamlit cockpit**
 
 <img src="docs/dashboard-shot.png" width="92%" alt="MandiIQ executive overview" />
 
@@ -901,7 +957,7 @@ print(healthy(), get_forecast("Onion")["commodity"])
 | Platform | Link | What you'll see |
 | :------- | :--- | :-------------- |
 | 🚀 **Live product** | [mandiiq.unifies.codes](https://mandiiq.unifies.codes) | Landing tour, live KPIs, pipeline walkthrough |
-| 📊 **Interactive cockpit** | [mandiiq.streamlit.app](https://mandiiq.streamlit.app) | 14 routes against live warehouse data — currently behind Streamlit Cloud login; run `streamlit run mandi_rdd/dashboard/app.py` for the open experience |
+| 📊 **Interactive cockpit** | [mandiiq.streamlit.app](https://mandiiq.streamlit.app) | 14 routes against live warehouse data - currently behind Streamlit Cloud login; run `streamlit run mandi_rdd/dashboard/app.py` for the open experience |
 | 📖 **API playground** | [`/docs`](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) | Try every endpoint from the browser |
 | 💓 **Heartbeat monitor** | [flawsom.github.io/MandiIQ/heartbeat-dashboard.html](https://flawsom.github.io/MandiIQ/heartbeat-dashboard.html) | Cache health and freshness in real time |
 | 🗺 **System design write-up** | [docs/system_design.md](docs/system_design.md) | Architecture decisions and trade-offs |
@@ -931,7 +987,7 @@ print(healthy(), get_forecast("Onion")["commodity"])
 
 ## 📊 Performance
 
-**Measured live on 2026-09-30** from a cloud runner against the primary production instance (median of 3 calls — cold-start variance included):
+**Measured live on 2026-09-30** from a cloud runner against the primary production instance (median of 3 calls - cold-start variance included):
 
 | Endpoint | Median response | Notes |
 | :------- | :-------------- | :---- |
@@ -947,7 +1003,7 @@ print(healthy(), get_forecast("Onion")["commodity"])
 | Model | Metric | Result |
 | :---- | :----- | :----- |
 | Prophet | MAPE | **11.2%** |
-| LSTM (benchmark) | MAPE | 13.7% — kept as an honest comparison, not the winner |
+| LSTM (benchmark) | MAPE | 13.7% - kept as an honest comparison, not the winner |
 | XGBoost spike classifier | ROC-AUC | **0.81** |
 
 **Warehouse scale** (production counters, auto-updating in [Live status](#live-status)):
@@ -958,11 +1014,11 @@ print(healthy(), get_forecast("Onion")["commodity"])
 | Commodities | 436 | 423 |
 | Districts | 668 | 667 |
 | Rainfall rows | 1,206 | 2,278 |
-| NDVI rows | — | 3,663 |
+| NDVI rows | - | 3,663 |
 | Cached RDD estimates | 47 | 33 |
 
 > [!NOTE]
-> Latency numbers depend on the runner's distance to the region and on cold starts — they are deliberately reported as measured, not as marketing. Re-run them yourself with `time curl …` against the live instance.
+> Latency numbers depend on the runner's distance to the region and on cold starts - they are deliberately reported as measured, not as marketing. Re-run them yourself with `time curl …` against the live instance.
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -990,7 +1046,19 @@ ruff check mandi_rdd/
 | `mermaid-validate` | Validates Mermaid diagrams in docs |
 | `skylos-scan` | Static quality scan against the project's complexity budget |
 
-**Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. Restoring the historical `test_no_mock_data` guard is on the [roadmap](#roadmap).
+**Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
+
+**Suite layout** (`mandi_rdd/tests/`):
+
+| File | Covers |
+| :--- | :----- |
+| `test_verification.py` | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
+| `test_no_mock_data.py` | Fails the build if fabricated-data markers or mock libraries appear in shipping code |
+| `test_scheduler_integrity.py` | Missing-key failure, idempotent upserts, workflow schedule/secret/CI policy |
+| `test_api_contract.py` | Documented routes exist and `/ask` schemas stay backwards compatible |
+| `test_orchestrator.py` | `/ask` commodity-detection regressions plus tool-fallback behaviour |
+| `test_analytics.py` | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
+| `test_analytics_db.py` | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -1046,7 +1114,7 @@ fly deploy
 
 <br/>
 
-Point Streamlit Cloud at this repo, entrypoint `mandi_rdd/dashboard/app.py`, and set `MANDIQ_API_URL` in the app secrets to your deployed API. The dashboard loads data from the API — no DuckDB required in the cloud runtime.
+Point Streamlit Cloud at this repo, entrypoint `mandi_rdd/dashboard/app.py`, and set `MANDIQ_API_URL` in the app secrets to your deployed API. The dashboard loads data from the API - no DuckDB required in the cloud runtime.
 
 </details>
 
@@ -1072,7 +1140,7 @@ The image is self-contained (no external database), so ECS / DigitalOcean App Pl
 
 ## 🤝 Contributing
 
-Contributions are welcome — data pipelines, additional commodities, model improvements, docs and design polish alike.
+Contributions are welcome - data pipelines, additional commodities, model improvements, docs and design polish alike.
 
 ```bash
 # 1 · fork, then branch from master
@@ -1090,11 +1158,11 @@ git commit -m "feat: add cumin to the tracked commodity set"
 
 | Convention | Detail |
 | :--------- | :----- |
-| **Commits** | [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `ci:`, `perf:` |
+| **Commits** | [Conventional Commits](https://www.conventionalcommits.org/) - `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `ci:`, `perf:` |
 | **Branches** | `feature/*`, `fix/*`, `refactor/*` from `master` |
-| **Data** | Live public data only — PRs must not introduce mock datasets |
+| **Data** | Live public data only - PRs must not introduce mock datasets |
 | **Checks** | CI (tests · lint · Mermaid validation) must be green before merge |
-| **Authorship** | Commits are attributed to human contributors and the `mandiiq-bot` ingestion automation only — no AI-assistant co-author trailers (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| **Authorship** | Commits are attributed to human contributors and the `mandiiq-bot` ingestion automation only - no AI-assistant co-author trailers (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md) before opening an issue.
 
@@ -1111,7 +1179,9 @@ Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_O
 - [x] Prophet vs LSTM benchmark, XGBoost spike-risk classifier + SHAP
 - [x] Prescriptive procurement advisor
 - [x] Multi-provider AI router with circuit breakers (Gemini → NVIDIA NIM → OpenRouter)
-- [x] 14-route Streamlit cockpit with a full design system
+- [x] 15-route Streamlit cockpit with a full design system
+- [x] Analytics engine: conformal intervals, drift monitoring, EVT tail risk, debiased ML, Kalman nowcasting (Analyst Lab page)
+- [x] Restored + expanded test suite: no-mock-data guard, scheduler integrity, API contracts, `/ask` regressions, analytics ground truth
 - [x] Hourly in-process refresh + boot-time auto-heal
 - [x] NDVI satellite pipeline + satellite page
 - [x] Ashoka CEDA historical import (background worker)
@@ -1123,9 +1193,7 @@ Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_O
 
 **Next up**
 
-- [ ] Restore and expand the full automated test suite (no-mock-data guard, scheduler integrity, API contract tests)
 - [ ] API-key auth for `/ask` and administrative routes
-- [ ] Harden commodity/district detection in the `/ask` orchestrator
 - [ ] Wire NDVI + completed Ashoka history into the primary instance
 - [ ] Multi-commodity portfolio risk view
 - [ ] Email / Telegram alerts on elevated spike risk
@@ -1144,7 +1212,7 @@ Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_O
 
 <br/>
 
-No. The product ingests live public data from data.gov.in, IMD and Sentinel Hub, and the counters at the top of this README are pulled from the production `/health` endpoint via shields.io dynamic badges — they update hourly, and they will show real (including unflattering) values. Where the project cites model metrics, they are labelled with their evaluation context.
+No. The product ingests live public data from data.gov.in, IMD and Sentinel Hub, and the counters at the top of this README are pulled from the production `/health` endpoint via shields.io dynamic badges - they update hourly, and they will show real (including unflattering) values. Where the project cites model metrics, they are labelled with their evaluation context.
 
 </details>
 
@@ -1162,7 +1230,7 @@ The production API runs the full pipeline on a **one-hour loop** and auto-heals 
 
 <br/>
 
-You need a free `DATA_GOV_IN_API_KEY` from [data.gov.in](https://api.data.gov.in/manage) for live ingestion. AI features are optional — without `GEMINI_API_KEY` or `OPENROUTER_API_KEY` the orchestrator returns structured tool output instead of a narrative. The dashboard and API still run fine.
+You need a free `DATA_GOV_IN_API_KEY` from [data.gov.in](https://api.data.gov.in/manage) for live ingestion. AI features are optional - without `GEMINI_API_KEY` or `OPENROUTER_API_KEY` the orchestrator returns structured tool output instead of a narrative. The dashboard and API still run fine.
 
 </details>
 
@@ -1189,7 +1257,7 @@ It is designed around free tiers: Google Gemini direct first, then NVIDIA NIM mo
 
 <br/>
 
-The primary Northflank instance is the CI-verified production API (badges, docs, dashboard default). A second instance carries newer NDVI data while satellite ingestion is being consolidated — both expose the same `/health` contract and are listed in [Live status](#live-status).
+The primary Northflank instance is the CI-verified production API (badges, docs, dashboard default). A second instance carries newer NDVI data while satellite ingestion is being consolidated - both expose the same `/health` contract and are listed in [Live status](#live-status).
 
 </details>
 
@@ -1198,7 +1266,7 @@ The primary Northflank instance is the CI-verified production API (badges, docs,
 
 <br/>
 
-If data.gov.in publishes it, the ingestion pipeline picks it up automatically — add it to `TRACKED_COMMODITIES` or just query it once the next cycle runs. Historical depth can be backfilled via `POST /backfill-historical` or by dropping a CSV for `ingest_historical_csv`.
+If data.gov.in publishes it, the ingestion pipeline picks it up automatically - add it to `TRACKED_COMMODITIES` or just query it once the next cycle runs. Historical depth can be backfilled via `POST /backfill-historical` or by dropping a CSV for `ingest_historical_csv`.
 
 </details>
 
@@ -1210,14 +1278,14 @@ If data.gov.in publishes it, the ingestion pipeline picks it up automatically �
 
 MandiIQ stands on public data and open-source tooling:
 
-- [data.gov.in](https://data.gov.in/) and [Agmarknet](https://agmarknet.gov.in/) — daily mandi price feeds
-- [Ashoka CEDA](https://agmarknet.ceda.ashoka.edu.in/) — historical price archive
-- [India Meteorological Department](https://mausam.imd.gov.in/) — sub-division rainfall departures
-- [Sentinel Hub](https://www.sentinel-hub.com/) — Sentinel-2 NDVI imagery
-- [Google AI Studio](https://aistudio.google.com/), [NVIDIA Build](https://build.nvidia.com/) and [OpenRouter](https://openrouter.ai/) — free-tier model access
-- [DuckDB](https://duckdb.org/), [Streamlit](https://streamlit.io/), [FastAPI](https://fastapi.tiangolo.com/), [Prophet](https://facebook.github.io/prophet/), [XGBoost](https://xgboost.readthedocs.io/), [scikit-learn](https://scikit-learn.org/) and [SHAP](https://shap.readthedocs.io/) — the analytical stack
-- [Grafana](https://grafana.com/) and [Prometheus](https://prometheus.io/) — observability
-- [Northflank](https://northflank.com/), [Render](https://render.com/), [Fly.io](https://fly.io/), [Streamlit Cloud](https://streamlit.io/cloud) and [Cloudflare](https://www.cloudflare.com/) — hosting and storage
+- [data.gov.in](https://data.gov.in/) and [Agmarknet](https://agmarknet.gov.in/) - daily mandi price feeds
+- [Ashoka CEDA](https://agmarknet.ceda.ashoka.edu.in/) - historical price archive
+- [India Meteorological Department](https://mausam.imd.gov.in/) - sub-division rainfall departures
+- [Sentinel Hub](https://www.sentinel-hub.com/) - Sentinel-2 NDVI imagery
+- [Google AI Studio](https://aistudio.google.com/), [NVIDIA Build](https://build.nvidia.com/) and [OpenRouter](https://openrouter.ai/) - free-tier model access
+- [DuckDB](https://duckdb.org/), [Streamlit](https://streamlit.io/), [FastAPI](https://fastapi.tiangolo.com/), [Prophet](https://facebook.github.io/prophet/), [XGBoost](https://xgboost.readthedocs.io/), [scikit-learn](https://scikit-learn.org/) and [SHAP](https://shap.readthedocs.io/) - the analytical stack
+- [Grafana](https://grafana.com/) and [Prometheus](https://prometheus.io/) - observability
+- [Northflank](https://northflank.com/), [Render](https://render.com/), [Fly.io](https://fly.io/), [Streamlit Cloud](https://streamlit.io/cloud) and [Cloudflare](https://www.cloudflare.com/) - hosting and storage
 - Every [contributor](https://github.com/flawsom/MandiIQ/graphs/contributors) who helps shape MandiIQ
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
@@ -1226,7 +1294,7 @@ MandiIQ stands on public data and open-source tooling:
 
 ## 📜 License
 
-Released under the **MIT License** — see [LICENSE](LICENSE). Data remains subject to the terms of the respective public providers.
+Released under the **MIT License** - see [LICENSE](LICENSE). Data remains subject to the terms of the respective public providers.
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 

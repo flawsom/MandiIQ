@@ -1,5 +1,5 @@
 """
-MandiRDD — storage layer.
+MandiRDD - storage layer.
 
 SQLite-backed storage with upsert-on-conflict deduplication.
 Schema mirrors the data.gov.in API fields.
@@ -92,7 +92,7 @@ def init_schema(conn: sqlite3.Connection):
     conn.commit()
 
 def upsert_prices(conn: sqlite3.Connection, records: list[dict]) -> int:
-    """Bulk upsert price records — idempotent, never duplicates."""
+    """Bulk upsert price records - idempotent, never duplicates."""
     if not records:
         return 0
 

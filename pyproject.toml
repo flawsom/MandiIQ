@@ -18,9 +18,9 @@ exclude = [
     "mandi_rdd/dashboard/frontend",  # pre-built JS bundle, not source
 ]
 ignore = [
-    "SKY-D222",        # "Hallucinated dependency" — mandi_rdd is a local package
-    "SKY-D224",        # "API signature hallucination" — pandas/openai pattern false positives
-    "SKY-S101",        # "Secret detected" — npm integrity hashes in package-lock
+    "SKY-D222",        # "Hallucinated dependency" - mandi_rdd is a local package
+    "SKY-D224",        # "API signature hallucination" - pandas/openai pattern false positives
+    "SKY-S101",        # "Secret detected" - npm integrity hashes in package-lock
 ]
 
 [tool.skylos.masking]

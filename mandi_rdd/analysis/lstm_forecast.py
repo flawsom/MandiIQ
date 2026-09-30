@@ -1,8 +1,8 @@
 """
-MandiRDD — LSTM forecast for honest comparison with Prophet.
+MandiRDD - LSTM forecast for honest comparison with Prophet.
 
 Superstore's key forecasting finding: Prophet beats LSTM on small datasets.
-This is the MandiRDD version — same comparison, repointed at modal_price.
+This is the MandiRDD version - same comparison, repointed at modal_price.
 
 Reports both MAPEs honestly. In an interview: "we let both models speak,
 reported what they said, and chose the one that earned it on this data."
@@ -32,10 +32,10 @@ except ImportError:
     torch = None
     nn = None
 
-# Guard class definition — only define if torch is available
+# Guard class definition - only define if torch is available
 if TORCH_AVAILABLE:
     class PriceLSTM(nn.Module):
-        """Simple LSTM for price forecasting — 1 layer, 32 hidden units."""
+        """Simple LSTM for price forecasting - 1 layer, 32 hidden units."""
 
         def __init__(self, input_size=1, hidden_size=32, num_layers=1):
             super().__init__()
@@ -191,7 +191,7 @@ def compare_forecast_models(
     """
     Run both Prophet and LSTM, return honest comparison.
 
-    This is the same pattern Superstore used — report both MAPEs,
+    This is the same pattern Superstore used - report both MAPEs,
     pick the winner, explain why.
     """
     result = {

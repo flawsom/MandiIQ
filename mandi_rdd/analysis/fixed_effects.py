@@ -1,5 +1,5 @@
 """
-MandiRDD — Fixed-effects regression cross-check.
+MandiRDD - Fixed-effects regression cross-check.
 
 Reuses Superstore's causal analysis pattern (fixed-effects with
 category/region dummies) but applied to the mandi price + rainfall data.
@@ -78,7 +78,7 @@ def fixed_effects_regression(
     else:
         time_dummies = pd.DataFrame(index=df.index)
     
-    # Combine features — ensure all numeric
+    # Combine features - ensure all numeric
     X_parts = [df[X_cols].copy()]
     for dummies in [entity_dummies, time_dummies]:
         if len(dummies.columns) > 0:

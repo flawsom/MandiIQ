@@ -148,7 +148,7 @@ jobs:
           RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL || '' }}
         run: |
           if [ -z "$RENDER_HOOK" ]; then
-            echo "::warning::RENDER_DEPLOY_HOOK_URL secret not set — skipping Render deploy."
+            echo "::warning::RENDER_DEPLOY_HOOK_URL secret not set - skipping Render deploy."
             exit 0
           fi
           echo "Heartbeat: triggering Render deploy hook..."

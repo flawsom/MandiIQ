@@ -1,5 +1,5 @@
 /* ============================================
-   DESIGN TOKENS — MandiIQ Design System
+   DESIGN TOKENS - MandiIQ Design System
    ============================================
    This file captures the MandiIQ design system.
    A dark, immersive, Japanese creative studio aesthetic.
@@ -188,7 +188,7 @@
     border-width: 1px 1px 0 0;
 }
 
-/* Inner corner pair for bottom edges — add .crosshair-panel-inner element */
+/* Inner corner pair for bottom edges - add .crosshair-panel-inner element */
 .crosshair-panel-inner::before,
 .crosshair-panel-inner::after {
     content: "";
@@ -208,7 +208,7 @@
     border-width: 0 1px 1px 0;
 }
 
-/* Crosshair Card — glass card with animated corner brackets on hover */
+/* Crosshair Card - glass card with animated corner brackets on hover */
 .crosshair-card {
     position: relative;
     overflow: hidden;
@@ -493,7 +493,7 @@
 .stagger-4 { transition-delay: 0.2s; }
 
 /* ============================================
-   Page Hero Section — reusable dashboard hero headers
+   Page Hero Section - reusable dashboard hero headers
    ============================================ */
 
 .page-hero {
@@ -536,7 +536,7 @@
 }
 
 /* ============================================
-   Enhanced Dynamics — scroll reveal + glass cards
+   Enhanced Dynamics - scroll reveal + glass cards
    ============================================ */
 
 .reveal {
@@ -610,7 +610,7 @@
 }
 
 /* ============================================
-   Theme: Surface Mode — lighter dark background (#111111 → #1a1a1a)
+   Theme: Surface Mode - lighter dark background (#111111 → #1a1a1a)
    Swaps pure black (#000000) for a dark-gray surface to reduce
    eye strain during daytime use. Applied via body.theme-surface
    or injected with !important overrides from the toggle.

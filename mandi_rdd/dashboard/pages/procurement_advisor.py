@@ -1,5 +1,5 @@
 """
-MandiIQ — Procurement Advisor page.
+MandiIQ - Procurement Advisor page.
 
 Interactive prescriptive recommendation combining causal effect,
 risk score, and forecast.

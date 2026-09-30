@@ -6,7 +6,7 @@ Implements:
 - Discount threshold analysis with confidence intervals
 - Documentation of assumptions and limitations
 
-Note: This dataset is observational — discount levels are not randomly assigned.
+Note: This dataset is observational - discount levels are not randomly assigned.
 Results should be interpreted as "evidence consistent with" causal effects,
 not definitive proof of causality.
 """
@@ -116,11 +116,11 @@ def run_fixed_effects_regression(df: pd.DataFrame) -> dict:
         "n_features": k,
         "interpretation": interpretation,
         "limitations": [
-            "Discount levels may not be randomly assigned — sales reps may discount more on already-low-margin items (selection bias)",
+            "Discount levels may not be randomly assigned - sales reps may discount more on already-low-margin items (selection bias)",
             "No instrumental variable available to isolate exogenous discount variation in this dataset",
             "Category and region fixed effects control for time-invariant heterogeneity but not time-varying confounds",
             "The linear model assumes a constant discount effect across categories; interaction terms suggest this varies substantially",
-            "Outlier investigation (FR-2.5): IQR-flagged sales outliers were reviewed — most occur in Furniture/Technology categories with high-quantity orders, suggesting legitimate bulk sales rather than data quality issues",
+            "Outlier investigation (FR-2.5): IQR-flagged sales outliers were reviewed - most occur in Furniture/Technology categories with high-quantity orders, suggesting legitimate bulk sales rather than data quality issues",
         ],
     }
 

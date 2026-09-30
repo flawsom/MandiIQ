@@ -1,5 +1,5 @@
 """
-MandiIQ — Forecast Explorer
+MandiIQ - Forecast Explorer
 ────────────────────────────
 Price-outlook explorer built from the live mandi price warehouse.
 
@@ -50,7 +50,7 @@ def render():
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
               A live read on where <strong style="color:#bababa;">mandi prices</strong> sit today and how much they could
-              swing in the near term. Built straight from the current price warehouse —
+              swing in the near term. Built straight from the current price warehouse -
               district by district, commodity by commodity.
             </p>
           </div>
@@ -141,7 +141,7 @@ def render():
             Price distribution across districts
           </h2>
           <p style="color:#7e7e7e;font-size:0.85rem;max-width:680px;margin-bottom:1rem;">
-            Modal price by district on the latest day — the real geographic spread.
+            Modal price by district on the latest day - the real geographic spread.
           </p>
         </div>
     """, unsafe_allow_html=True)
@@ -213,7 +213,7 @@ def render():
         x=list(future_days), y=center, mode="lines",
         name="Projected median", line=dict(color=TURMERIC, width=2, dash="dot"),  # note: TURMERIC should be #d7ff00
     ))
-    # Fix the above trace — TURMERIC is used which may be #E8B14D. Let's use lime
+    # Fix the above trace - TURMERIC is used which may be #E8B14D. Let's use lime
     fc_fig.data[-1].line.color = "#d7ff00"
     fc_fig.update_layout(
         xaxis_title="Date", yaxis_title="Median price (₹/quintal)",

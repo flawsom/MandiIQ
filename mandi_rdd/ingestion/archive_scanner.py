@@ -1,5 +1,5 @@
 """
-MandiRDD — Stale-offset quarantine, circuit breaker, adaptive probe,
+MandiRDD - Stale-offset quarantine, circuit breaker, adaptive probe,
 and 80M-row variety-wise archive scanner.
 
 Extracted from fetch_prices.py to keep each module focused on one

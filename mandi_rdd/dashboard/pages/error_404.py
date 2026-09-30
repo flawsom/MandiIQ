@@ -1,5 +1,5 @@
 """
-MandiIQ — 404 Not Found page.
+MandiIQ - 404 Not Found page.
 
 On-brand 404 page that doesn't look like a framework default.
 """
@@ -38,7 +38,7 @@ def render():
         </h1>
         
         <p style="color: #bababa; font-size: 1rem; max-width: 400px; margin-bottom: 2rem;">
-            This page doesn't exist — but the district data does. 
+            This page doesn't exist - but the district data does. 
             The page you're looking for may have been moved or the URL is incorrect.
         </p>
         

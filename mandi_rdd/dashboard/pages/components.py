@@ -3,12 +3,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 """
-mandi_rdd/dashboard/pages/components.py — Dev-only Component Visual QA
+mandi_rdd/dashboard/pages/components.py - Dev-only Component Visual QA
 
 This page renders every component in every state for visual review.
 Only accessible in dev mode (session flag). Removed from navigation in production.
 
-This is a design-system sanity check — not a functional page.
+This is a design-system sanity check - not a functional page.
 """
 
 import streamlit as st
@@ -48,7 +48,7 @@ def _get_grade_opts():
 
 
 def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", PAPER="#ffffff"):
-    st.title("Component Library — Visual QA")
+    st.title("Component Library - Visual QA")
 
     st.caption("Every component in every defined state. Use this to verify design consistency.")
 
@@ -115,7 +115,7 @@ def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", P
         st.markdown("**Hover (simulated)**")
         st.markdown(
             f'<span style="color:{MUTED};font-size:0.8rem;">'
-            f'Hover states are interactive — mouse over the "Default" column buttons.</span>',
+            f'Hover states are interactive - mouse over the "Default" column buttons.</span>',
             unsafe_allow_html=True
         )
     with col5:
@@ -205,7 +205,7 @@ def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", P
             f'<div class="mandiq-card error" style="padding:1.25rem;">'
             f'<div style="font-size:0.85rem;color:{RUST};">\u26a0 Error</div>'
             f'<div style="font-size:0.8rem;color:{MUTED};margin-top:0.5rem;">'
-            f'Data source unavailable — using last known values</div></div>',
+            f'Data source unavailable - using last known values</div></div>',
             unsafe_allow_html=True
         )
 
@@ -228,7 +228,7 @@ def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", P
 
     # ── 5. Charts (theme placeholder) ──
     st.markdown("## 5. Chart Theme")
-    st.caption("Plotly theme applied via `apply_chart_theme()` — see plotly_theme.py")
+    st.caption("Plotly theme applied via `apply_chart_theme()` - see plotly_theme.py")
     st.markdown(
         f'<div class="mandiq-card" style="padding:2rem;text-align:center;color:{MUTED};font-size:0.85rem;">'
         f'Chart theme is applied dynamically to Plotly figures. '
@@ -277,11 +277,11 @@ def render(RUST="#D9663B", TURMERIC="#d7ff00", INK="#000000", MUTED="#bababa", P
     with col2:
         st.markdown("**Status Dots**")
         status_dot("green")
-        st.caption("Green — healthy")
+        st.caption("Green - healthy")
         status_dot("amber")
-        st.caption("Amber — degraded")
+        st.caption("Amber - degraded")
         status_dot("red")
-        st.caption("Red — unavailable")
+        st.caption("Red - unavailable")
     with col3:
         st.markdown("**Tier Badges**")
         badge("High Risk", RUST, "medium")

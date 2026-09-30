@@ -57,10 +57,10 @@ ALL_INDIA_RAINFALL_RESOURCE_ID = "..."
 ```
 
 ### Step 4: Fix Custom Domain
-**Option A — Point DNS to Render (easiest):**
+**Option A - Point DNS to Render (easiest):**
 Set `CNAME` record for `mandiiq.unifies.codes` → `mandiiq-api.onrender.com`
 
-**Option B — Vercel:**
+**Option B - Vercel:**
 Add domain in Vercel project settings, deploy a wrapper/proxy
 
 ### Step 5: Verify all 4 URLs
@@ -80,7 +80,7 @@ Add domain in Vercel project settings, deploy a wrapper/proxy
 | GitHub 500 on push | Use SSH: `git remote set-url origin git@github.com:flawsom/MandiIQ.git` |
 | Rainfall 403 | Find working data.gov.in resource ID |
 | Render deploy hook fails | Set `RENDER_DEPLOY_HOOK_URL` in Render env vars |
-| API returns 404 for forecast | Fixed in code — now returns 200 with `"status":"unavailable"` |
+| API returns 404 for forecast | Fixed in code - now returns 200 with `"status":"unavailable"` |
 | Risk score = 50 always | Need XGBoost installed + pipeline run (`POST /refresh`) |
 
 ## GitHub Secrets (for Actions workflows)

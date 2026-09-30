@@ -1,4 +1,4 @@
-# Grafana Cloud Free Tier — Setup Guide
+# Grafana Cloud Free Tier - Setup Guide
 
 Use **Grafana Cloud free tier** instead of the self-hosted Grafana sidecar
 (which required Render's $7/mo `starter` plan).
@@ -28,7 +28,7 @@ Use **Grafana Cloud free tier** instead of the self-hosted Grafana sidecar
 1. In your Grafana Cloud portal, go to **Security → API Keys**
 2. Click **Add API Key**
 3. Role: **MetricsPublisher** (for pushing metrics)
-4. Copy the key — it starts with `glc_`
+4. Copy the key - it starts with `glc_`
 
 ## Step 3: Configure Prometheus Agent (on Render)
 
@@ -65,7 +65,7 @@ metrics:
           metrics_path: /metrics
 ```
 
-**Option B: Prometheus Remote Write (lighter — preferred)**
+**Option B: Prometheus Remote Write (lighter - preferred)**
 
 Render's free tier can't run multiple processes (no Docker). The simpler approach
 is to use a **remote write proxy** inside the API itself:
@@ -73,7 +73,7 @@ is to use a **remote write proxy** inside the API itself:
 1. Add `prometheus-client` to `requirements/api.txt`
 2. Instrument the API to push metrics to Grafana Cloud on an interval
 
-**Option C: No Agent — Use HTTP Endpoint (simplest)**
+**Option C: No Agent - Use HTTP Endpoint (simplest)**
 
 Grafana Cloud can scrape your `/metrics` endpoint directly if it's publicly
 accessible. In your Grafana Cloud dashboard:
@@ -101,11 +101,11 @@ accessible. In your Grafana Cloud dashboard:
 ## Step 5: Verify
 
 You should see metrics within 60 seconds:
-- `mandiiq_uptime_seconds` — API uptime
-- `mandiiq_llm_fallback_total` — LLM failures
-- `mandiiq_pipeline_duration_seconds` — Pipeline run time
-- `mandiiq_prices_total` — Total prices in DB
-- `mandiiq_commodities_total` — Commodity count
+- `mandiiq_uptime_seconds` - API uptime
+- `mandiiq_llm_fallback_total` - LLM failures
+- `mandiiq_pipeline_duration_seconds` - Pipeline run time
+- `mandiiq_prices_total` - Total prices in DB
+- `mandiiq_commodities_total` - Commodity count
 
 ---
 

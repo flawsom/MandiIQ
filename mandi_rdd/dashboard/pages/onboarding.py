@@ -1,5 +1,5 @@
 """
-MandiIQ — Onboarding page.
+MandiIQ - Onboarding page.
 
 First-run walkthrough: 3 steps, skippable, session-only.
 Explains what the app does, how to use Ask MandiIQ, and how to follow districts.
@@ -109,7 +109,7 @@ def render_step_1():
         </h2>
         <p style="color: #bababa; font-size: 1rem; line-height: 1.6; max-width: 500px; margin: 0 auto;">
             MandiIQ detects <strong style="color: #d7ff00;">causal price effects</strong> 
-            in Indian agricultural markets using real mandi data — no correlations, 
+            in Indian agricultural markets using real mandi data - no correlations, 
             no guesswork, no mock numbers.
         </p>
     </div>
@@ -138,7 +138,7 @@ def render_step_2():
             Ask MandiIQ
         </h2>
         <p style="color: #bababa; font-size: 1rem; line-height: 1.6; max-width: 500px; margin: 0 auto;">
-            Ask questions in plain English. Get answers grounded in live data — 
+            Ask questions in plain English. Get answers grounded in live data - 
             not speculation, not AI hallucinations.
         </p>
     </div>

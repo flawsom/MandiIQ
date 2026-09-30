@@ -1,5 +1,5 @@
 """
-MandiIQ — Ask MandiIQ Full Page.
+MandiIQ - Ask MandiIQ Full Page.
 
 Expanded chat interface with conversation history.
 Dedicated route for in-depth Q&A sessions.
@@ -30,10 +30,10 @@ def render():
               AI Procurement Chat
             </div>
             <h1 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:300;font-size:clamp(1.6rem,3vw,2.4rem);color:#ffffff;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:0.5rem;">
-              Ask MandiIQ — <span style="font-weight:600;color:#d7ff00;">Full Chat</span>
+              Ask MandiIQ - <span style="font-weight:600;color:#d7ff00;">Full Chat</span>
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
-                Ask procurement questions in plain English. Answers are grounded in live data —
+                Ask procurement questions in plain English. Answers are grounded in live data -
                 real mandi prices, rainfall, and NDVI from official sources. No speculation, no mock data.
             </p>
           </div>
@@ -69,7 +69,7 @@ def render():
     if not (gemini_key or openrouter_key):
         st.markdown(
             '<div class="interpretation-box insig-box">'
-            'ℹ️ No LLM key in this app\'s env. The API server handles the model call — '
+            'ℹ️ No LLM key in this app\'s env. The API server handles the model call - '
             'if Render has GEMINI_API_KEY/OPENROUTER_API_KEY set, chat still works.'
             '</div>',
             unsafe_allow_html=True,
@@ -167,7 +167,7 @@ def _render_chat_entry(entry: dict):
     model_used = entry.get("model_used")
     error = entry.get("error", False)
 
-    # User query — subtle right-aligned pill
+    # User query - subtle right-aligned pill
     st.markdown(f"""
         <div style="margin:1rem 0 0.5rem;display:flex;justify-content:flex-end;">
             <div style="padding:0.6rem 1rem;background:rgba(215,255,0,0.04);border:1px solid rgba(215,255,0,0.1);border-radius:8px;display:inline-block;max-width:80%;">
@@ -179,18 +179,18 @@ def _render_chat_entry(entry: dict):
         </div>
     """, unsafe_allow_html=True)
 
-    # Answer box — crosshair panel with lime corner markers
+    # Answer box - crosshair panel with lime corner markers
     error_style = "border-left:3px solid #D9663B;" if error else ""
     st.markdown(f"""
         <div class="crosshair-panel" style="padding:1.2rem;line-height:1.7;font-size:0.9rem;{error_style}">
             <div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:#7e7e7e;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.06em;">
-                ASSISTANT{' — Error' if error else ''}
+                ASSISTANT{' - Error' if error else ''}
             </div>
             {answer}
         </div>
     """, unsafe_allow_html=True)
 
-    # Model served metadata — sleek inline badge
+    # Model served metadata - sleek inline badge
     if model_used:
         st.markdown(f"""
             <div style="display:flex;justify-content:flex-end;margin-top:-0.2rem;margin-bottom:1.5rem;">

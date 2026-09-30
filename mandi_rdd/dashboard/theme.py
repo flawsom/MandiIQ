@@ -1,5 +1,5 @@
 """
-MandiIQ — Shared design-system theme (Layer 2 of the design system).
+MandiIQ - Shared design-system theme (Layer 2 of the design system).
 
 Single source of truth for all injected CSS consumed by the dashboard pages.
 Every page calls inject_theme() once at the top of its render() function.
@@ -99,7 +99,7 @@ def inject_cursor_effect():
 def inject_theme():
     """Inject the full Layer 2 stylesheet into the Streamlit page.
 
-    Only injects once per session — subsequent calls are no-ops.
+    Only injects once per session - subsequent calls are no-ops.
     Call once at the top of each page render for safety; the gate
     prevents duplicate ~35KB CSS injections.
     """

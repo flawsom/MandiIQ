@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MandiIQ — Data Freshness Checker.
+MandiIQ - Data Freshness Checker.
 
 CLI script that queries the production API for per-commodity freshness,
 flags any of the top 10 commodities that haven't received new data in
@@ -65,7 +65,7 @@ def build_issue_body(
 ) -> str:
     """Build a Markdown GitHub issue body for stale commodities."""
     lines = [
-        f"## ⏰ Data Freshness Alert — {len(stale)} commodity/ies stale",
+        f"## ⏰ Data Freshness Alert - {len(stale)} commodity/ies stale",
         "",
         f"**Checked at:** `{run_ts}`",
         f"**API:** `{api_url}`",
@@ -77,8 +77,8 @@ def build_issue_body(
 
     for entry in stale:
         commodity = entry.get("commodity", "Unknown")
-        latest = entry.get("latest_date", "—")
-        earliest = entry.get("earliest_date", "—")
+        latest = entry.get("latest_date", "-")
+        earliest = entry.get("earliest_date", "-")
         row_count = entry.get("row_count", 0)
         n_districts = entry.get("n_districts", 0)
         n_states = entry.get("n_states", 0)
@@ -87,7 +87,7 @@ def build_issue_body(
 
         # Compute how many hours stale (rough estimate from latest_date)
         stale_hours = "?"
-        if latest and latest != "—":
+        if latest and latest != "-":
             try:
                 latest_dt = datetime.datetime.strptime(str(latest)[:10], "%Y-%m-%d")
                 stale_hours = round((datetime.datetime.utcnow() - latest_dt).total_seconds() / 3600)
@@ -103,7 +103,7 @@ def build_issue_body(
         lines.append(f"| Total rows | {row_count:,} |")
         lines.append(f"| Districts covered | {n_districts} |")
         lines.append(f"| States covered | {n_states} |")
-        lines.append(f"| Last source | `{source_type}` — {source_name} |")
+        lines.append(f"| Last source | `{source_type}` - {source_name} |")
         lines.append("")
 
         # Append lineage trace if available
@@ -119,7 +119,7 @@ def build_issue_body(
             lines.append("|---|--------|-------------|------|-----|----------------|")
             for i, lr in enumerate(lineage_records[:5], 1):
                 l_source = lr.get("source_type", "?")
-                l_commas = (lr.get("commodity_list") or "—")[:40]
+                l_commas = (lr.get("commodity_list") or "-")[:40]
                 if len(l_commas) >= 40:
                     l_commas += "…"
                 l_rows = lr.get("row_count", 0)
@@ -198,7 +198,7 @@ def main() -> int:
         freshness = http_get_json(f"{api_url}/freshness", timeout=20)
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError) as e:
         print(f"  ERROR: Could not reach {api_url}/freshness: {e}")
-        print("  Skipping freshness check — API may be down.")
+        print("  Skipping freshness check - API may be down.")
         report = {
             "status": "error",
             "checked_at": run_ts,
@@ -265,23 +265,23 @@ def main() -> int:
         latest_str = entry.get("latest_date") or ""
         if not latest_str:
             stale_commodities.append(entry)
-            print(f"  🔴 {commodity}: no latest_date — flagged stale")
+            print(f"  🔴 {commodity}: no latest_date - flagged stale")
             continue
 
         try:
             latest_dt = datetime.datetime.strptime(str(latest_str)[:10], "%Y-%m-%d")
         except (ValueError, TypeError):
             stale_commodities.append(entry)
-            print(f"  🔴 {commodity}: unparseable latest_date='{latest_str}' — flagged stale")
+            print(f"  🔴 {commodity}: unparseable latest_date='{latest_str}' - flagged stale")
             continue
 
         hours_ago = (now - latest_dt).total_seconds() / 3600
         if hours_ago > threshold_hours:
             stale_commodities.append(entry)
-            print(f"  🔴 {commodity}: last data {hours_ago:.0f}h ago (>{threshold_hours}h) — STALE")
+            print(f"  🔴 {commodity}: last data {hours_ago:.0f}h ago (>{threshold_hours}h) - STALE")
         else:
             fresh_commodities.append(commodity)
-            print(f"  🟢 {commodity}: last data {hours_ago:.0f}h ago — fresh")        # Also check 5 more from the prices table (non-top commodities)
+            print(f"  🟢 {commodity}: last data {hours_ago:.0f}h ago - fresh")        # Also check 5 more from the prices table (non-top commodities)
     extra_checked = 0
     for entry in freshness:
         if not isinstance(entry, dict):

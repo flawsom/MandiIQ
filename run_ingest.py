@@ -1,5 +1,5 @@
 """
-MandiIQ — Daily NDVI + Data Ingestion Pipeline
+MandiIQ - Daily NDVI + Data Ingestion Pipeline
 
 Runs automatically every day at 03:00 UTC via GitHub Actions.
 - Fetches fresh mandi prices, rainfall, and NDVI from Sentinel Hub
@@ -25,5 +25,5 @@ from mandi_rdd.ingestion.scheduler import run_ingestion
 
 summary = run_ingestion()
 print(f"\n{'='*60}")
-print(f"Pipeline complete — {summary.get('status', 'unknown')}")
+print(f"Pipeline complete - {summary.get('status', 'unknown')}")
 print(f"{'='*60}")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MandiRDD — Nightly pipeline runner.
+MandiRDD - Nightly pipeline runner.
 
 Run this once daily (e.g., via cron, GitHub Actions schedule, or Render Cron Job).
 
@@ -44,7 +44,7 @@ def _write_status(outcome, status=None, new_price_rows=None, duration_s=None, er
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MandiRDD — Nightly pipeline runner"
+        description="MandiRDD - Nightly pipeline runner"
     )
     parser.add_argument(
         "--prices-only",
@@ -77,7 +77,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print("🌾 MandiRDD — Nightly Pipeline")
+    print("🌾 MandiRDD - Nightly Pipeline")
     print("=" * 60)
 
     filters = {}

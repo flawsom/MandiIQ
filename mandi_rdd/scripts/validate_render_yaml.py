@@ -38,7 +38,7 @@ def load_yaml(path: str) -> dict:
 def validate_with_schema(data: dict, schema_path: str | None) -> list[str]:
     """Validate loaded YAML data against the JSON Schema."""
     if schema_path is None:
-        # jsonschema not available or schema file not found — fall back to basic checks
+        # jsonschema not available or schema file not found - fall back to basic checks
         errors: list[str] = []
         _check_basic(data, errors)
         return errors
@@ -167,17 +167,17 @@ def main() -> int:
         print(f"::error::File not found: {args.yaml_path}")
         return 1
 
-    # Determine schema path — fall back to None if missing
+    # Determine schema path - fall back to None if missing
     schema_path: str | None = args.schema if os.path.exists(args.schema) else None
     if schema_path is None:
-        print(f"::warning::Schema file not found: {args.schema} — falling back to basic checks")
+        print(f"::warning::Schema file not found: {args.schema} - falling back to basic checks")
 
     data = load_yaml(args.yaml_path)
     errors = validate_with_schema(data, schema_path)
 
     if not errors:
         services = data.get("services", [])
-        print(f"render.yaml: valid — {len(services)} service(s)")
+        print(f"render.yaml: valid - {len(services)} service(s)")
         for svc in services:
             name = svc.get("name", "?")
             rtype = svc.get("type", "?")
@@ -187,7 +187,7 @@ def main() -> int:
             print(f"  [OK] {name} ({rtype}, {runtime}, {plan}, disk={has_disk})")
         return 0
     else:
-        print(f"render.yaml: FAILED — {len(errors)} error(s)")
+        print(f"render.yaml: FAILED - {len(errors)} error(s)")
         for err in errors:
             print(f"  ::error:: {err}")
         return 1

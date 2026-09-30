@@ -68,7 +68,8 @@ superstore_dashboard.png
 
 # Scratch test and check scripts (one-off, not for deploy)
 test_*.py
-!mandi_rdd/tests/test_verification.py
+# ...but the real automated suite under mandi_rdd/tests/ always ships
+!mandi_rdd/tests/test_*.py
 _check_*.py
 _fix_*.py
 _test_*.py
@@ -88,7 +89,7 @@ skills-lock.json
 .github/hooks/
 .github/skills/
 
-# Frontend build dependencies (dist/ IS committed — it's the built bundle)
+# Frontend build dependencies (dist/ IS committed - it's the built bundle)
 mandi_rdd/dashboard/frontend/node_modules/
 
 # Excluded per user request (local notes, not for deploy)

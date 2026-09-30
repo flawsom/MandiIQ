@@ -1,17 +1,17 @@
 """
-MandiRDD — FastAPI serving layer.
+MandiRDD - FastAPI serving layer.
 
 Endpoints:
-- GET /health — liveness check
-- GET /prices — query stored prices with filters
-- GET /rdd-result/{commodity} — latest RDD estimate
-- GET /rdd-plot/{commodity} — binned scatter plot data
-- GET /robustness/{commodity} — robustness check bundle
-- GET /forecast/{commodity} — Prophet forecast
-- GET /risk-score/{commodity} — XGBoost risk score
-- GET /recommendation/{commodity} — procurement recommendation
-- POST /ask — AI orchestrator (OpenRouter multi-model routing)
-- POST /refresh — manual pipeline re-run
+- GET /health - liveness check
+- GET /prices - query stored prices with filters
+- GET /rdd-result/{commodity} - latest RDD estimate
+- GET /rdd-plot/{commodity} - binned scatter plot data
+- GET /robustness/{commodity} - robustness check bundle
+- GET /forecast/{commodity} - Prophet forecast
+- GET /risk-score/{commodity} - XGBoost risk score
+- GET /recommendation/{commodity} - procurement recommendation
+- POST /ask - AI orchestrator (OpenRouter multi-model routing)
+- POST /refresh - manual pipeline re-run
 """
 
 import sys
@@ -35,7 +35,6 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 import threading
-import duckdb
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -264,16 +263,16 @@ app = FastAPI(
     to detect price jumps around the -19% rainfall deficiency threshold.
     
     **Endpoints:**
-    * `/health` — Liveness check + data counts
-    * `/prices` — Query stored prices by state/district/commodity
-    * `/rdd-result/{commodity}` — Latest RDD estimate for a commodity
-    * `/rdd-plot/{commodity}` — Binned scatter data for the discontinuity plot
-    * `/robustness/{commodity}` — Full robustness check bundle
-    * `/forecast/{commodity}` — Prophet forecast with optional LSTM comparison
-    * `/risk-score/{commodity}` — XGBoost price-spike risk probability
-    * `/recommendation/{commodity}` — Procurement recommendation
-    * `/ask` — AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
-    * `/refresh` — Manual re-run of the full pipeline
+    * `/health` - Liveness check + data counts
+    * `/prices` - Query stored prices by state/district/commodity
+    * `/rdd-result/{commodity}` - Latest RDD estimate for a commodity
+    * `/rdd-plot/{commodity}` - Binned scatter data for the discontinuity plot
+    * `/robustness/{commodity}` - Full robustness check bundle
+    * `/forecast/{commodity}` - Prophet forecast with optional LSTM comparison
+    * `/risk-score/{commodity}` - XGBoost price-spike risk probability
+    * `/recommendation/{commodity}` - Procurement recommendation
+    * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
+    * `/refresh` - Manual re-run of the full pipeline
     """,
     version="2.0.0",
     lifespan=lifespan,
@@ -354,7 +353,7 @@ async def health():
             last_outcome=last_outcome,
             commodities_analyzed=state.commodities[:20],
         )
-    except Exception as health_err:
+    except Exception:
         return HealthResponse(
             status="degraded",
             llm_fallback_count=get_llm_fallback_count(),
@@ -632,6 +631,105 @@ async def recommendation(
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Analytics Engine: uncertainty, drift, tail risk, DML, nowcast ──
+
+@app.get("/analytics/{commodity}", tags=["Analytics"])
+async def analytics_report(commodity: str):
+    """
+    Composite analyst deep-dive for one commodity.
+
+    Runs all five analytics modules in one call: conformal prediction
+    intervals, drift + data-quality monitoring, EVT tail risk, cross-fitted
+    debiased ML rainfall sensitivity, and a Kalman month-end nowcast. Each
+    section degrades independently.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.analytics import commodity_analytics
+        return commodity_analytics(conn, commodity)
+    except Exception as e:
+        logger.error(f"Analytics report failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/conformal/{commodity}", tags=["Analytics"])
+async def conformal_intervals(commodity: str):
+    """Distribution-free prediction intervals (split conformal) around the forecast."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.conformal import conformal_report
+        return conformal_report(conn, commodity)
+    except Exception as e:
+        logger.error(f"Conformal report failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/drift/{commodity}", tags=["Analytics"])
+async def drift_report_endpoint(commodity: str):
+    """PSI / KS / Page-Hinkley / EWMA drift plus a 0-100 data-quality score."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.drift import drift_report
+        return drift_report(conn, commodity)
+    except Exception as e:
+        logger.error(f"Drift report failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/tail-risk/{commodity}", tags=["Analytics"])
+async def tail_risk_endpoint(commodity: str):
+    """Historical VaR/CVaR, EVT tail fits and maximum drawdown."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.tail_risk import tail_risk_report
+        return tail_risk_report(conn, commodity)
+    except Exception as e:
+        logger.error(f"Tail risk report failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/dml/{commodity}", tags=["Analytics"])
+async def dml_endpoint(commodity: str):
+    """Cross-fitted debiased ML estimate of rainfall-price sensitivity."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.dml import dml_report
+        return dml_report(conn, commodity)
+    except Exception as e:
+        logger.error(f"DML report failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/nowcast/{commodity}", tags=["Analytics"])
+async def nowcast_endpoint(commodity: str):
+    """Kalman-filter month-end nowcast for incomplete reporting months."""
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.analysis.nowcast import nowcast_report
+        return nowcast_report(conn, commodity)
+    except Exception as e:
+        logger.error(f"Nowcast failed for {commodity}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 
 # ── Phase 11: AI Orchestrator Endpoint ──
@@ -1100,7 +1198,7 @@ def admin_ingest_historical(file: UploadFile = File(...)):
     Uses DuckDB's native CSV reader for fast bulk import.
 
     Declared sync (not async) so FastAPI runs it in a worker thread,
-    keeping /health responsive during long-running inserts — otherwise
+    keeping /health responsive during long-running inserts - otherwise
     Northflank health checks fail and the container is killed mid-ingest.
     """
     import tempfile
@@ -1203,7 +1301,6 @@ def admin_ingest_historical(file: UploadFile = File(...)):
             }
         finally:
             conn.close()
-            import os
             os.unlink(tmp_path)
 
     except Exception as e:

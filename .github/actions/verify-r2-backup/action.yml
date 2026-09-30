@@ -5,7 +5,7 @@ description: >
   Catches silent corruption, partial uploads, wrong-routing, and gzip
   corruption that a simple existence check misses.
   Emits ::notice:: on integrity verified or ::warning:: on mismatch.
-  Does NOT fail the pipeline — the step is always best-effort.
+  Does NOT fail the pipeline - the step is always best-effort.
 
 inputs:
   bucket:
@@ -47,23 +47,23 @@ runs:
 
         # Only verify if the backup actually completed (metrics file written on success)
         if [ ! -f "$METRICS_FILE" ]; then
-          echo "::notice::R2 backup verification skipped — no metrics file found"
+          echo "::notice::R2 backup verification skipped - no metrics file found"
           exit 0
         fi
 
         # Read expected SHA256 from metrics
         EXPECTED_SHA=$(python3 -c "import json; print(json.load(open('${METRICS_FILE}')).get('sha256', ''))")
         if [ -z "$EXPECTED_SHA" ]; then
-          echo "::warning::R2 backup verification skipped — failed to read sha256 from metrics file (may be empty, corrupt, or old format)"
+          echo "::warning::R2 backup verification skipped - failed to read sha256 from metrics file (may be empty, corrupt, or old format)"
           exit 0
         fi
 
-        # Check metrics file freshness — don't verify against a stale metrics file
+        # Check metrics file freshness - don't verify against a stale metrics file
         NOW_EPOCH=$(date +%s)
         TS_EPOCH=$(python3 -c "import json; print(json.load(open('${METRICS_FILE}')).get('timestamp_epoch', 0))")
         STALE_CUTOFF=$((NOW_EPOCH - 7200))  # 2 hours
         if [ "$TS_EPOCH" -lt "$STALE_CUTOFF" ] 2>/dev/null; then
-          echo "::warning::R2 backup verification skipped — metrics file is stale (>2h old), upload may not have completed"
+          echo "::warning::R2 backup verification skipped - metrics file is stale (>2h old), upload may not have completed"
           exit 0
         fi
 
@@ -75,7 +75,7 @@ runs:
           --endpoint-url "${ENDPOINT}" \
           --region "${REGION}" \
           --only-show-errors; then
-          echo "::warning::R2 backup verification FAILED — download failed (object may not exist)"
+          echo "::warning::R2 backup verification FAILED - download failed (object may not exist)"
           rm -f "$DL_FILE"
           exit 0
         fi
@@ -83,7 +83,7 @@ runs:
         # Step 2: Decompress
         DECOMPRESSED_FILE="/tmp/verify_mandi_iq.duckdb"
         if ! gunzip -c "$DL_FILE" > "$DECOMPRESSED_FILE" 2>/dev/null; then
-          echo "::warning::R2 backup verification FAILED — gzip corruption (decompress failed)"
+          echo "::warning::R2 backup verification FAILED - gzip corruption (decompress failed)"
           rm -f "$DL_FILE" "$DECOMPRESSED_FILE"
           exit 0
         fi
@@ -91,7 +91,7 @@ runs:
         # Step 3: Decompressed size sanity check
         DECOMPRESSED_SIZE=$(stat -c%s "$DECOMPRESSED_FILE" 2>/dev/null || stat -f%z "$DECOMPRESSED_FILE" 2>/dev/null)
         if [ -z "$DECOMPRESSED_SIZE" ] || [ "$DECOMPRESSED_SIZE" -lt 1000 ]; then
-          echo "::warning::R2 backup verification FAILED — decompressed file too small (${DECOMPRESSED_SIZE:-0} bytes)"
+          echo "::warning::R2 backup verification FAILED - decompressed file too small (${DECOMPRESSED_SIZE:-0} bytes)"
           rm -f "$DL_FILE" "$DECOMPRESSED_FILE"
           exit 0
         fi
@@ -101,9 +101,9 @@ runs:
 
         # Step 5: Compare
         if [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ]; then
-          echo "::notice::R2 backup integrity VERIFIED — SHA256(${ACTUAL_SHA:0:12}...) matches — ${DECOMPRESSED_SIZE} bytes"
+          echo "::notice::R2 backup integrity VERIFIED - SHA256(${ACTUAL_SHA:0:12}...) matches - ${DECOMPRESSED_SIZE} bytes"
         else
-          echo "::warning::R2 backup verification FAILED — SHA256 MISMATCH"
+          echo "::warning::R2 backup verification FAILED - SHA256 MISMATCH"
           echo "::warning::  Expected: ${EXPECTED_SHA}"
           echo "::warning::  Actual:   ${ACTUAL_SHA}"
           echo "::warning::  The backup may be corrupted, from a different upload, or a partial write."

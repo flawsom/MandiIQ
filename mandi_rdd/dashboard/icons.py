@@ -1,11 +1,11 @@
 """
-MandiIQ — SVG Icon Library.
+MandiIQ - SVG Icon Library.
 
 Single source of truth for all inline SVG icons used across the dashboard.
 Import these constants instead of inlining SVGs in pages or HTML strings.
 """
 
-# Sun — for "switch to lighter surface" toggle
+# Sun - for "switch to lighter surface" toggle
 SVG_SUN = (
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'
@@ -18,7 +18,7 @@ SVG_SUN = (
     '</svg>'
 )
 
-# Moon — for "switch to darker surface" toggle
+# Moon - for "switch to darker surface" toggle
 SVG_MOON = (
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'
@@ -27,7 +27,7 @@ SVG_MOON = (
     '</svg>'
 )
 
-# Leaf/sprout — used in the MandiIQ logo
+# Leaf/sprout - used in the MandiIQ logo
 SVG_LEAF = (
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'
@@ -38,7 +38,7 @@ SVG_LEAF = (
     '</svg>'
 )
 
-# Chat/speech bubble — used in the "Ask" link
+# Chat/speech bubble - used in the "Ask" link
 SVG_CHAT = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'
@@ -47,7 +47,7 @@ SVG_CHAT = (
     '</svg>'
 )
 
-# Cog/gear — used in the Settings link
+# Cog/gear - used in the Settings link
 SVG_COG = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round"'

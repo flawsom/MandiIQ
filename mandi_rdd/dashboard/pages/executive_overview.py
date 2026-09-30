@@ -1,8 +1,8 @@
 """
-MandiIQ — Executive Overview page.
+MandiIQ - Executive Overview page.
 
 Headline finding, KPI panel, price trend by district/commodity.
-Includes "Ask MandiIQ" AI chat panel (Phase 11 — OpenRouter multi-model routing).
+Includes "Ask MandiIQ" AI chat panel (Phase 11 - OpenRouter multi-model routing).
 
 Design: glass cards, interpretation boxes, crosshair panels,
 section labels, and consistent monochrome-lime palette.
@@ -197,7 +197,7 @@ def render(**kwargs):
             unsafe_allow_html=True,
         )
 
-    # ── KPI row — flip-board hero ──
+    # ── KPI row - flip-board hero ──
     try:
         import math
 
@@ -214,25 +214,25 @@ def render(**kwargs):
                 return False
 
         flip_board(
-            effect=(f"{effect:,.0f}" if is_valid_num(effect) else "—"),
+            effect=(f"{effect:,.0f}" if is_valid_num(effect) else "-"),
             effect_raw=(float(effect) if is_valid_num(effect) else None),
-            avg_price=(f"{avg_price:,.0f}" if is_valid_num(avg_price) else "—"),
+            avg_price=(f"{avg_price:,.0f}" if is_valid_num(avg_price) else "-"),
             avg_price_raw=(float(avg_price) if is_valid_num(avg_price) else None),
-            districts=(f"{spike_n:,}" if is_valid_num(spike_n) else "—"),
+            districts=(f"{spike_n:,}" if is_valid_num(spike_n) else "-"),
             districts_raw=(float(spike_n) if is_valid_num(spike_n) else None),
-            mape=(f"{_mape:.1f}" if is_valid_num(_mape) else "—"),
+            mape=(f"{_mape:.1f}" if is_valid_num(_mape) else "-"),
             mape_raw=(float(_mape) if is_valid_num(_mape) else None),
         )
     except Exception:
         # Fallback: flat metrics (graceful degradation)
-        _mape_s = f"{_mape:.1f}%" if isinstance(_mape, (int, float)) else "—"
+        _mape_s = f"{_mape:.1f}%" if isinstance(_mape, (int, float)) else "-"
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Price Effect (₹)", f"₹{effect:,.0f}" if effect is not None else "—")
+            st.metric("Price Effect (₹)", f"₹{effect:,.0f}" if effect is not None else "-")
         with col2:
-            st.metric("Avg Modal Price", f"₹{avg_price:,.0f}" if avg_price else "—")
+            st.metric("Avg Modal Price", f"₹{avg_price:,.0f}" if avg_price else "-")
         with col3:
-            st.metric("Districts Flagged", f"{spike_n:,}" if spike_n else "—")
+            st.metric("Districts Flagged", f"{spike_n:,}" if spike_n else "-")
         with col4:
             st.metric("Forecast MAPE", _mape_s)
 
@@ -282,7 +282,7 @@ def render(**kwargs):
             )
     except Exception:
         st.markdown(
-            '<div class="interpretation-box insig-box">Price trend unavailable — run ingestion first.</div>',
+            '<div class="interpretation-box insig-box">Price trend unavailable - run ingestion first.</div>',
             unsafe_allow_html=True,
         )
 
@@ -360,7 +360,7 @@ def _render_freshness_widget():
                 stype = r.get("source_type") or ""
                 if stype:
                     source_types.add(stype)
-        st.metric("Data sources", ", ".join(sorted(source_types)) if source_types else "—")
+        st.metric("Data sources", ", ".join(sorted(source_types)) if source_types else "-")
 
     # Render the freshness table as styled HTML
     _FRESHNESS_TABLE_CSS = f"""
@@ -449,8 +449,8 @@ def _render_freshness_widget():
         if not isinstance(r, dict):
             continue
         commodity = (r.get("commodity") or "Other / Uncategorized").title()
-        latest = r.get("latest_date") or "—"
-        earliest = r.get("earliest_date") or "—"
+        latest = r.get("latest_date") or "-"
+        earliest = r.get("earliest_date") or "-"
         row_count = r.get("row_count", 0)
         n_districts = r.get("n_districts", 0)
         n_states = r.get("n_states", 0)
@@ -458,10 +458,10 @@ def _render_freshness_widget():
         source_name = r.get("source_name") or ""
 
         # Determine freshness status dot
-        if latest != "—" and latest >= _cutoff_recent:
+        if latest != "-" and latest >= _cutoff_recent:
             dot_class = "fresh-dot-recent"
             dot_title = "Updated in last 7 days"
-        elif latest != "—" and latest >= _cutoff_stale:
+        elif latest != "-" and latest >= _cutoff_stale:
             dot_class = "fresh-dot-stale"
             dot_title = "7–30 days old"
         else:
@@ -613,7 +613,7 @@ def _render_ask_panel(default_commodity: str):
         st.session_state.ask_input_key += 1
         st.rerun()
 
-    # ── Submit — POST /ask to the API ──
+    # ── Submit - POST /ask to the API ──
     if asked and query.strip():
         with st.spinner("Routing through OpenRouter fallback chain..."):
             try:
@@ -647,9 +647,9 @@ def _render_ask_panel(default_commodity: str):
                         or "openrouter" in err.lower() or "gemini" in err.lower()):
                     result["answer"] = (
                         "⚠️ **AI chat is not configured.** No LLM provider key is set "
-                        "on the API server. Set **GEMINI_API_KEY** (free — get one at "
+                        "on the API server. Set **GEMINI_API_KEY** (free - get one at "
                         "[aistudio.google.com/apikey](https://aistudio.google.com/apikey)) "
-                        "or **OPENROUTER_API_KEY** (free — "
+                        "or **OPENROUTER_API_KEY** (free - "
                         "[openrouter.ai/keys](https://openrouter.ai/keys)) to enable the "
                         "Ask MandiIQ feature. No credit card required for either."
                     )
@@ -733,7 +733,7 @@ def _render_chat_entry(entry: dict, idx: int):
             if commodity or district:
                 st.markdown(
                     f'<span style="color:#7e7e7e;font-size:0.8rem;">Context:</span> '
-                    f'<span style="color:#ffffff;font-size:0.8rem;">{commodity} — {district}</span>',
+                    f'<span style="color:#ffffff;font-size:0.8rem;">{commodity} - {district}</span>',
                     unsafe_allow_html=True,
                 )
             if error:
@@ -765,7 +765,7 @@ def _render_national_monsoon_strip():
                 National Monsoon Baseline · 1901–2019
               </h2>
               <p style="color:#7e7e7e;font-size:0.85rem;max-width:700px;line-height:1.7;margin-bottom:1.2rem;">
-                The long IMD series — a national reference frame for the district-level
+                The long IMD series - a national reference frame for the district-level
                 rainfall-deficit threshold that drives the causal analysis.
               </p>
             </div>

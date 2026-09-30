@@ -1,5 +1,5 @@
 """
-MandiIQ — Error: No Data page.
+MandiIQ - Error: No Data page.
 
 Shown when a district/commodity combination has no matching records.
 """
@@ -63,7 +63,7 @@ def render():
     st.markdown("""
     <div style="color: #bababa; font-size: 0.9rem; line-height: 1.6;">
         <p>Mandi price reporting is voluntary and varies by region. Some districts report 
-        regularly for certain commodities but not others. We show real data only — 
+        regularly for certain commodities but not others. We show real data only - 
         no interpolation or estimation.</p>
         <p>If you expected data for this combination, it may indicate:</p>
         <ul style="margin-left: 1rem;">

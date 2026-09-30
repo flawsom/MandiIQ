@@ -3,7 +3,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 """
-MandiIQ — Rainfall Discontinuity (Regression Discontinuity Design)
+MandiIQ - Rainfall Discontinuity (Regression Discontinuity Design)
 ─────────────────────────────────────────────────────────────────
 RDD on India's IMD rainfall-deficit classification.
 
@@ -68,7 +68,7 @@ def render():
               India's IMD flags a subdivision as <strong style="color:#bababa;">deficient</strong> when monsoon rainfall
               departs more than <strong style="color:#bababa;">−19%</strong> from the long-period normal. That hard cutoff is
               a natural regression-discontinuity threshold. We test whether the density of
-              rainfall departures drops off a cliff at −19% — and how deficit exposure
+              rainfall departures drops off a cliff at −19% - and how deficit exposure
               has shifted across the monsoon years.
             </p>
           </div>
@@ -129,7 +129,7 @@ def render():
             01 / Density Test
           </div>
           <h2 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:400;font-size:1.3rem;color:#ffffff;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
-            The deficit cliff — McCrary density test
+            The deficit cliff - McCrary density test
           </h2>
           <p style="color:#7e7e7e;font-size:0.85rem;max-width:680px;margin-bottom:1rem;">
             If the −19% line is a real administrative threshold, the density of departures
@@ -172,7 +172,7 @@ def render():
             f"""
             <div class="interpretation-box">
                 McCrary test: density jump ≈ <span style="font-family:'IBM Plex Mono',monospace;">{jump:.2f}</span>
-                (p ≈ {pval:.3f}) — a {verdict} at the −19% threshold,
+                (p ≈ {pval:.3f}) - a {verdict} at the −19% threshold,
                 consistent with the IMD classification acting as a real discontinuity.
             </div>
             """,
@@ -313,7 +313,7 @@ def render():
                 <div class="interpretation-box">
                     Pearson correlation between deficit frequency and {commodity} price across
                     {len(prices)} mapped districts: <strong style="font-family:'IBM Plex Mono',monospace;">r = {corr:.2f}</strong>.
-                    A positive value would suggest deficit-prone regions carry a price premium —
+                    A positive value would suggest deficit-prone regions carry a price premium -
                     the economic mechanism the full price-outcome RDD is designed to estimate.
                 </div>
                 """,
@@ -407,13 +407,13 @@ def render():
             st.plotly_chart(fig, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
             st.caption(
-                "Source: IMD / data.gov.in — Rainfall in all India and its departure from normal "
+                "Source: IMD / data.gov.in - Rainfall in all India and its departure from normal "
                 "during monsoon (June‑Sep), 1901‑2019. The −19% line mirrors the IMD deficient "
                 "classification that defines the RDD cutoff."
             )
         else:
             st.markdown(
-                '<div class="interpretation-box insig-box">All‑India monsoon series unavailable right now — '
+                '<div class="interpretation-box insig-box">All‑India monsoon series unavailable right now - '
                 'showing district‑level RDD above.</div>',
                 unsafe_allow_html=True,
             )

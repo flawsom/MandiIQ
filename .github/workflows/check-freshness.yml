@@ -1,4 +1,4 @@
-# MandiIQ — Daily Data Freshness Check
+# MandiIQ - Daily Data Freshness Check
 #
 # Runs every day at 06:00 UTC. Queries the production API for per-commodity
 # freshness. If any of the top 10 commodities haven't received new data in
@@ -100,7 +100,7 @@ jobs:
             --jq 'length')
 
           if [ "$EXISTING" -gt 0 ]; then
-            echo "Found $EXISTING open freshness issue(s). Skipping — duplicate prevention."
+            echo "Found $EXISTING open freshness issue(s). Skipping - duplicate prevention."
             echo "Close the existing issue or re-run with different parameters."
             exit 0
           fi

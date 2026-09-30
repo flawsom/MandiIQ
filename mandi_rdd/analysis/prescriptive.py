@@ -1,5 +1,5 @@
 """
-MandiRDD — Prescriptive Procurement Risk Advisor.
+MandiRDD - Prescriptive Procurement Risk Advisor.
 
 Combines the RDD effect size (how much prices jump), the classifier's
 risk score (how likely a jump is next month), and the Prophet forecast
@@ -160,7 +160,7 @@ def _generate_recommendation_text(data: dict) -> dict:
         if (fe_effect > 0 and data["rdd_effect"] > 0) or (fe_effect < 0 and data["rdd_effect"] < 0):
             fe_note = " (causal estimate corroborated by fixed-effects cross-check)"
         else:
-            fe_note = " (note: fixed-effects cross-check shows a different direction — interpret with caution)"
+            fe_note = " (note: fixed-effects cross-check shows a different direction - interpret with caution)"
 
     # Forecast direction
     forecast_note = ""
@@ -182,14 +182,14 @@ def _generate_recommendation_text(data: dict) -> dict:
             action_text = "Recommend locking procurement now to avoid expected price increase."
         else:
             action = "MONITOR"
-            action_text = "High uncertainty — monitor weekly price data."
+            action_text = "High uncertainty - monitor weekly price data."
     elif risk_level == "MODERATE":
         if rdd_direction and "jump" in rdd_direction:
             action = "CONSIDER_EARLY_PROCUREMENT"
             action_text = "Consider partial advance procurement to hedge against potential price increase."
         else:
             action = "WATCH"
-            action_text = "Conditions are evolving — review again next week."
+            action_text = "Conditions are evolving - review again next week."
     else:
         action = "NO_ACTION_NEEDED"
         action_text = "No urgent procurement action needed at this time."

@@ -13,7 +13,7 @@
 # - PYTHONPATH=/app
 # - PORT=8080
 # - MANDIIQ_DB_PATH=/data/mandi_iq.duckdb
-# - DATA_GOV_IN_API_KEY=<your data.gov.in key — set in Northflank, never in git>
+# - DATA_GOV_IN_API_KEY=<your data.gov.in key - set in Northflank, never in git>
 # - GEMINI_API_KEY (optional)
 # - NVIDIA_API_KEY (optional)
 # - OPENROUTER_API_KEY (optional)

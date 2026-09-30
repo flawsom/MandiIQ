@@ -1,5 +1,5 @@
 """
-MandiIQ — Settings page.
+MandiIQ - Settings page.
 
 Data source status, model routing status, theme controls.
 Shows live health of all connected APIs.
@@ -29,7 +29,7 @@ def render():
               Configuration
             </div>
             <h1 style="font-family:'Space Grotesk',system-ui,sans-serif;font-weight:300;font-size:clamp(1.6rem,3vw,2.4rem);color:#ffffff;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:0.5rem;">
-              Settings — <span style="font-weight:600;color:#d7ff00;">System Status</span>
+              Settings - <span style="font-weight:600;color:#d7ff00;">System Status</span>
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
               Monitor data source health, pipeline status, and environment configuration.
@@ -72,7 +72,7 @@ def render():
     for name, count, unit, url in sources:
         configured = count > 0
         status_color = SAGE if configured else RUST
-        status_text = f"Configured — {count:,} {unit}" if configured else "Not configured"
+        status_text = f"Configured - {count:,} {unit}" if configured else "Not configured"
 
         st.markdown(f"""
             <div class="crosshair-panel glass" style="padding:1rem;margin:0.5rem 0;display:flex;justify-content:space-between;align-items:center;">
@@ -122,15 +122,15 @@ def render():
                 <strong style="color:#ffffff;">No AI provider configured</strong><br/>
                 <span style="color:{MUTED};font-size:0.8rem;">
                     Set <code>GEMINI_API_KEY</code> or <code>OPENROUTER_API_KEY</code> to enable chat.
-                    Both have free tiers — no credit card required.
+                    Both have free tiers - no credit card required.
                 </span>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("""
             <div style="margin-top:0.8rem;">
                 <strong style="color:#d7ff00;">Get a free API key:</strong><br/>
-                • <a href="https://aistudio.google.com/apikey" style="color:#d7ff00;">Google AI Studio (Gemini)</a> — 15 req/min free<br/>
-                • <a href="https://openrouter.ai/keys" style="color:#d7ff00;">OpenRouter</a> — multi-model routing
+                • <a href="https://aistudio.google.com/apikey" style="color:#d7ff00;">Google AI Studio (Gemini)</a> - 15 req/min free<br/>
+                • <a href="https://openrouter.ai/keys" style="color:#d7ff00;">OpenRouter</a> - multi-model routing
             </div>
         """, unsafe_allow_html=True)
 
@@ -281,7 +281,7 @@ def render():
                 st.session_state.pipeline_result = None
                 st.rerun()
 
-            with st.spinner("Running pipeline — fetching data, running RDD analysis..."):
+            with st.spinner("Running pipeline - fetching data, running RDD analysis..."):
                 result = run_ingestion(skip_rainfall=False)
                 st.session_state.pipeline_result = result
                 st.session_state.pipeline_running = False
@@ -324,7 +324,7 @@ def render():
         <div class="crosshair-panel glass" style="padding:1.2rem;">
             <p style="color:#bababa;font-size:0.85rem;margin-bottom:0.8rem;">
                 Swap the pure-black canvas (<code style="color:#d7ff00;">#000000</code>) for a dark-gray surface
-                (<code style="color:#d7ff00;">#111111</code>) — easier on the eyes during daytime.
+                (<code style="color:#d7ff00;">#111111</code>) - easier on the eyes during daytime.
             </p>
     """, unsafe_allow_html=True)
 

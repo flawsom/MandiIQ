@@ -57,4 +57,4 @@ jobs:
         env:
           RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
           STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
-        run: echo "No RENDER_API_URL / STREAMLIT_APP_URL secrets set — keep-alive skipped. Add them in repo Settings > Secrets to enable."
+        run: echo "No RENDER_API_URL / STREAMLIT_APP_URL secrets set - keep-alive skipped. Add them in repo Settings > Secrets to enable."

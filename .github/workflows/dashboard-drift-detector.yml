@@ -1,4 +1,4 @@
-# MandiIQ — Dashboard Drift Detector
+# MandiIQ - Dashboard Drift Detector
 #
 # Checks daily whether the production API's dashboard JSON matches
 # the committed version in the repo. If someone edits the dashboard
@@ -91,7 +91,7 @@ jobs:
 
           if [ "$LOCAL" = "$REMOTE" ]; then
             echo "drifted=false" >> "$GITHUB_OUTPUT"
-            echo "Hashes match — no drift detected."
+            echo "Hashes match - no drift detected."
           else
             echo "drifted=true" >> "$GITHUB_OUTPUT"
             echo "Hash MISMATCH detected!"
@@ -126,7 +126,7 @@ jobs:
             --jq 'length')
           echo "count=${EXISTING}" >> "$GITHUB_OUTPUT"
           if [ "$EXISTING" -gt 0 ]; then
-            echo "Found ${EXISTING} open drift issue(s). Skipping — duplicate prevention."
+            echo "Found ${EXISTING} open drift issue(s). Skipping - duplicate prevention."
           else
             echo "No open drift issues. Proceeding..."
           fi
@@ -137,45 +137,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TITLE="Dashboard drift detected: production JSON differs from repo"
-          BODY=$(cat << EOF
-## Dashboard Drift Detected
-
-The production API is serving a dashboard JSON file that differs from the
-committed version in this repository. This means someone edited the dashboard
-directly in Grafana and did **not** commit the updated JSON.
-
-### Details
-
-| Field | Local (repo) | Production (API) |
-|-------|-------------|------------------|
-| **MD5 Hash** | \`${{ needs.detect-drift.outputs.local_hash }}\` | \`${{ needs.detect-drift.outputs.remote_hash }}\` |
-| **File mtime** | — | ${{ needs.detect-drift.outputs.remote_mtime }} |
-
-### How to fix
-
-1. Export the current dashboard from Grafana:
-   - Open the dashboard in Grafana
-   - **Share** → **Export** → **Save to file**
-2. Replace \`dashboards/mandiiq-pipeline.json\` in this repo
-3. Commit and push to \`master\`
-4. The \`Dashboard Sync\` workflow will auto-refresh the API cache
-5. Close this issue when done
-
-### Why this matters
-
-The dashboard JSON in the repo is the source of truth. If the production
-instance diverges, the next deploy will overwrite the Grafana-edited version
-with the stale repo version, losing any changes made directly in Grafana.
-
----
-
-_Automated by the Dashboard Drift Detector workflow._
-EOF
-)
+          BODY="The production API is serving a dashboard JSON file that differs from the committed version in this repository. Someone edited the dashboard directly in Grafana and did not commit the updated JSON.\n\nMD5 hash (repo): ${{ needs.detect-drift.outputs.local_hash }}\nMD5 hash (production): ${{ needs.detect-drift.outputs.remote_hash }}\n\nTo fix: export the current dashboard from Grafana, replace dashboards/mandiiq-pipeline.json in this repo, commit and push to master, wait for the Dashboard Sync workflow to auto-refresh the API cache, then close this issue.\n\nThe dashboard JSON in the repo is the source of truth: if the production instance diverges, the next deploy overwrites the Grafana-edited version with the stale repo version, losing any changes made directly in Grafana.\n\nAutomated by the Dashboard Drift Detector workflow."
+          printf "%b\n" "$BODY" > /tmp/drift_issue_body.md
           echo "Filing GitHub issue..."
           gh issue create \
             --repo ${{ github.repository }} \
             --title "$TITLE" \
-            --body "$BODY" \
+            --body-file /tmp/drift_issue_body.md \
             --label "dashboard-drift,automated"
           echo "Issue filed successfully."

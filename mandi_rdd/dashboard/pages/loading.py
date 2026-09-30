@@ -1,5 +1,5 @@
 """
-MandiIQ — Loading page.
+MandiIQ - Loading page.
 
 App-level splash while nightly cache is (re)building.
 """

@@ -146,13 +146,13 @@ To distinguish MandiIQ from typical data dashboards, we upgraded the frontend st
 ### 6.1 Monochrome Surface System
 
 - **Infinite Canvas:** Pure `#000000` (black) backdrop to maximize contrast, replacing standard muddy slate backgrounds.
-- **Surface Mode:** A `.theme-surface` CSS class swaps the background from pure black (`#000000`) to a lighter dark gray (`#111111`/`#1a1a1a`) for daytime readability. The toggle is available as a sun/moon icon in the top bar, a sidebar `st.toggle`, and a button on the Settings page — all three controls write to the same session state key (`surface_mode`).
+- **Surface Mode:** A `.theme-surface` CSS class swaps the background from pure black (`#000000`) to a lighter dark gray (`#111111`/`#1a1a1a`) for daytime readability. The toggle is available as a sun/moon icon in the top bar, a sidebar `st.toggle`, and a button on the Settings page - all three controls write to the same session state key (`surface_mode`).
 - **Persistence Architecture (four-layer):**
-  1. **Session state** — `st.session_state.surface_mode` is checked and set server-side on every render.
-  2. **localStorage** — The JS IIFE saves the toggle state on every render, so it survives page refreshes within the same browser.
-  3. **URL query param** — `history.replaceState` updates `?surface=1` in the URL on every render. On the next page load, `st.query_params` restores the preference before the first render, eliminating the flash-of-wrong-theme problem.
-  4. **Cross-tab sync** — A `window.addEventListener('storage', ...)` listener detects when another browser tab writes to the `mandiiq_surface_mode` localStorage key and automatically syncs the theme by triggering the hidden toggle button.
-- **Duplicate CSS Prevention:** The `inject_theme()` function in `theme.py` uses a one-shot session-state gate (`_mandiiq_theme_injected`) — the 35KB stylesheet is injected exactly once per session instead of up to three times per page navigation.
+  1. **Session state** - `st.session_state.surface_mode` is checked and set server-side on every render.
+  2. **localStorage** - The JS IIFE saves the toggle state on every render, so it survives page refreshes within the same browser.
+  3. **URL query param** - `history.replaceState` updates `?surface=1` in the URL on every render. On the next page load, `st.query_params` restores the preference before the first render, eliminating the flash-of-wrong-theme problem.
+  4. **Cross-tab sync** - A `window.addEventListener('storage', ...)` listener detects when another browser tab writes to the `mandiiq_surface_mode` localStorage key and automatically syncs the theme by triggering the hidden toggle button.
+- **Duplicate CSS Prevention:** The `inject_theme()` function in `theme.py` uses a one-shot session-state gate (`_mandiiq_theme_injected`) - the 35KB stylesheet is injected exactly once per session instead of up to three times per page navigation.
 
 ### 6.2 Color & Typography
 
@@ -166,7 +166,7 @@ To distinguish MandiIQ from typical data dashboards, we upgraded the frontend st
 
 ### 6.3 SVG Icon System
 
-All inline icons across the dashboard are centralized in `mandi_rdd/dashboard/icons.py` — a single file that exports five SVG constants:
+All inline icons across the dashboard are centralized in `mandi_rdd/dashboard/icons.py` - a single file that exports five SVG constants:
 
 | Constant | Icon | Usage |
 |----------|------|-------|
@@ -182,9 +182,9 @@ The icons are Lucide-compatible (24×24 viewBox, `stroke="currentColor"`, `strok
 
 - **SlotButtons:** Navigation CTAs slide up on hover, transitioning from white text on transparent backgrounds to black text on lime/white backgrounds. A center-grown underline accent animates beneath each button on hover.
 - **Text Scramble Effect:** JavaScript scrambler cycles characters on link hovers before settling, adding a dynamic, code-inspired feel. Applied via `[data-scramble]` attributes on all navigation links and footer links.
-- **Stellla-Inspired Frames:** Hero elements are wrapped in vector-drawn borders that animate on load — the `stroke-dasharray`/`stroke-dashoffset` technique draws the frame outline over 2.8s and the crosshair center lines over 1.8s, both using `cubic-bezier(0.16, 1, 0.3, 1)` overshoot easing.
+- **Stellla-Inspired Frames:** Hero elements are wrapped in vector-drawn borders that animate on load - the `stroke-dasharray`/`stroke-dashoffset` technique draws the frame outline over 2.8s and the crosshair center lines over 1.8s, both using `cubic-bezier(0.16, 1, 0.3, 1)` overshoot easing.
 - **Glassmorphic Overlays:** Cards use a subtle transparent glass style (`rgba(255, 255, 255, 0.03)` with thin `rgba(255, 255, 255, 0.07)` borders) to layer content elegantly on the dark canvas.
-- **Crosshair Brackets:** Lime (`#d7ff00`) SVG corner markers on `::before`/`::after` pseudo-elements that fade in on hover. The brackets use `top: -1px`/`left: -1px` positioning to sit exactly at the card border. **Fix applied:** `overflow: hidden` was removed from all `.glass-card` and `.crosshair-panel` elements across all pages — the previous clipping prevented the outer 1px of the bracket lines from rendering.
+- **Crosshair Brackets:** Lime (`#d7ff00`) SVG corner markers on `::before`/`::after` pseudo-elements that fade in on hover. The brackets use `top: -1px`/`left: -1px` positioning to sit exactly at the card border. **Fix applied:** `overflow: hidden` was removed from all `.glass-card` and `.crosshair-panel` elements across all pages - the previous clipping prevented the outer 1px of the bracket lines from rendering.
 - **Scroll Reveal:** Elements with the `.reveal` class fade and translate-up when they enter the viewport via IntersectionObserver. Staggered via `.stagger-1` through `.stagger-4` delay helpers.
 
 ### 6.5 Atmosphere & Background Effects
@@ -210,7 +210,7 @@ All three static pages (`docs/index.html`, `landing/index.html`, `landing/mandi-
 | Crosshair corners not clipped (`overflow:hidden` removed) | ✅ | ✅ | ✅ | N/A (robo-card never had overflow) |
 | Scroll reveal (IntersectionObserver) | ✅ | ✅ | ✅ | ✅ |
 | Favicon (inline SVG lime leaf) | ✅ (browser tab) | ✅ | ✅ | ✅ |
-| Duplicate keyframes cleaned | — | ✅ (drawLine dedup) | N/A (no dup) | N/A (no dup) |
+| Duplicate keyframes cleaned | - | ✅ (drawLine dedup) | N/A (no dup) | N/A (no dup) |
 | Responsive layout (mobile breakpoints) | ✅ | ✅ | ✅ | ✅ |
 | Data-scramble on nav/footer links | ✅ | ✅ | ✅ | ✅ |
 

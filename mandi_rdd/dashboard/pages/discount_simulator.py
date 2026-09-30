@@ -1,5 +1,5 @@
 """
-MandiIQ — Discount Approval Simulator (Superstore extension).
+MandiIQ - Discount Approval Simulator (Superstore extension).
 
 Calculate optimal discount, safe range, and loss probability for retail promotions.
 SHAP contribution mini-chart explains the model's decision.
@@ -34,7 +34,7 @@ def render():
             </h1>
             <p style="color:#7e7e7e;max-width:680px;line-height:1.7;font-size:0.9rem;">
                 Model-driven discount recommendations for retail promotions. Enter product details
-                to get optimal discount, safe range, and loss probability — based on historical
+                to get optimal discount, safe range, and loss probability - based on historical
                 Superstore transaction patterns.
             </p>
           </div>

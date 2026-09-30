@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo } from "react";
 import { Streamlit } from "streamlit-component-lib";
 
 /* ═══════════════════════════════════════════════════════════
-   MandiIQ Flip-Board KPI Hero — MandiIQ Design.
+   MandiIQ Flip-Board KPI Hero - MandiIQ Design.
 
    Pure black canvas · Lime (#d7ff00) single accent
    Glass cards · Crosshair corner markers on hover
@@ -180,7 +180,7 @@ export default function FlipBoard({ kpis }: FlipBoardProps) {
                       border-color 0.35s ease;
         }
 
-        /* Crosshair corner markers — active-target pattern */
+        /* Crosshair corner markers - active-target pattern */
         .flip-kpi-card::before {
           content: '';
           position: absolute;

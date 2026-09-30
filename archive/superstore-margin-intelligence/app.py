@@ -1,5 +1,5 @@
 """
-Superstore Margin Intelligence System — Streamlit Dashboard
+Superstore Margin Intelligence System - Streamlit Dashboard
 
 An interactive decision-support dashboard with:
 - Executive Overview (KPI panels + 6-pitch visual summary)
@@ -33,7 +33,7 @@ from src.data.init_db import get_connection
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 USE_API = os.getenv("USE_API", "true").lower() == "true"
 
-# Always import both — API client and local models
+# Always import both - API client and local models
 from dashboard.api_client import (
     predict_loss_risk as api_predict_loss,
     predict_max_discount as api_max_discount,
@@ -56,7 +56,7 @@ else:
     print("  Dashboard using local models (USE_API=false)")
 
 def predict_loss(features, artifacts=None):
-    """Predict loss risk — tries API first, falls back to local."""
+    """Predict loss risk - tries API first, falls back to local."""
     if API_AVAILABLE:
         result = api_predict_loss(
             category=features["category"],
@@ -73,7 +73,7 @@ def predict_loss(features, artifacts=None):
     return local_predict_loss(features, artifacts)
 
 def compute_safe_discount(category, sub_category, region, segment, quantity=3, ship_mode="Standard Class", artifacts=None):
-    """Compute safe discount — tries API first, falls back to local."""
+    """Compute safe discount - tries API first, falls back to local."""
     if API_AVAILABLE:
         result = api_max_discount(
             category=category,
@@ -88,7 +88,7 @@ def compute_safe_discount(category, sub_category, region, segment, quantity=3, s
     return local_compute_safe_discount(category, sub_category, region, segment, quantity, ship_mode, artifacts=artifacts)
 
 # =============================================================================
-# PAGE CONFIG — MUST BE FIRST
+# PAGE CONFIG - MUST BE FIRST
 # =============================================================================
 
 st.set_page_config(
@@ -99,7 +99,7 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CUSTOM CSS — Glass-morphism + Gradient + Micro-interactions
+# CUSTOM CSS - Glass-morphism + Gradient + Micro-interactions
 # =============================================================================
 
 st.markdown("""
@@ -546,7 +546,7 @@ def render_overview(df, metrics):
     st.markdown("<h1>📊 Margin Intelligence Dashboard</h1>", unsafe_allow_html=True)
     st.markdown("""
     <p style="color: rgba(255,255,255,0.6); font-size: 1rem; margin-bottom: 1.5rem;">
-        Real-time visibility into profitability drivers · <strong>18.7%</strong> of orders are unprofitable — 
+        Real-time visibility into profitability drivers · <strong>18.7%</strong> of orders are unprofitable - 
         catch them <em>before</em> they ship.
     </p>
     """, unsafe_allow_html=True)
@@ -869,12 +869,12 @@ def render_overview(df, metrics):
 # =============================================================================
 
 def render_simulator(df, artifacts):
-    """Discount Approval Simulator — the core interactive feature."""
+    """Discount Approval Simulator - the core interactive feature."""
     
     st.markdown("<h1>🎯 Discount Approval Simulator</h1>", unsafe_allow_html=True)
     st.markdown("""
     <p style="color: rgba(255,255,255,0.6); font-size: 1rem; margin-bottom: 1.5rem;">
-        Simulate a proposed discount and see whether it will be profitable — <em>before you approve it.</em>
+        Simulate a proposed discount and see whether it will be profitable - <em>before you approve it.</em>
         The model analyzes <strong>8 features</strong> to predict loss risk and recommends a safe discount ceiling.
     </p>
     """, unsafe_allow_html=True)

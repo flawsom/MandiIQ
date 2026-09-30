@@ -1,8 +1,8 @@
 """
-MandiRDD — Regression Discontinuity Design engine.
+MandiRDD - Regression Discontinuity Design engine.
 
 Implements a local-linear RDD with a triangular kernel, bandwidth
-sensitivity analysis, and placebo tests — all from scratch (no
+sensitivity analysis, and placebo tests - all from scratch (no
 dependency on R-only packages).
 
 Designed so the estimator can be explained line-by-line in an
@@ -217,7 +217,7 @@ def bandwidth_sensitivity(
     
     The gold standard for robustness: if the effect flips sign or
     loses significance across reasonable bandwidths, that's the
-    honest result — report it.
+    honest result - report it.
     """
     if bandwidths is None:
         bandwidths = [10, 15, 20, 25, 30]
@@ -528,7 +528,7 @@ def run_rdd(
         elif p_value < 0.1:
             result["interpretation"] = (
                 f"Marginally significant discontinuity (p={p_value:.4f}). "
-                f"Effect of ₹{effect:.2f} at cutoff — suggestive but not definitive."
+                f"Effect of ₹{effect:.2f} at cutoff - suggestive but not definitive."
             )
         else:
             result["interpretation"] = (

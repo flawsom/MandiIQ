@@ -1,5 +1,5 @@
 """
-MandiIQ — Real-time pipeline latency & throughput metrics.
+MandiIQ - Real-time pipeline latency & throughput metrics.
 
 Provides a thread-safe singleton PipelineMetrics object that records
 per-step durations, row counts, API response times, failure rates,
@@ -292,5 +292,5 @@ class PipelineMetrics:
                 self._step_failure[step_name] += 1
 
 
-# Module-level singleton — imported by scheduler and API module.
+# Module-level singleton - imported by scheduler and API module.
 pipeline_metrics = PipelineMetrics()

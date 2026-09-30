@@ -1,9 +1,9 @@
 """
-MandiIQ — Flip-board KPI hero (Layer 3 of the design system).
+MandiIQ - Flip-board KPI hero (Layer 3 of the design system).
 
 Streamlit custom component wrapping a React flip-board that receives
 4 analytical KPIs from Python. The component holds its own client-side
-state so it only animates when a value actually changes — immune to
+state so it only animates when a value actually changes - immune to
 unrelated Streamlit reruns (PRD §1/§4).
 
 Usage:
@@ -30,7 +30,7 @@ from pathlib import Path
 # Resolve the built bundle path relative to this file.
 _FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 
-# declare_component — loads from the built static bundle.
+# declare_component - loads from the built static bundle.
 # Streamlit serves the files from this directory.
 _component_func = components.declare_component(
     "flip_board",
@@ -39,13 +39,13 @@ _component_func = components.declare_component(
 
 
 def flip_board(
-    effect: str = "—",
+    effect: str = "-",
     effect_raw: float = float("nan"),
-    avg_price: str = "—",
+    avg_price: str = "-",
     avg_price_raw: float = float("nan"),
-    districts: str = "—",
+    districts: str = "-",
     districts_raw: float = float("nan"),
-    mape: str = "—",
+    mape: str = "-",
     mape_raw: float = float("nan"),
 ) -> None:
     """Render the flip-board KPI hero.
@@ -55,7 +55,7 @@ def flip_board(
     actually changes). Use float('nan') for the initial/unknown state.
 
     Falls back gracefully if the frontend bundle is missing (e.g.
-    during development before npm build) — renders plain st.metric.
+    during development before npm build) - renders plain st.metric.
     """
     # If the bundle doesn't exist, fall back to st.metric
     if not _FRONTEND_DIST.exists():
@@ -97,7 +97,7 @@ def flip_board(
         },
     }
 
-    # NaN / Inf are not valid JSON tokens — they serialize to the literal
+    # NaN / Inf are not valid JSON tokens - they serialize to the literal
     # `NaN`/`Infinity` and break the React client's JSON.parse (manifests as
     # "Unexpected token 'N'... is not valid JSON"). Coerce non-finite raw
     # values to None (→ JSON null) so the component treats them as the

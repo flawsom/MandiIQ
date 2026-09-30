@@ -160,6 +160,27 @@ def get_freshness(commodity: Optional[str] = None) -> list:
             return []
 
 
+def get_analytics(commodity: str) -> dict:
+    """Fetch the composite analytics deep-dive, falling back to local DuckDB."""
+    import requests
+    api_base = _get_api_base()
+    try:
+        resp = requests.get(f"{api_base}/analytics/{commodity}", timeout=60)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        _warn_stale_fallback(f"/analytics/{commodity}", str(e))
+        try:
+            from mandi_rdd.storage.duckdb_store import get_connection
+            from mandi_rdd.analysis.analytics import commodity_analytics
+            conn = get_connection(read_only=True)
+            report = commodity_analytics(conn, commodity)
+            conn.close()
+            return report
+        except Exception as fallback_error:
+            return {"error": f"Analytics unavailable: {e} ({fallback_error})"}
+
+
 def get_recommendation(commodity: str, district: Optional[str] = None) -> dict:
     """Fetch a procurement recommendation from the API."""
     import requests

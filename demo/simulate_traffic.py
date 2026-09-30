@@ -2,7 +2,7 @@
 Generate synthetic prediction traffic for the monitoring demo.
 
 This script simulates real API usage so the monitoring view has data to display.
-All traffic is synthetic — clearly labeled as such in the dashboard.
+All traffic is synthetic - clearly labeled as such in the dashboard.
 """
 
 import sys
@@ -69,7 +69,7 @@ def simulate_traffic(n_requests: int = 500, api_url: str = "http://localhost:800
                 response = json.loads(f.read())
             latency = (time.time() - start) * 1000
         except Exception:
-            # API not running — generate synthetic response
+            # API not running - generate synthetic response
             latency = random.uniform(50, 500)
             response = {
                 "loss_probability": round(random.uniform(0, 1), 4),

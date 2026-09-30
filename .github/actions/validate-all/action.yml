@@ -1,6 +1,6 @@
 name: Validate all (render.yaml + DuckDB)
 description: >
-  Runs both validators in sequence — render.yaml schema validation first,
+  Runs both validators in sequence - render.yaml schema validation first,
   then DuckDB LFS integrity check. A single uses: line that replaces the
   common validate-render + validate-duckdb pair found in most workflows.
 

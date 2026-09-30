@@ -1,14 +1,14 @@
 """
-mandi_rdd/dashboard/components.py — Reusable UI Component Library
+mandi_rdd/dashboard/components.py - Reusable UI Component Library
 
 Provides styled wrapper functions and design-system-aligned components
 for the MandiIQ dashboard. Uses the existing turmeric/ink/slate token system.
 
 All components are thin wrappers over Streamlit primitives or direct HTML
-injection — they add design-system layer, not new functionality.
+injection - they add design-system layer, not new functionality.
 
 Component categories (10):
-  1. Buttons  (primary, secondary, ghost, danger — all states)
+  1. Buttons  (primary, secondary, ghost, danger - all states)
   2. Inputs   (empty, focused, filled, invalid, disabled)
   3. Cards    (metric card, info card, error card)
   4. Tables   (styled dataframe wrapper)
@@ -40,7 +40,7 @@ _BUTTON_CSS = f"""
     text-decoration: none;
     position: relative;
 }}
-/* Primary — turmeric fill, ink text */
+/* Primary - turmeric fill, ink text */
 .mandiq-btn-primary {{
     background: {TURMERIC}; color: {INK};
     border: 1px solid {TURMERIC};
@@ -62,7 +62,7 @@ _BUTTON_CSS = f"""
     content: "..."; animation: mandiq-pulse 1.2s infinite;
 }}
 
-/* Secondary — outline, slate-2 border */
+/* Secondary - outline, slate-2 border */
 .mandiq-btn-secondary {{
     background: transparent; color: {PAPER};
     border: 1px solid rgba({int(SLATE[1:3],16)},{int(SLATE[3:5],16)},{int(SLATE[5:7],16)},0.6);
@@ -77,7 +77,7 @@ _BUTTON_CSS = f"""
     opacity: 0.4; cursor: not-allowed; pointer-events: none;
 }}
 
-/* Ghost — text only */
+/* Ghost - text only */
 .mandiq-btn-ghost {{
     background: transparent; color: {MUTED};
     border: 1px solid transparent; padding: 0.45rem 0.75rem;
@@ -92,7 +92,7 @@ _BUTTON_CSS = f"""
     opacity: 0.4; cursor: not-allowed;
 }}
 
-/* Danger — rust border/text */
+/* Danger - rust border/text */
 .mandiq-btn-danger {{
     background: transparent; color: {RUST};
     border: 1px solid {RUST};

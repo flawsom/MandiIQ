@@ -1,4 +1,4 @@
-# MandiIQ — local development stack
+# MandiIQ - local development stack
 # Builds both services from the single mandi_rdd/Dockerfile.
 # The API serves FastAPI (mandi_rdd.api.main:app); the dashboard runs the
 # Streamlit app (mandi_rdd.dashboard.app) against it.

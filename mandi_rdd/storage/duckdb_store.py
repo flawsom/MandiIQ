@@ -14,7 +14,7 @@ except Exception:
 
 """
 
-MandiRDD — DuckDB storage layer.
+MandiRDD - DuckDB storage layer.
 
 Migrated from SQLite to DuckDB for analytical SQL capabilities
 
@@ -520,7 +520,7 @@ def init_schema(conn) -> None:
 
 def upsert_prices(conn, records: list[dict]) -> int:
 
-    """Bulk upsert price records — idempotent, never duplicates."""
+    """Bulk upsert price records - idempotent, never duplicates."""
 
     if not records or not DUCKDB_AVAILABLE:
 
@@ -959,7 +959,7 @@ def record_lineage_batch(
         _refresh_freshness(conn, comm)
 
     logger.info(
-        "Lineage: %s/%s — %d rows (%d new), %d commodities, %s → %s",
+        "Lineage: %s/%s - %d rows (%d new), %d commodities, %s → %s",
         source_type, source_name, row_count, n_new,
         len(commodities), first_date, last_date,
     )
