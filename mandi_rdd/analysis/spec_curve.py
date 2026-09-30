@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional
 
 import numpy as np
 from scipy import stats

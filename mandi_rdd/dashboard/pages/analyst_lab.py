@@ -146,6 +146,79 @@ def _dml_section(payload: dict) -> None:
     st.caption(payload.get("interpretation", ""))
 
 
+def _spec_curve_section(payload: dict, color: str) -> None:
+    """The whole specification curve, not just the headline specification.
+
+    Sorted estimates with the significant ones picked out, the median marked,
+    and the p-values underneath on the same spec order. A reviewer can see at
+    a glance whether the effect lives in one cell of the grid or in all of it.
+    """
+    summary = payload.get("summary") or {}
+    specs = [s for s in (payload.get("specifications") or []) if s.get("effect") is not None]
+    if not specs:
+        _error_box(payload.get("error", "no specification could be estimated"))
+        return
+
+    cols = st.columns(4)
+    cols[0].metric("Median effect", f"\u20b9{summary['median_effect']:.0f}",
+                   help="Median across every bandwidth, kernel and polynomial order")
+    cols[1].metric("Specifications significant",
+                   f"{summary['n_significant']}/{summary['n_estimated']}",
+                   help=f"Two-sided p < {summary['alpha']}")
+    cols[2].metric("Interquartile range", f"\u20b9{summary['iqr_effect']:.0f}")
+    label = str(summary.get("verdict", "unknown(")).replace("_", " ")
+    cols[3].metric("Verdict", label.upper(),
+                   help="stable = the sign holds and most specifications agree; fragile = it does not")
+    if summary.get("verdict") == "fragile":
+        st.caption(
+            "Fragile: the headline number does not survive reasonable changes to "
+            "bandwidth, kernel or polynomial order. Report it as suggestive."
+        )
+
+    ordered = sorted(specs, key=lambda s: s["effect"])
+    labels = [
+        f"{s['kernel'][:4]} bw{s['bandwidth']:g} deg{s['order']}" for s in ordered
+    ]
+    effects = [s["effect"] for s in ordered]
+    significant = [
+        s["effect"] if (s.get("p_value") is not None and s["p_value"] < summary.get("alpha", 0.05))
+        else None
+        for s in ordered
+    ]
+
+    fig = make_themed_figure(height=380)
+    fig.add_trace(go.Scatter(
+        x=effects, y=labels, mode="markers", name="not significant",
+        marker=dict(color="rgba(151,151,151,0.85)", size=9),
+    ))
+    fig.add_trace(go.Scatter(
+        x=significant, y=labels, mode="markers", name=f"p < {summary.get('alpha', 0.05)}",
+        marker=dict(color=color, size=11, line=dict(width=1, color="#0b0b0b")),
+    ))
+    fig.add_vline(x=0, line=dict(color="rgba(151,151,151,0.5)", width=1, dash="dot"))
+    fig.add_vline(x=summary["median_effect"],
+                  line=dict(color="#d7ff00", width=1, dash="dash"),
+                  annotation_text="median", annotation_position="top")
+    fig.update_layout(
+        xaxis_title="Estimated discontinuity at -19% rainfall (\u20b9/quintal)",
+        yaxis=dict(autorange="reversed"),
+        hovermode="closest",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    pfig = make_themed_figure(height=200, show_legend=False)
+    pfig.add_trace(go.Bar(
+        x=[s["p_value"] for s in ordered], y=labels, orientation="h",
+        marker=dict(color=[color if (s.get("p_value") or 1) < summary.get("alpha", 0.05)
+                           else "rgba(151,151,151,0.6)" for s in ordered]),
+        hovertemplate="%{x:.4f}<extra></extra>",
+    ))
+    if summary.get("alpha"):
+        pfig.add_vline(x=summary["alpha"], line=dict(color="#ff5c39", width=1, dash="dash"))
+    pfig.update_layout(xaxis_title="two-sided p-value", yaxis=dict(autorange="reversed"))
+    st.plotly_chart(pfig, use_container_width=True)
+
+
 def _nowcast_section(payload: dict) -> None:
     if "error" in payload:
         _error_box(payload["error"])
@@ -221,3 +294,6 @@ def render(**kwargs):
 
     _section_label("Nowcast - Kalman month-end projection")
     _nowcast_section(sections.get("nowcast", {}))
+
+    _section_label("Robustness - specification curve (30 specifications)")
+    _spec_curve_section(sections.get("spec_curve", {}), color)
