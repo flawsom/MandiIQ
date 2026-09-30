@@ -4,7 +4,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml/badge.svg)](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml)
-[![Tests](https://img.shields.io/badge/tests-29%2F29%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-116%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -172,7 +172,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**69 tests passing** (1 skipped = warehouse-dependent check):
+**116 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -184,7 +184,10 @@ pytest mandi_rdd/tests/ -v
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
-| `test_dashboard_boot.py` (4 tests) | Headless Streamlit run, every page imports, route table intact |
+| `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
+| `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
+| `test_storage_repair.py` (11 tests) | Index-fault detection, table rebuild, write self-healing, memory-limit regression |
+| `test_spec_curve.py` (16 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
 
@@ -273,7 +276,7 @@ pytest mandi_rdd/tests/ -v
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **29/29 ✅** |
+| Tests passing | ≥ 25 | **116 passing, 1 skipped ✅** |
 | API endpoints | ≥ 10 | **10 endpoints ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |

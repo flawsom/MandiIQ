@@ -64,7 +64,7 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 | **Landing page** | Product tour, live KPIs, pipeline explainer | [![Landing](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.unifies.codes&style=flat-square&label=mandiiq.unifies.codes&up_color=2E7D32)](https://mandiiq.unifies.codes) |
 | **Live Data Console** | Always-on public console: live counters, price series, RDD plot, analytics cards - reads the production API directly | [![Console](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Flive.html&style=flat-square&label=live%20console&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/live.html) |
 | **Streamlit cockpit** | 10 routes - overview, discontinuity, forecast, risk map, satellite, advisor, ask, analyst lab. Access-restricted on Streamlit Cloud (login); set *Who can view this app* to public in the Streamlit dashboard to open it up - or run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
-| **FastAPI (primary)** | 35 documented endpoints (40 routes) + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
+| **FastAPI (primary)** | 38 documented endpoints (43 routes) + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
 | **FastAPI (NDVI instance)** | Second Northflank instance carrying satellite NDVI rows | [![API mirror](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--zbvjrztgjqgw.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--zbvjrztgjqgw.code.run/docs) |
 | **GitHub Pages** | Static docs, SEO surface and heartbeat monitor | [![Pages](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2F&style=flat-square&label=flawsom.github.io%2FMandiIQ&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/) |
 | **Heartbeat monitor** | Live cache + freshness board fed by the heartbeat workflow | [![Heartbeat](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Fheartbeat-dashboard.html&style=flat-square&label=heartbeat&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/heartbeat-dashboard.html) |
@@ -87,6 +87,7 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 > 1. **Keep-alive** - `keepalive.yml` pings the API, mirror API, landing page and Streamlit app every 10 minutes *continuously* (each run covers the gap until the next one), and the Cloudflare worker carries a `*/1` cron trigger so `wrangler deploy` adds per-minute pings from the edge.
 > 2. **External refresh** - `refresh-live-data.yml` POSTs `/refresh` every hour, waits for the run to finish, then verifies `/health` and `/data-quality`. If the warehouse does not advance, the workflow fails loudly, so staleness is caught in minutes instead of months.
 > 3. **Date integrity** - arrival dates are parsed explicitly as `DD/MM/YYYY` (month-first guessing used to file September records under December), impossible future dates are rejected at ingest, and any that already exist are repaired by `POST /admin/repair-dates`. `/health` reports `data_max_date`, `days_behind` and `n_future_dates` so no surface can claim freshness it does not have.
+> 4. **Index integrity** - DuckDB's unique index over `prices` can be left inconsistent by a bulk load that runs out of memory, after which every write to those keys fails and ingestion stops dead. The pipeline checks for it as its first step (`ensure_price_index`, cheap: duplicates are impossible while the index enforces), rebuilds the table when it finds it, and `upsert_prices` repairs and retries once rather than failing the run. `POST /admin/rebuild-prices` does it on demand.
 >
 > GitHub Actions also layers on the scheduled jobs - nightly ingestion (05:30 UTC), NDVI/daily cycle (06:00 UTC), Ashoka import polling (every 3 h), dashboard heartbeat (every 6 h), freshness alerts (daily) and live-endpoint verification (daily, which fails the run and files an issue when production is stale). See [Data cadence](#data-cadence) for the full table.
 
@@ -145,6 +146,8 @@ Beyond the headline result, MandiIQ ships a full quantitative work-packet for ev
 | :---- | :----- | :------------------ |
 | **Uncertainty** | Split conformal prediction + Adaptive Conformal Inference (Gibbs & Candès, 2021) | How wide is the honest band around the forecast, without assuming a noise distribution? |
 | **Reliability** | PSI · KS two-sample test · Page-Hinkley · EWMA control chart · 0-100 data-quality score | Has the market regime or the warehouse itself drifted under the models? |
+| **Robustness** | Specification curve over 30 bandwidth x kernel x polynomial combinations, with a stable/fragile verdict | Does the headline effect survive a different analyst choosing different defaults? |
+| **Multiplicity** | Benjamini-Hochberg q-values across every commodity fitted | With 400+ commodities at p < 0.05, how many effects are still real after correcting? |
 | **Tail risk** | Historical VaR/CVaR + peaks-over-threshold GPD fits (EVT) | How bad can a bad day get, including losses beyond the observed sample? |
 | **Causal sensitivity** | Cross-fitted partially-linear debiased ML (Chernozhukov et al.) | How much does the *whole* rainfall distribution move prices, away from the threshold? |
 | **Nowcasting** | Kalman local-linear-trend filter + RTS smoother (maximum-likelihood parameters) | What is this month's price level while mandi reporting is still incomplete? |
@@ -702,7 +705,7 @@ MandiIQ/
 | `GET` | `/forecast/{commodity}` | Prophet forecast with volatility envelope (`?compare=true` adds LSTM) |
 | `GET` | `/risk-score/{commodity}` | XGBoost spike-risk probability (`?district=` optional) |
 | `GET` | `/recommendation/{commodity}` | Procurement advice from RDD + forecast + risk (`?district=` optional) |
-| `GET` | `/analytics/{commodity}` | Composite deep-dive: conformal, drift, tail risk, DML, nowcast |
+| `GET` | `/analytics/{commodity}` | Composite deep-dive: conformal, drift, tail risk, DML, nowcast, specification curve |
 | `GET` | `/conformal/{commodity}` | Distribution-free prediction intervals around the forecast |
 | `GET` | `/drift/{commodity}` | PSI / KS / Page-Hinkley / EWMA + data-quality score |
 | `GET` | `/tail-risk/{commodity}` | Historical VaR/CVaR, EVT GPD tail fit, max drawdown |
@@ -726,7 +729,10 @@ MandiIQ/
 | `POST` | `/trigger-backfill` | Queue a backfill job |
 | `POST` | `/trigger-ashoka-import` | Start the Ashoka archive import |
 | `GET` | `/data-quality` | Date-integrity report: newest arrival date, days behind, impossible-date rows |
+| `GET` | `/spec-curve/{commodity}` | The RDD across 30 specifications (bandwidth x kernel x polynomial order) |
+| `GET` | `/fdr` | Benjamini-Hochberg q-values across every stored commodity estimate |
 | `POST` | `/admin/repair-dates` | Rewrite (or drop) rows whose arrival date cannot be true (`?dry_run=false` to apply) |
+| `POST` | `/admin/rebuild-prices` | Rebuild the prices table and its index after a DuckDB index fault |
 | `POST` | `/run-rainfall-rdd` | Recompute RDD with the rainfall join |
 | `GET` | `/debug/rainfall-test` | Rainfall pipeline diagnostics |
 | `GET` | `/proxy/github/{path}` | Token-backed GitHub API proxy |
@@ -1070,6 +1076,9 @@ ruff check mandi_rdd/
 | `test_analytics_db.py` | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_date_integrity.py` | Day-first date parsing, future-date rejection, warehouse repair, run locking |
 | `test_dashboard_boot.py` | Runs the real Streamlit app headlessly and checks every page imports and renders |
+| `test_freshness_contract.py` | `/health` may not call two-month-old prices fresh; the external freshness gate must fail a run that ingested nothing |
+| `test_storage_repair.py` | Index-fault detection and repair, self-healing writes, the memory cap that caused the fault |
+| `test_spec_curve.py` | The general estimator must reproduce the local-linear one; a real effect survives all 30 specifications and a null one does not; BH q-values |
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
