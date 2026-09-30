@@ -782,6 +782,22 @@ def note_index_fault(error: object) -> bool:
         return True
 
 
+def flag_index_fault(reason: str) -> None:
+    """Record a fault unconditionally.
+
+    Used *before* a write probe: if the probe is what kills this process, the
+    marker is already on the volume and the next process rebuilds instead of
+    rediscovering the fault the hard way.
+    """
+    path = index_fault_flag_path()
+    try:
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(str(reason)[:2000], encoding="utf-8")
+    except OSError as exc:
+        logger.warning(f"Could not record the index fault: {exc}")
+
+
 def index_fault_flagged() -> bool:
     """Is there a recorded index fault that has not been repaired yet?"""
     path = index_fault_flag_path()
@@ -789,6 +805,33 @@ def index_fault_flagged() -> bool:
         return bool(path is not None and path.exists())
     except OSError:
         return False
+
+
+PROBE_MARKET = "__mandiiq_index_probe__"
+
+
+def probe_price_index(conn) -> None:
+    """Find out whether the unique index still works by using it.
+
+    A read cannot tell a working index from one that has stopped enforcing, so
+    the only honest test is to write. The row uses market names nobody trades
+    under and is removed again in the same call, so a healthy warehouse is
+    left exactly as it was; a broken one raises here, which is the point.
+    """
+    conn.execute(
+        """
+        INSERT INTO prices
+            (state, district, market, commodity, variety, grade, arrival_date,
+             min_price, max_price, modal_price)
+        VALUES
+            ('__probe__', '__probe__', ?, '__probe__', '__probe__', '__probe__',
+             CURRENT_DATE, 0.0, 0.0, 0.0)
+        """,
+        [PROBE_MARKET],
+    )
+    # The delete is the other half of the test: "Failed to delete all rows from
+    # index" is raised here, not by the insert.
+    conn.execute("DELETE FROM prices WHERE market = ?", [PROBE_MARKET])
 
 
 def clear_index_fault() -> None:
@@ -831,13 +874,52 @@ def ensure_price_index(conn, force: bool = False) -> dict:
     return report
 
 
-def heal_price_index(conn) -> dict:
-    """Repair the index if anything says it needs it, else do nothing.
+def verify_price_index(conn, probe: bool = True) -> dict:
+    """Decide whether the prices index needs rebuilding, and rebuild it.
 
-    Called before a pipeline run and before the first write of a fresh
-    process, so a fault recorded by a run that crashed cannot be inherited by
-    the next one.
+    Three sources of evidence, cheapest first:
+
+      1. a marker recorded by an earlier run (survives restarts on the volume),
+      2. duplicate business keys, which a working UNIQUE index cannot permit,
+      3. a write probe that uses the index - the only way to see a fault that
+         leaves the index self-consistent.
+
+    The marker is written *before* the probe, so a process that dies probing
+    teaches its successor to rebuild rather than repeat the failure. On the
+    healthy path the marker is cleared immediately and the warehouse keeps its
+    rows.
     """
+    if index_fault_flagged():
+        return ensure_price_index(conn, force=True)
+
+    duplicates = find_duplicate_price_keys(conn)
+    if duplicates:
+        return ensure_price_index(conn)
+
+    if not probe:
+        return {"duplicates": 0, "rebuilt": False, "trigger": None, "probed": False}
+
+    flag_index_fault("write probe did not complete")
+    try:
+        probe_price_index(conn)
+    except Exception as exc:
+        logger.error(
+            f"The prices index failed a write probe ({exc}); rebuilding the table"
+        )
+        report = rebuild_prices_table(conn)
+        report["duplicates"] = 0
+        report["rebuilt"] = True
+        report["trigger"] = "write_probe"
+        report["duplicates_after"] = find_duplicate_price_keys(conn)
+        clear_index_fault()
+        return report
+
+    clear_index_fault()
+    return {"duplicates": 0, "rebuilt": False, "trigger": None, "probed": True}
+
+
+def heal_price_index(conn) -> dict:
+    """Repair the index if anything says it needs it, else do nothing."""
     if index_fault_flagged():
         return ensure_price_index(conn, force=True)
     return ensure_price_index(conn)

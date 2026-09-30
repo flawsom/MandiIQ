@@ -304,9 +304,7 @@ def _refresh_once() -> dict:
         logger.info("Self-refresh skipped: an ingestion is already running")
         return {"status": "busy"}
 
-    rehab = _repair_price_index_if_flagged()
-    if rehab:
-        _REFRESH_STATE["last_index_repair"] = rehab
+    _verify_price_index_once()
 
     try:
         summary = run_ingestion()
@@ -325,37 +323,49 @@ def _refresh_once() -> dict:
     return summary
 
 
-def _repair_price_index_if_flagged() -> Optional[dict]:
-    """Rebuild the prices table when a previous run recorded an index fault.
+# One verification per process: the probe writes two statements, and repeating
+# it on every hourly tick would be pointless work on a healthy warehouse.
+_INDEX_VERIFIED = False
 
-    Done before the pipeline, not inside it, because the first write of a run
-    is what dies: a fault recorded by a process that was restarted must be
-    repaired by its successor rather than inherited. The marker lives on the
-    data volume so it survives that restart.
+
+def _verify_price_index_once() -> Optional[dict]:
+    """Make sure the prices index works before the pipeline writes anything.
+
+    Runs ahead of the pipeline rather than inside it because the first write of
+    a run is what dies, and it happens once per process so a restart is itself
+    the trigger. The marker lives on the data volume, so a process killed by
+    the probe leaves its successor a rebuild instead of the same failure.
     """
+    global _INDEX_VERIFIED
+    if _INDEX_VERIFIED:
+        return None
     try:
         from mandi_rdd.storage.duckdb_store import (
             get_connection,
-            heal_price_index,
             index_fault_flagged,
-        )
-        if not index_fault_flagged():
-            return None
-        logger.error(
-            "A previous run left an index fault recorded; rebuilding the prices "
-            "table before ingesting"
+            verify_price_index,
         )
         conn = get_connection()
         try:
             init_schema(conn)
-            return heal_price_index(conn)
+            report = verify_price_index(conn)
         finally:
             try:
                 conn.close()
             except Exception:
                 pass
+        _INDEX_VERIFIED = True
+        if report.get("rebuilt"):
+            logger.error(f"Price index repaired before ingesting: {report}")
+            _REFRESH_STATE["last_index_repair"] = report
+            return report
+        if index_fault_flagged():
+            # The probe succeeded but the marker survived, which means we could
+            # not record the outcome. Say so rather than claim a clean bill.
+            logger.warning("Price index probed clean but the fault marker persists")
+        return None
     except Exception as exc:
-        logger.error(f"Price-index repair failed: {exc}")
+        logger.error(f"Price-index verification failed: {exc}")
         return {"error": str(exc)}
 
 
@@ -671,6 +681,11 @@ async def fdr(alpha: float = Query(0.05, ge=0.001, le=0.5)):
 
     With 400+ commodities each fitted at p < 0.05, roughly one in twenty looks
     significant by chance. q-values say how many survive that correction.
+
+    Collapsed fits (a numerically zero discontinuity, ~1e-12 rupees, with a
+    zero-variance standard error) are not hypotheses and are excluded from the
+    family; they are listed under ``degenerate`` with a count so the exclusion
+    is visible rather than silent.
     """
     conn = get_connection()
     init_schema(conn)

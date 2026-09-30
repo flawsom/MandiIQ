@@ -178,6 +178,88 @@ def test_fdr_report_counts_survivors_from_the_warehouse():
     assert report["n_significant_fdr"] < report["n_significant_raw"]
     assert report["expected_false_positives"] == pytest.approx(0.5)
     assert all(e["q_value"] is not None for e in report["entries"])
+    assert report["n_excluded_degenerate"] == 0
+    assert report["degenerate"] == []
+
+
+class _FdrConn:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def execute(self, sql, params=None):
+        class _Result:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        return _Result(self._rows)
+
+
+def test_degenerate_effect_detection_covers_null_nan_and_inf():
+    assert spec_curve._is_degenerate_effect(None) is True
+    assert spec_curve._is_degenerate_effect(float("nan")) is True
+    assert spec_curve._is_degenerate_effect(float("inf")) is True
+    assert spec_curve._is_degenerate_effect(0.0) is True
+    assert spec_curve._is_degenerate_effect(1e-12) is True
+    assert spec_curve._is_degenerate_effect(2384.36) is False
+    assert spec_curve._is_degenerate_effect(-97.82) is False
+
+
+def test_fdr_report_excludes_collapsed_fits_from_the_family():
+    """A flattened outcome series must not be published as the strongest finding.
+
+    Regression: live production reported Wheat/Chili Red/Paddy/Paddy as the only
+    four FDR survivors, each with an effect of ~1e-12 rupees and p = 0, while
+    the genuinely large effects were reported as non-findings.
+    """
+    rows = [
+        ("Wheat", -4.0927e-12, 0.0, 25, 41),
+        ("Chili Red", -1.4551e-11, 5.0e-14, 25, 41),
+        ("Paddy(Common)", 2.2737e-12, 1.2e-4, 62, 40),
+        ("Garlic", 2384.36, 0.0449, 40, 40),
+        ("Onion", 97.82, 0.4656, 93, 106),
+        ("Turmeric", 770.95, 0.4656, 40, 40),
+    ]
+
+    report = spec_curve.fdr_report(_FdrConn(rows), alpha=0.05)
+
+    assert report["n_excluded_degenerate"] == 3
+    assert report["degenerate"] == ["Wheat", "Chili Red", "Paddy(Common)"]
+    # The family is what was actually tested, not the raw row count.
+    assert report["n_hypotheses"] == 3
+    assert report["expected_false_positives"] == pytest.approx(0.15)
+    assert set(report["survivors"]).isdisjoint({"Wheat", "Chili Red", "Paddy(Common)"})
+    for entry in report["entries"]:
+        assert abs(entry["effect"]) >= spec_curve.DEGENERATE_EFFECT_EPSILON
+
+
+def test_fdr_report_keeps_a_real_effect_that_survives_correction():
+    rows = [
+        ("Garlic", 2384.36, 0.0001, 40, 40),
+        ("Onion", 97.82, 0.4656, 93, 106),
+        ("Turmeric", 770.95, 0.60, 40, 40),
+    ]
+
+    report = spec_curve.fdr_report(_FdrConn(rows), alpha=0.05)
+
+    assert report["survivors"] == ["Garlic"]
+    assert report["n_significant_fdr"] == 1
+
+
+def test_fdr_report_reports_no_survivors_when_nothing_beats_chance():
+    """The honest answer when every commodity's p-value is mid-range."""
+    rows = [
+        ("Onion", 97.82, 0.4657, 93, 106),
+        ("Tomato", 65.48, 0.4657, 60, 60),
+        ("Potato", 24.24, 0.4657, 60, 60),
+    ]
+
+    report = spec_curve.fdr_report(_FdrConn(rows), alpha=0.05)
+
+    assert report["n_significant_fdr"] == 0
+    assert report["survivors"] == []
 
 
 # ── warehouse-backed report ─────────────────────────────────────────────────

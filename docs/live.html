@@ -344,7 +344,12 @@ async function loadHealth() {
     kpi("Date integrity", (h.n_future_dates ? fmt.format(h.n_future_dates) + " anomalies" : "clean"), h.n_future_dates ? "repair queued on next run" : "no impossible arrival dates"),
     kpi("Last pipeline run", h.last_run_utc ? h.last_run_utc.slice(0, 16).replace("T", " ") + "Z" : "-", (h.last_outcome || "unknown") + (h.ingestion_running ? " - running now" : "")),
     ...(fdr ? [kpi("Effects surviving FDR", fmt.format(fdr.n_significant_fdr || 0) + " of " + fmt.format(fdr.n_hypotheses || 0),
-      `${fmt.format(fdr.n_significant_raw || 0)} raw p<${num(fdr.alpha, 2)}; ~${num(fdr.expected_false_positives, 1)} expected false positives`)] : []),
+      `${fmt.format(fdr.n_significant_raw || 0)} raw p<${num(fdr.alpha, 2)}; ~${num(fdr.expected_false_positives, 1)} expected false positives`
+        + (fdr.n_excluded_degenerate ? `; ${fmt.format(fdr.n_excluded_degenerate)} collapsed fit(s) excluded` : ""))] : []),
+    kpi("Price index", h.last_index_repair && h.last_index_repair.rebuilt ? "rebuilt" : "healthy",
+      h.last_index_repair && h.last_index_repair.rebuilt
+        ? `${fmt.format(h.last_index_repair.rows_after || 0)} rows kept, ${fmt.format(h.last_index_repair.rows_removed || 0)} removed (${h.last_index_repair.trigger || "startup"})`
+        : "no repair needed since the last restart"),
     kpi("Self-refresh", h.refresh_runs ? `${fmt.format(h.refresh_runs - (h.refresh_failures || 0))}/${fmt.format(h.refresh_runs)}` : "not reported",
       h.refresh_failures ? `${fmt.format(h.refresh_failures)} failed - ${h.last_refresh_error || "see server logs"}`
         : (h.refresh_interval_s ? `every ${Math.round(h.refresh_interval_s / 60)} min, ${h.last_refresh_success_utc ? "last ok " + h.last_refresh_success_utc.slice(0, 16).replace("T", " ") + "Z" : "waiting for first run"}` : "older build")),

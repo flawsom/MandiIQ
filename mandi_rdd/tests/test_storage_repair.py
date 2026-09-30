@@ -272,16 +272,52 @@ def test_heal_is_a_no_op_without_a_fault(conn, tmp_path, monkeypatch):
     assert duckdb_store.heal_price_index(conn)["rebuilt"] is False
 
 
-def test_the_api_repairs_before_it_ingests():
-    """The first write of a run is what dies, so the repair is in front of it."""
+def test_the_api_verifies_the_index_before_it_ingests():
+    """The first write of a run is what dies, so the check is in front of it."""
     from pathlib import Path as _Path
 
     repo_root = _Path(__file__).resolve().parents[2]
     source = (repo_root / "mandi_rdd" / "api" / "main.py").read_text(encoding="utf-8")
-    assert "_repair_price_index_if_flagged()" in source
-    assert source.index("rehab = _repair_price_index_if_flagged()") < source.index(
+    assert "_verify_price_index_once()" in source
+    assert source.index("_verify_price_index_once()") < source.index(
         "summary = run_ingestion()"
     )
+
+
+def test_the_marker_is_written_before_the_probe(conn, tmp_path, monkeypatch):
+    """A probe that kills the process must still teach the next one."""
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    duckdb_store.upsert_prices(conn, [_record()])
+
+    def _explode(_conn):
+        # Assert the state the next process will inherit, mid-failure.
+        assert duckdb_store.index_fault_flagged() is True, \
+            "the marker must exist before the probe can fail"
+        raise RuntimeError("probe died")
+
+    monkeypatch.setattr(duckdb_store, "probe_price_index", _explode)
+    report = duckdb_store.verify_price_index(conn)
+
+    assert report["rebuilt"] is True
+    assert report["trigger"] == "write_probe"
+    assert duckdb_store.index_fault_flagged() is False
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 1, \
+        "the rebuild must keep the rows"
+
+
+def test_a_healthy_probe_leaves_the_warehouse_untouched(conn, tmp_path, monkeypatch):
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    duckdb_store.upsert_prices(conn, [_record(), _record(commodity="Tomato")])
+
+    report = duckdb_store.verify_price_index(conn)
+
+    assert report["rebuilt"] is False
+    assert report["probed"] is True
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 2
+    assert conn.execute(
+        "SELECT COUNT(*) FROM prices WHERE market = ?", [duckdb_store.PROBE_MARKET]
+    ).fetchone()[0] == 0, "the probe row must be gone"
+    assert duckdb_store.index_fault_flagged() is False
 
 
 # ── self-healing writes ─────────────────────────────────────────────────────

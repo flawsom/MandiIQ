@@ -64,7 +64,7 @@ Everything below is real, public and **automatically refreshed** - no mock data,
 | **Landing page** | Product tour, live KPIs, pipeline explainer | [![Landing](https://img.shields.io/website?url=https%3A%2F%2Fmandiiq.unifies.codes&style=flat-square&label=mandiiq.unifies.codes&up_color=2E7D32)](https://mandiiq.unifies.codes) |
 | **Live Data Console** | Always-on public console: live counters, price series, RDD plot, analytics cards - reads the production API directly | [![Console](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Flive.html&style=flat-square&label=live%20console&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/live.html) |
 | **Streamlit cockpit** | 10 routes - overview, discontinuity, forecast, risk map, satellite, advisor, ask, analyst lab. Access-restricted on Streamlit Cloud (login); set *Who can view this app* to public in the Streamlit dashboard to open it up - or run locally for the full tour | ![Private](https://img.shields.io/badge/%F0%9F%94%92_login_required-5B6572?style=flat-square) |
-| **FastAPI (primary)** | 38 documented endpoints (43 routes) + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
+| **FastAPI (primary)** | 38 documented endpoints (47 routes) + OpenAPI docs, CI-verified every morning | [![API](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--x4n8x4gkmzht.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) |
 | **FastAPI (NDVI instance)** | Second Northflank instance carrying satellite NDVI rows | [![API mirror](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fp01--mandiiq--zbvjrztgjqgw.code.run%2Fhealth&query=%24.status&label=status&style=flat-square&color=2E7D32&cacheSeconds=600)](https://p01--mandiiq--zbvjrztgjqgw.code.run/docs) |
 | **GitHub Pages** | Static docs, SEO surface and heartbeat monitor | [![Pages](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2F&style=flat-square&label=flawsom.github.io%2FMandiIQ&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/) |
 | **Heartbeat monitor** | Live cache + freshness board fed by the heartbeat workflow | [![Heartbeat](https://img.shields.io/website?url=https%3A%2F%2Fflawsom.github.io%2FMandiIQ%2Fheartbeat-dashboard.html&style=flat-square&label=heartbeat&up_color=2E7D32)](https://flawsom.github.io/MandiIQ/heartbeat-dashboard.html) |
@@ -147,7 +147,7 @@ Beyond the headline result, MandiIQ ships a full quantitative work-packet for ev
 | **Uncertainty** | Split conformal prediction + Adaptive Conformal Inference (Gibbs & Candès, 2021) | How wide is the honest band around the forecast, without assuming a noise distribution? |
 | **Reliability** | PSI · KS two-sample test · Page-Hinkley · EWMA control chart · 0-100 data-quality score | Has the market regime or the warehouse itself drifted under the models? |
 | **Robustness** | Specification curve over 30 bandwidth x kernel x polynomial combinations, with a stable/fragile verdict | Does the headline effect survive a different analyst choosing different defaults? |
-| **Multiplicity** | Benjamini-Hochberg q-values across every commodity fitted | With 400+ commodities at p < 0.05, how many effects are still real after correcting? |
+| **Multiplicity** | Benjamini-Hochberg q-values across every commodity fitted, with collapsed fits (numerically zero effect, zero-variance SE) excluded from the family and listed separately | With 400+ commodities at p < 0.05, how many effects are still real after correcting? |
 | **Tail risk** | Historical VaR/CVaR + peaks-over-threshold GPD fits (EVT) | How bad can a bad day get, including losses beyond the observed sample? |
 | **Causal sensitivity** | Cross-fitted partially-linear debiased ML (Chernozhukov et al.) | How much does the *whole* rainfall distribution move prices, away from the threshold? |
 | **Nowcasting** | Kalman local-linear-trend filter + RTS smoother (maximum-likelihood parameters) | What is this month's price level while mandi reporting is still incomplete? |
@@ -730,7 +730,7 @@ MandiIQ/
 | `POST` | `/trigger-ashoka-import` | Start the Ashoka archive import |
 | `GET` | `/data-quality` | Date-integrity report: newest arrival date, days behind, impossible-date rows |
 | `GET` | `/spec-curve/{commodity}` | The RDD across 30 specifications (bandwidth x kernel x polynomial order) |
-| `GET` | `/fdr` | Benjamini-Hochberg q-values across every stored commodity estimate |
+| `GET` | `/fdr` | Benjamini-Hochberg q-values across every stored commodity estimate; collapsed fits are excluded from the family and returned under `degenerate` |
 | `POST` | `/admin/repair-dates` | Rewrite (or drop) rows whose arrival date cannot be true (`?dry_run=false` to apply) |
 | `POST` | `/admin/rebuild-prices` | Rebuild the prices table and its index after a DuckDB index fault |
 | `POST` | `/run-rainfall-rdd` | Recompute RDD with the rainfall join |
@@ -1063,22 +1063,24 @@ ruff check mandi_rdd/
 
 **Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
 
+**134 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
+
 **Suite layout** (`mandi_rdd/tests/`):
 
-| File | Covers |
-| :--- | :----- |
-| `test_verification.py` | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
-| `test_no_mock_data.py` | Fails the build if fabricated-data markers or mock libraries appear in shipping code |
-| `test_scheduler_integrity.py` | Missing-key failure, idempotent upserts, workflow schedule/secret/CI policy |
-| `test_api_contract.py` | Documented routes exist and `/ask` schemas stay backwards compatible |
-| `test_orchestrator.py` | `/ask` commodity-detection regressions plus tool-fallback behaviour |
-| `test_analytics.py` | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
-| `test_analytics_db.py` | End-to-end analytics adapters on a synthetic in-memory DuckDB |
-| `test_date_integrity.py` | Day-first date parsing, future-date rejection, warehouse repair, run locking |
-| `test_dashboard_boot.py` | Runs the real Streamlit app headlessly and checks every page imports and renders |
-| `test_freshness_contract.py` | `/health` may not call two-month-old prices fresh; the external freshness gate must fail a run that ingested nothing |
-| `test_storage_repair.py` | Index-fault detection and repair, self-healing writes, the memory cap that caused the fault |
-| `test_spec_curve.py` | The general estimator must reproduce the local-linear one; a real effect survives all 30 specifications and a null one does not; BH q-values |
+| File | Tests | Covers |
+| :--- | :---- | :----- |
+| `test_spec_curve.py` | 20 | The general estimator must reproduce the local-linear one; a real effect survives all 30 specifications and a null one does not; BH q-values; collapsed fits are kept out of the family |
+| `test_storage_repair.py` | 18 | Index-fault detection and repair, self-healing writes, the memory cap that caused the fault, the fault marker surviving a restart |
+| `test_scheduler_integrity.py` | 17 | Missing-key failure, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading, workflow schedule/secret/CI policy |
+| `test_api_contract.py` | 14 | Documented routes exist, `/fdr` and `/spec-curve/{commodity}` schema, `/health` truthfulness, `/ask` schemas stay backwards compatible |
+| `test_date_integrity.py` | 14 | Day-first date parsing, future-date rejection, warehouse repair, run locking |
+| `test_analytics.py` | 14 | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |
+| `test_orchestrator.py` | 13 | `/ask` commodity-detection regressions plus tool-fallback behaviour |
+| `test_freshness_contract.py` | 7 | `/health` may not call two-month-old prices fresh; the external freshness gate must fail a run that ingested nothing |
+| `test_analytics_db.py` | 6 | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_dashboard_boot.py` | 5 | Runs the real Streamlit app headlessly and checks every page imports and renders |
+| `test_verification.py` | 4 | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
+| `test_no_mock_data.py` | 3 | Fails the build if fabricated-data markers or mock libraries appear in shipping code |
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
@@ -1247,6 +1249,29 @@ The API container refreshes itself: on boot it waits 90 s and then runs the full
 `/health` reports what is actually true rather than a fixed string: `status` is derived from the warehouse (`healthy`, `stale`, `degraded`, `empty`, `unknown`) alongside `data_max_date`, `days_behind`, `n_future_dates` and the self-refresh counters (`refresh_runs`, `refresh_failures`, `last_refresh_error`). A scheduler that fails on every tick can therefore no longer look identical to one that is simply idle.
 
 Two honest caveats: the public data source publishes with a one-to-two day lag (so `days_behind` of 0-2 is normal, not staleness), and the Streamlit cockpit needs its *Who can view this app* setting flipped to public in the Streamlit Cloud dashboard before visitors can reach it instead of a sign-in page. The always-on [Live Data Console](https://flawsom.github.io/MandiIQ/live.html) needs no such setting.
+
+</details>
+
+<details>
+<summary><b>How do I verify the whole thing myself, the way a visitor sees it?</b></summary>
+
+<br/>
+
+One command walks the product the way a consumer does rather than the way the repository is laid out:
+
+```bash
+python -m mandi_rdd.scripts.consumer_check          # human-readable report
+python -m mandi_rdd.scripts.consumer_check --json    # machine-readable
+```
+
+It checks, in order:
+
+1. **Pages** - the landing page, the GitHub Pages hero, the Live Data Console, the Streamlit cockpit and the repository are fetched and must return something a browser can render. A private Streamlit app is reported as a warning with the fix; an unreachable page is a blocker.
+2. **API** - 20 routes that consumer surfaces actually call, each with the keys that surface requires. `/spec-curve/Onion` missing its `summary`, or `/data-quality` missing `days_behind`, fails here instead of rendering a blank in front of a visitor.
+3. **Links** - every link found on those pages is followed, so a CTA pointing at a dead page fails in the check rather than in front of a visitor.
+4. **Provenance** - the product's own freshness reporting is cross-examined: a future arrival date, a failed or degraded last run, a self-refresh loop that has never succeeded, or `/health` and `/data-quality` disagreeing about impossible dates are all blockers. The primary and mirror instances disagreeing about row counts is a warning.
+
+Exit status is 0 only when nothing is blocking. It is the same measurement used for the published status rows above, so the README and the product cannot drift apart silently.
 
 </details>
 

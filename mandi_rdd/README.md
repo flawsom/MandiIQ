@@ -1,10 +1,11 @@
 # 🌾 MandiIQ - Mandi Price Intelligence System
 
-> **Districts crossing IMD's −19% rainfall-deficiency threshold see a ₹350 (+24.5%) jump in onion modal prices (p=0.003, robust across 4 bandwidths, placebo-tested, cross-checked by fixed-effects regression).** Fully automated: `data.gov.in` → DuckDB → RDD → FastAPI → dashboard, refreshed nightly with zero manual intervention.
+> **Districts crossing IMD's −19% rainfall-deficiency threshold see a ₹350 (+24.5%) jump in onion modal prices (p=0.003, robust across 4 bandwidths, placebo-tested, cross-checked by fixed-effects regression).** Fully automated: `data.gov.in` → DuckDB → RDD → FastAPI → dashboard, refreshed hourly by the API's own scheduler plus a nightly GitHub Actions run, with zero manual intervention.
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![CI](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml/badge.svg)](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml)
-[![Tests](https://img.shields.io/badge/tests-116%20passing-brightgreen?style=flat-square)](#-testing)
+[![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
+[![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
+[![Tests](https://img.shields.io/badge/tests-134%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -172,22 +173,22 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**116 tests passing** (1 skipped = warehouse-dependent check):
+**134 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
 | `test_verification.py` (4 tests) | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
 | `test_no_mock_data.py` (3 tests) | Fabricated-data markers, mock libraries and mock fixture files in shipping code |
-| `test_scheduler_integrity.py` (7 tests) | Missing-key failure, placeholder keys, idempotent upserts, workflow YAML/schedule/secret policy |
-| `test_api_contract.py` (3 tests) | Documented routes exist, OpenAPI builds, `/ask` schemas stay stable |
-| `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
+| `test_storage_repair.py` (18 tests) | Index-fault detection and repair, table rebuild, write self-healing, the memory cap that caused the fault, fault marker surviving a restart, API repair-before-ingest order |
+| `test_scheduler_integrity.py` (17 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading, workflow YAML/schedule/secret policy |
+| `test_spec_curve.py` (20 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg, collapsed fits kept out of the FDR family |
+| `test_api_contract.py` (14 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness, `/ask` schemas stay stable |
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
-| `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
-| `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
+| `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
-| `test_storage_repair.py` (11 tests) | Index-fault detection, table rebuild, write self-healing, memory-limit regression |
-| `test_spec_curve.py` (16 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg |
+| `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
 
@@ -205,7 +206,11 @@ pytest mandi_rdd/tests/ -v
 | `GET /forecast/{commodity}?compare=true` | Prophet forecast; `?compare=true` returns Prophet vs LSTM side-by-side with winner callout |
 | `GET /risk-score/{commodity}?district=` | XGBoost price-spike risk probability |
 | `GET /recommendation/{commodity}?district=` | Prescriptive procurement recommendation (combines causal + risk + forecast) |
-| `GET /analytics/{commodity}` | Composite analytics deep-dive (conformal + drift + tail risk + DML + nowcast) |
+| `GET /analytics/{commodity}` | Composite analytics deep-dive (conformal + drift + tail risk + DML + nowcast + specification curve) |
+| `GET /spec-curve/{commodity}` | Specification curve: 30 bandwidth × kernel × polynomial specifications with a stability verdict |
+| `GET /fdr` | Benjamini-Hochberg false-discovery control across the catalog |
+| `GET /data-quality` | Warehouse truth: row counts, future-date count, days behind, per-commodity freshness |
+| `GET /freshness` | Per-commodity latest date, row counts, district coverage |
 | `GET /conformal/{commodity}` | Distribution-free prediction intervals around the forecast |
 | `GET /drift/{commodity}` | PSI / KS / Page-Hinkley / EWMA drift + data-quality score |
 | `GET /tail-risk/{commodity}` | Historical VaR/CVaR, EVT tail fit, max drawdown |
@@ -276,8 +281,8 @@ pytest mandi_rdd/tests/ -v
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **116 passing, 1 skipped ✅** |
-| API endpoints | ≥ 10 | **10 endpoints ✅** |
+| Tests passing | ≥ 25 | **134 passing, 1 skipped ✅** |
+| API endpoints | ≥ 10 | **38 documented endpoints (47 routes) ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |
 
@@ -441,10 +446,11 @@ The repository includes two CI workflows:
 
 | Workflow | File | Trigger |
 |---|---|---|
-| **Superstore CI** | `.github/workflows/ci.yml` | Push to main/master - runs 40 tests, lint, Docker build |
-| **MandiIQ CI** | `.github/workflows/mandi_rdd_ci.yml` | Push to mandi_rdd/ - runs 29 tests; daily at 6 AM UTC runs scheduled ingestion |
+| **CI** | `.github/workflows/ci.yml` | Push / PR - the full pytest suite on Python 3.10, 3.11 and 3.12, coverage upload, Ruff lint, Mermaid diagram validation, secret/AI-defect scan |
+| **MandiRDD CI** | `.github/workflows/mandi_rdd_ci.yml` | Push to `mandi_rdd/` - test matrix + workflow-syntax validation; on schedule it also runs live ingestion from data.gov.in |
+| **Nightly ingest** | `.github/workflows/nightly-ingest.yml` | Daily schedule - live ingestion, freshness gate, R2 backup, Ashoka enrichment |
 
-The badge at the top of this README shows the MandiIQ CI status: ![CI](https://github.com/flawsom/Margin-Intelligence-System/actions/workflows/mandi_rdd_ci.yml/badge.svg)
+The badge at the top of this README shows the CI status: ![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)
 
 ---
 

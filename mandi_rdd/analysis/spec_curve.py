@@ -36,6 +36,25 @@ DEFAULT_ORDERS = (1, 2)
 DEFAULT_CUTOFF = -19.0
 MIN_SIDE_OBSERVATIONS = 5
 
+# An estimated discontinuity smaller than this many rupees is not a price
+# effect, it is the residue of float arithmetic on a collapsed fit. Rupee prices
+# sit in the 1e2-1e4 range, so doubles carry ~1e-12 absolute resolution there;
+# a real discontinuity is never this small.
+DEGENERATE_EFFECT_EPSILON = 1e-6
+
+
+def _is_degenerate_effect(effect) -> bool:
+    """True when an estimate is numerically zero rather than economically zero."""
+    if effect is None:
+        return True
+    try:
+        value = float(effect)
+    except (TypeError, ValueError):
+        return True
+    if math.isnan(value) or math.isinf(value):
+        return True
+    return abs(value) < DEGENERATE_EFFECT_EPSILON
+
 
 def _json_safe(value):
     """NaN/Inf must become null; FastAPI cannot serialise them."""
@@ -284,6 +303,15 @@ def fdr_report(conn, alpha: float = 0.05) -> dict:
 
     Uses the most recent row per commodity, because older rows are superseded
     fits rather than additional hypotheses.
+
+    Estimates whose effect is numerically indistinguishable from zero are not
+    hypotheses. A collapsed fit - for example a commodity whose outcome series
+    is flat within the bandwidth - produces a discontinuity of ~1e-12 rupees and
+    a zero-variance standard error, which in turn drives the p-value to 0. Those
+    rows used to be reported as the *strongest* findings in the catalog while
+    every economically meaningful estimate was reported as a non-finding. They
+    are excluded from the family and counted separately so the exclusion is
+    visible rather than silent.
     """
     rows = conn.execute(
         """
@@ -296,6 +324,9 @@ def fdr_report(conn, alpha: float = 0.05) -> dict:
         ORDER BY p_value
         """
     ).fetchall()
+
+    degenerate = [r[0] for r in rows if _is_degenerate_effect(r[1])]
+    rows = [r for r in rows if not _is_degenerate_effect(r[1])]
 
     commodities = [r[0] for r in rows]
     p_values = [float(r[2]) for r in rows]
@@ -325,6 +356,8 @@ def fdr_report(conn, alpha: float = 0.05) -> dict:
         "n_hypotheses": len(entries),
         "n_significant_raw": raw_count,
         "n_significant_fdr": fdr_count,
+        "n_excluded_degenerate": len(degenerate),
+        "degenerate": degenerate,
         "expected_false_positives": _json_safe(alpha * len(entries)),
         "survivors": [e["commodity"] for e in entries if e["significant_fdr"]],
         "entries": entries,
