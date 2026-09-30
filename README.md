@@ -1190,6 +1190,7 @@ Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_O
 - [x] 16 GitHub Actions workflows (CI, ingest, deploy, monitoring)
 - [x] Docker Compose stack + Fly.io / Northflank / Render deployments
 - [x] Live landing page, docs site and heartbeat monitor
+- [x] First versioned release: [v2.0.0 - Analytics Engine](https://github.com/flawsom/MandiIQ/releases/tag/v2.0.0)
 
 **Next up**
 
@@ -1199,7 +1200,6 @@ Please also read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_O
 - [ ] Email / Telegram alerts on elevated spike risk
 - [ ] Historical backtesting harness for procurement strategies
 - [ ] Typed client SDK generated from the OpenAPI schema
-- [ ] Cut versioned releases (the badges are ready for a first tag)
 
 <img src="docs/assets/svg/divider.svg" width="100%" alt="" />
 
