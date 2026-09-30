@@ -30,15 +30,43 @@ PAGE_FILES = sorted(
 )
 
 
-def test_dashboard_app_runs_without_exceptions():
+def test_dashboard_app_runs_without_exceptions(monkeypatch):
+    """The app must render its shell and its live strip without blowing up.
+
+    The page's self-refresh tick is switched off for this run: it calls
+    st.rerun(scope="app") on a timer, which in a real browser is the whole
+    point and inside AppTest means the script never settles. Setting the
+    interval to 0 is the supported escape hatch and is asserted below.
+    """
     from streamlit.testing.v1 import AppTest
 
+    monkeypatch.setenv("MANDIIQ_UI_REFRESH_SECONDS", "0")
     app = AppTest.from_file(str(DASHBOARD_DIR / "app.py"), default_timeout=120)
     app.run()
 
     assert not app.exception, "Dashboard raised: " + "; ".join(
         str(exc.value) for exc in app.exception
     )
+
+
+def test_live_freshness_strip_is_wired_into_the_shell():
+    """The staleness banner, the auto-refresh tick and the manual refresh
+    control all have to be present: they are what keeps every number on the
+    page current instead of a snapshot nobody remembered to reload."""
+    source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
+    for needle in (
+        "def _live_snapshot",
+        "def _behind_wording",
+        "def _request_ingest",
+        "mandiq-live-banner",
+        "run_every=LIVE_REFRESH_SECONDS",
+        'st.rerun(scope="app")',
+        "MANDIIQ_UI_REFRESH_SECONDS",
+    ):
+        assert needle in source, f"dashboard shell is missing {needle!r}"
+    # The banner must be driven by the API's own status vocabulary, not a
+    # hard-coded "healthy".
+    assert 'if _live["status"] != "healthy"' in source
 
 
 def test_every_page_module_is_importable():

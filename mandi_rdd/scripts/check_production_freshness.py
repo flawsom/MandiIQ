@@ -67,10 +67,25 @@ def evaluate(report: dict, max_days_behind: int = 4) -> list:
         problems.append(
             "API does not report data_max_date/days_behind - an old build is deployed"
         )
+    elif days_behind < 0:
+        # Negative means the newest "arrival date" is in the future: the
+        # month/day mis-parse is present and the warehouse cannot be trusted.
+        problems.append(
+            "newest arrival date %s is %d days in the future - impossible dates "
+            "are in the warehouse"
+            % (health.get("data_max_date"), -days_behind)
+        )
     elif days_behind > max_days_behind:
         problems.append(
             "newest arrival date %s is %d days old (>%dd)"
             % (health.get("data_max_date"), days_behind, max_days_behind)
+        )
+
+    status = health.get("status")
+    if status in ("empty", "degraded"):
+        problems.append(
+            "/health reports status=%r (n_prices=%s)"
+            % (status, health.get("n_prices"))
         )
 
     if health.get("n_future_dates"):

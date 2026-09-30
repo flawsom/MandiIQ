@@ -128,6 +128,17 @@ def _run_ingestion_locked(
     init_schema(conn)
     logger.info("Storage initialized")
 
+    # 1a. Make sure the UNIQUE index over prices is still enforcing. A bulk load
+    #     that ran out of memory can leave it inconsistent, after which every
+    #     write touching those keys fails and ingestion cannot make progress.
+    with pipeline_metrics.step("index_health"):
+        try:
+            from mandi_rdd.storage.duckdb_store import ensure_price_index
+            index_report = ensure_price_index(conn)
+            summary["steps"]["index_health"] = index_report
+        except Exception as e:
+            logger.warning(f"Price index check skipped: {e}")
+
     # 1b. Heal arrival dates before anything analytical runs. Future-dated
     #     rows are month-first mis-parses of a DD/MM/YYYY source, and they
     #     poison freshness, RDD, forecasts and nowcasts alike.
@@ -165,9 +176,23 @@ def _run_ingestion_locked(
             price_fetch_error = str(e)
             pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, False)
     n_prices = len(price_records)
+    n_new = 0
+    price_write_error = None
     with pipeline_metrics.step("upsert_prices"):
-        n_new = upsert_prices(conn, price_records)
-        pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
+        try:
+            n_new = upsert_prices(conn, price_records)
+            pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
+        except Exception as e:
+            # A write fault in the prices table must not take rainfall, RDD and
+            # forecast down with it. upsert_prices already rebuilds the table
+            # and retries once on an index fault; if it still failed, report a
+            # degraded run and let POST /admin/rebuild-prices finish the job.
+            logger.error(f"Price upsert failed; continuing with existing data: {e}")
+            summary["steps"]["upsert_prices"] = {
+                "status": "error", "error": str(e),
+                "hint": "POST /admin/rebuild-prices rebuilds the table and its index",
+            }
+            price_write_error = str(e)
 
     # Record lineage for primary price fetch
     try:
@@ -240,6 +265,14 @@ def _run_ingestion_locked(
         summary["steps"]["prices"]["error"] = price_fetch_error
         summary["status"] = "degraded"
         summary["error"] = f"price source unavailable: {price_fetch_error}"
+    if price_write_error:
+        summary["steps"]["prices"]["write_error"] = price_write_error
+        summary["status"] = "degraded"
+        previous = summary.get("error")
+        summary["error"] = (
+            f"{previous}; price write failed: {price_write_error}"
+            if previous else f"price write failed: {price_write_error}"
+        )
     logger.info(f"Prices: {n_prices} fetched, {n_new} new")
 
     # 3. Load district-subdivision mapping (always, regardless of rainfall)

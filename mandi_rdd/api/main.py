@@ -624,6 +624,29 @@ async def admin_repair_dates(dry_run: bool = Query(True)):
         conn.close()
 
 
+@app.post("/admin/rebuild-prices", tags=["Admin"])
+async def admin_rebuild_prices():
+    """Rebuild the prices table to clear an inconsistent ART index.
+
+    DuckDB's unique index can be left inconsistent by a bulk load that runs out
+    of memory; every later write touching those keys then fails with
+    "Failed to delete all rows from index" and ingestion cannot make progress.
+    Rebuilding re-derives the index from the data. Duplicate business keys are
+    collapsed to their lowest id, so the row count can only fall.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        from mandi_rdd.storage.duckdb_store import rebuild_prices_table
+        report = rebuild_prices_table(conn)
+        report["data_max_date"] = _cached_date_quality(conn).get("max_date")
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
 @app.get("/freshness", tags=["System"])
 async def freshness(commodity: Optional[str] = None):
     """Per-commodity data freshness: latest date, row count, district coverage."""

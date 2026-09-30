@@ -1,0 +1,279 @@
+"""Storage-layer recovery tests.
+
+The production warehouse went three months without a successful write because
+DuckDB's UNIQUE index over `prices` was left inconsistent by an out-of-memory
+bulk load: every later INSERT failed with "Failed to delete all rows from
+index" and the only code that could have fixed it deleted the database instead.
+These tests pin the replacement behaviour:
+
+  * the memory cap that caused the fault is gone,
+  * a broken index is detectable (duplicates are impossible while it works),
+  * it is repairable without losing rows,
+  * and a write that hits it repairs itself and retries.
+"""
+
+from __future__ import annotations
+
+import duckdb
+import pytest
+
+from mandi_rdd.storage import duckdb_store
+
+PRICES_DDL = """
+    CREATE TABLE prices (
+        id INTEGER PRIMARY KEY DEFAULT nextval('seq_prices'),
+        state VARCHAR NOT NULL,
+        district VARCHAR NOT NULL,
+        market VARCHAR NOT NULL,
+        commodity VARCHAR NOT NULL,
+        variety VARCHAR,
+        grade VARCHAR,
+        arrival_date DATE NOT NULL,
+        min_price DOUBLE,
+        max_price DOUBLE,
+        modal_price DOUBLE,
+        UNIQUE(market, commodity, variety, grade, arrival_date)
+    )
+"""
+
+
+def _record(**overrides) -> dict:
+    rec = {
+        "state": "Maharashtra",
+        "district": "Pune",
+        "market": "Pune",
+        "commodity": "Onion",
+        "variety": "Other",
+        "grade": "FAQ",
+        "arrival_date": "2026-09-12",
+        "min_price": 1000.0,
+        "max_price": 1500.0,
+        "modal_price": 1200.0,
+    }
+    rec.update(overrides)
+    return rec
+
+
+@pytest.fixture()
+def conn():
+    """An in-memory warehouse with the real prices schema."""
+    connection = duckdb.connect(":memory:")
+    connection.execute("CREATE SEQUENCE IF NOT EXISTS seq_prices START 1")
+    connection.execute(PRICES_DDL)
+    yield connection
+    connection.close()
+
+
+def _insert_raw(connection, rows):
+    for row in rows:
+        connection.execute(
+            """INSERT INTO prices
+               (state, district, market, commodity, variety, grade,
+                arrival_date, min_price, max_price, modal_price)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                row["state"], row["district"], row["market"], row["commodity"],
+                row.get("variety"), row.get("grade"), row["arrival_date"],
+                row.get("min_price"), row.get("max_price"), row.get("modal_price"),
+            ],
+        )
+
+
+# ── memory limit ────────────────────────────────────────────────────────────
+
+def _memory_limit_bytes(conn) -> float:
+    """DuckDB normalises memory_limit to MiB, so compare in bytes."""
+    raw = str(conn.execute("SELECT current_setting('memory_limit')").fetchone()[0])
+    number = float("".join(c for c in raw if c.isdigit() or c == "."))
+    if "GiB" in raw:
+        return number * 1024 ** 3
+    if "MiB" in raw:
+        return number * 1024 ** 2
+    if "KiB" in raw:
+        return number * 1024
+    return number
+
+
+def test_connection_does_not_cap_memory_at_200mb(tmp_path):
+    """The old hard-coded cap is what made the index inconsistent."""
+    db = tmp_path / "m.duckdb"
+    conn = duckdb_store.get_connection(db_path=db, read_only=False)
+    try:
+        limit = _memory_limit_bytes(conn)
+    finally:
+        conn.close()
+    assert limit > 200 * 1024 ** 2, f"memory limit is still capped: {limit} bytes"
+
+
+def test_memory_limit_is_configurable(tmp_path, monkeypatch):
+    monkeypatch.setenv("MANDIIQ_MEMORY_LIMIT", "300MB")
+    db = tmp_path / "m2.duckdb"
+    conn = duckdb_store.get_connection(db_path=db, read_only=False)
+    try:
+        limit = _memory_limit_bytes(conn)
+    finally:
+        conn.close()
+    assert abs(limit - 300 * 1000 ** 2) < 2 * 1024 ** 2, limit
+
+
+# ── duplicate detection ─────────────────────────────────────────────────────
+
+def _bare_prices_table(conn):
+    """The observable state of a broken index: no UNIQUE constraint left."""
+    conn.execute("DROP TABLE prices")
+    conn.execute("""
+        CREATE TABLE prices (
+            id INTEGER PRIMARY KEY DEFAULT nextval('seq_prices'),
+            state VARCHAR NOT NULL,
+            district VARCHAR NOT NULL,
+            market VARCHAR NOT NULL,
+            commodity VARCHAR NOT NULL,
+            variety VARCHAR,
+            grade VARCHAR,
+            arrival_date DATE NOT NULL,
+            min_price DOUBLE,
+            max_price DOUBLE,
+            modal_price DOUBLE
+        )
+    """)
+
+
+def test_duplicate_keys_are_impossible_while_the_index_works(conn):
+    duckdb_store.upsert_prices(conn, [_record(), _record()])
+    assert duckdb_store.find_duplicate_price_keys(conn) == 0
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 1
+
+
+def test_null_variety_duplicates_are_legal(conn):
+    """SQL uniqueness treats NULLs as distinct, so these are not a fault."""
+    _insert_raw(conn, [_record(variety=None, grade=None), _record(variety=None, grade=None)])
+    assert duckdb_store.find_duplicate_price_keys(conn) == 0
+
+
+def test_duplicates_are_detected_when_the_index_stops_enforcing(conn):
+    _bare_prices_table(conn)
+    _insert_raw(conn, [_record(), _record()])
+    assert duckdb_store.find_duplicate_price_keys(conn) == 1
+
+
+# ── repair ──────────────────────────────────────────────────────────────────
+
+def test_rebuild_collapses_duplicates_and_keeps_ids(conn):
+    _bare_prices_table(conn)
+    _insert_raw(conn, [_record(), _record(), _record(commodity="Tomato")])
+    before_ids = {r[0] for r in conn.execute("SELECT id FROM prices").fetchall()}
+
+    report = duckdb_store.rebuild_prices_table(conn)
+
+    assert report["rows_before"] == 3
+    assert report["rows_after"] == 2
+    assert report["rows_removed"] == 1
+    kept_ids = {r[0] for r in conn.execute("SELECT id FROM prices").fetchall()}
+    assert kept_ids <= before_ids, "the rebuild must not renumber surviving rows"
+    # The constraint is back on, so a duplicate insert is refused again.
+    assert conn.execute(
+        "SELECT COUNT(*) FROM information_schema.table_constraints "
+        "WHERE table_name = 'prices' AND constraint_type = 'UNIQUE'"
+    ).fetchone()[0] >= 1
+
+
+def test_ensure_price_index_only_rebuilds_when_needed(conn):
+    duckdb_store.upsert_prices(conn, [_record()])
+    assert duckdb_store.ensure_price_index(conn) == {"duplicates": 0, "rebuilt": False}
+
+    _bare_prices_table(conn)
+    _insert_raw(conn, [_record(), _record()])
+    report = duckdb_store.ensure_price_index(conn)
+
+    assert report["rebuilt"] is True
+    assert report["duplicates_after"] == 0
+
+
+def test_rebuilding_does_not_delete_the_database_file(tmp_path, monkeypatch):
+    """Deleting the warehouse is the one mistake there is no coming back from."""
+    path = tmp_path / "keep.duckdb"
+    conn = duckdb_store.get_connection(db_path=path, read_only=False)
+    duckdb_store.init_schema(conn)
+    duckdb_store.upsert_prices(conn, [_record()])
+    conn.close()
+
+    dropped = []
+    monkeypatch.setattr(duckdb_store, "_drop_corrupt_database",
+                        lambda p: dropped.append(p))
+    monkeypatch.setattr(duckdb_store, "_matches",
+                        lambda err, markers: "failed to delete" in str(err).lower())
+
+    # Re-open: the integrity probe must not reach the delete path for an
+    # index-level message.
+    playback = duckdb.connect(str(path), read_only=True)
+    try:
+        probe_err = Exception("FATAL Error: Failed to delete all rows from index")
+        assert duckdb_store._is_index_fault(probe_err) is True
+        assert duckdb_store._is_index_fault(Exception("syntax error")) is False
+    finally:
+        playback.close()
+    assert dropped == []
+    assert path.exists()
+
+
+# ── self-healing writes ─────────────────────────────────────────────────────
+
+class _FlakyConn:
+    """Proxy that fails the first statement matching `marker`."""
+
+    def __init__(self, real, marker: str, message: str):
+        self._real = real
+        self._marker = marker
+        self._message = message
+        self.failures = 0
+
+    def execute(self, sql, *args, **kwargs):
+        if self._marker in sql and self.failures == 0:
+            self.failures += 1
+            raise RuntimeError(self._message)
+        return self._real.execute(sql, *args, **kwargs)
+
+    def register(self, *a, **k):
+        return self._real.register(*a, **k)
+
+    def unregister(self, *a, **k):
+        return self._real.unregister(*a, **k)
+
+
+def test_upsert_repairs_the_index_and_retries_once(conn, monkeypatch):
+    calls = []
+    real_rebuild = duckdb_store.rebuild_prices_table
+
+    def spy(connection):
+        calls.append(connection)
+        return real_rebuild(connection)
+
+    monkeypatch.setattr(duckdb_store, "rebuild_prices_table", spy)
+
+    flaky = _FlakyConn(
+        conn,
+        marker="INSERT INTO prices",
+        message="FATAL Error: Failed to delete all rows from index. "
+                "Only deleted 0 out of 12 rows.",
+    )
+
+    n_new = duckdb_store.upsert_prices(flaky, [_record()])
+
+    assert n_new == 1, "the retry after the repair must still insert the row"
+    assert len(calls) == 1, "the table must be rebuilt exactly once"
+    assert flaky.failures == 1
+
+
+def test_upsert_does_not_swallow_unrelated_errors(conn, monkeypatch):
+    monkeypatch.setattr(duckdb_store, "rebuild_prices_table",
+                        lambda connection: pytest.fail("must not rebuild"))
+    flaky = _FlakyConn(conn, marker="INSERT INTO prices", message="Binder Error: no such column")
+    with pytest.raises(RuntimeError, match="Binder Error"):
+        duckdb_store.upsert_prices(flaky, [_record()])
+
+
+def test_upsert_is_idempotent_and_never_duplicates(conn):
+    records = [_record(), _record(commodity="Tomato"), _record(arrival_date="2026-09-13")]
+    assert duckdb_store.upsert_prices(conn, records) == 3
+    assert duckdb_store.upsert_prices(conn, records) == 0
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 3

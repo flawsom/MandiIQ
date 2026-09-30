@@ -152,10 +152,18 @@ _LOCK_CONTENTION_MARKERS = (
     "being used by another",
     "another process",
 )
+# Markers of a database-wide problem: only these justify deleting the file.
+# An index-only fault must never get here - dropping the warehouse is the one
+# mistake there is no coming back from.
 _CORRUPTION_MARKERS = (
-    "invalidated", "fatal error", "index corruption",
-    "failed to delete", "database has been invalidated",
+    "index corruption", "database has been invalidated",
     "corrupt", "cannot be used",
+)
+# Markers of an inconsistent ART index. Recoverable by rebuilding the table.
+_INDEX_FAULT_MARKERS = (
+    "failed to delete",
+    "invalidated",
+    "index",
 )
 # Files already probed successfully by this process: the first open verifies
 # the ART indexes, later opens share the same instance and skip the scan.
@@ -183,11 +191,91 @@ def _is_lock_contention(err: Exception) -> bool:
     return _matches(err, _LOCK_CONTENTION_MARKERS)
 
 
+def _is_index_fault(err: Exception) -> bool:
+    """True when an error means one of the table's ART indexes is inconsistent."""
+    return _matches(err, _INDEX_FAULT_MARKERS)
+
+
 def _drop_corrupt_database(path: Path) -> None:
     """Delete an unusable DuckDB file plus its WAL/tmp siblings."""
     path.unlink(missing_ok=True)
     for suffix in (".wal", ".tmp"):
         path.with_suffix(path.suffix + suffix).unlink(missing_ok=True)
+
+
+# Must mirror the `prices` DDL in init_schema(). The rebuild needs its own copy
+# because CREATE TABLE IF NOT EXISTS cannot be re-pointed at a temp name.
+_PRICES_DDL = """
+    CREATE TABLE IF NOT EXISTS {table} (
+        id INTEGER PRIMARY KEY DEFAULT nextval('seq_prices'),
+        state VARCHAR NOT NULL,
+        district VARCHAR NOT NULL,
+        market VARCHAR NOT NULL,
+        commodity VARCHAR NOT NULL,
+        variety VARCHAR,
+        grade VARCHAR,
+        arrival_date DATE NOT NULL,
+        min_price DOUBLE,
+        max_price DOUBLE,
+        modal_price DOUBLE,
+        UNIQUE(market, commodity, variety, grade, arrival_date)
+    )
+"""
+
+_PRICES_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_prices_commodity ON prices(commodity)",
+    "CREATE INDEX IF NOT EXISTS idx_prices_date ON prices(arrival_date)",
+    "CREATE INDEX IF NOT EXISTS idx_prices_state ON prices(state)",
+)
+
+
+def rebuild_prices_table(conn) -> dict:
+    """Rebuild `prices`, and with it every ART index over it.
+
+    The only reliable repair for an inconsistent index: DuckDB re-derives the
+    index from the data, so whatever the old index had wrong is discarded. The
+    lowest id wins for each business key, so ids stay stable and the table keeps
+    being 1:1 with the records that were already there.
+    """
+    before = int(conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0)
+
+    conn.execute("DROP TABLE IF EXISTS prices_rebuild")
+    conn.execute(_PRICES_DDL.format(table="prices_rebuild"))
+    conn.execute(
+        """
+        INSERT INTO prices_rebuild
+            (id, state, district, market, commodity, variety, grade,
+             arrival_date, min_price, max_price, modal_price)
+        SELECT id, state, district, market, commodity, variety, grade,
+               arrival_date, min_price, max_price, modal_price
+        FROM prices
+        QUALIFY row_number() OVER (
+            PARTITION BY market, commodity, variety, grade, arrival_date
+            ORDER BY id
+        ) = 1
+        """
+    )
+    after = int(conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0] or 0)
+
+    conn.execute("DROP TABLE prices")
+    conn.execute("ALTER TABLE prices_rebuild RENAME TO prices")
+    for idx_sql in _PRICES_INDEXES:
+        try:
+            conn.execute(idx_sql)
+        except Exception as exc:  # an index is a convenience, not a contract
+            logger.warning(f"Could not recreate {idx_sql}: {exc}")
+
+    report = {
+        "rows_before": before,
+        "rows_after": after,
+        "rows_removed": before - after,
+    }
+    logger.warning(
+        "Rebuilt the prices table after an index fault: %d rows kept, %d "
+        "duplicate or inconsistent rows removed",
+        after, report["rows_removed"],
+    )
+    return report
 
 
 def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "duckdb.DuckDBPyConnection":
@@ -235,7 +323,16 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         except Exception as probe_err:
             try: probe.close()
             except Exception: pass
-            if _matches(probe_err, _CORRUPTION_MARKERS):
+            if _is_index_fault(probe_err):
+                # A bad index is repairable with rebuild_prices_table(); the
+                # previous code deleted the entire warehouse here instead.
+                logger.error(
+                    "DuckDB index fault at %s (%s). The file is kept - repair "
+                    "it with POST /admin/rebuild-prices or rebuild_prices_table()",
+                    path, probe_err,
+                )
+                _mark_integrity_checked(path)
+            elif _matches(probe_err, _CORRUPTION_MARKERS):
                 logger.warning(
                     "Corrupted DuckDB detected (%s); deleting %s",
                     probe_err, path,
@@ -258,14 +355,30 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        conn = duckdb.connect(str(path), read_only=read_only)
-
-        # Increase memory limit for large bulk inserts (ART index needs room)
+        conn = duckdb.connect(str(path), read_only=read_only)        # DuckDB's ART index needs real headroom. This used to hard-code
+        # `SET memory_limit = '200MB'` - a comment claiming it was increasing
+        # the limit while doing the opposite - and a bulk load that ran out of
+        # room under that cap is what left the UNIQUE(market, commodity,
+        # variety, grade, arrival_date) index inconsistent. Every later write
+        # to those keys then failed with "Failed to delete all rows from
+        # index", which is how ingestion stayed dead from July until now.
+        # DuckDB's own default (80% of detected RAM) is the safe choice, so the
+        # limit is only overridden when an operator sets it explicitly.
         if not read_only:
-            try:
-                conn.execute("SET memory_limit = '200MB'")
-            except Exception:
-                pass
+
+            limit = os.environ.get("MANDIIQ_MEMORY_LIMIT", "").strip()
+            if limit:
+
+                try:
+
+                    conn.execute(f"SET memory_limit = '{limit}'")
+
+                    logger.info(f"DuckDB memory_limit set to {limit}")
+
+                except Exception:
+
+                    logger.warning(f"Ignoring invalid MANDIIQ_MEMORY_LIMIT={limit!r}")
+
 
         return conn
 
@@ -592,6 +705,49 @@ def init_schema(conn) -> None:
 
             pass
 
+def find_duplicate_price_keys(conn) -> int:
+    """Count business keys that appear more than once in `prices`.
+
+    UNIQUE(market, commodity, variety, grade, arrival_date) cannot permit these,
+    so a non-zero count is proof that the index is no longer enforcing the
+    constraint - the state that makes writes fail with "Failed to delete all
+    rows from index". Rows with a NULL variety or grade are excluded because
+    SQL uniqueness treats NULLs as distinct, so those duplicates are legal.
+    """
+    row = conn.execute(
+        """
+        SELECT COUNT(*) FROM (
+            SELECT market, commodity, variety, grade, arrival_date
+            FROM prices
+            WHERE variety IS NOT NULL AND grade IS NOT NULL
+            GROUP BY market, commodity, variety, grade, arrival_date
+            HAVING COUNT(*) > 1
+        )
+        """
+    ).fetchone()
+    return int(row[0] or 0)
+
+
+def ensure_price_index(conn) -> dict:
+    """Rebuild the prices table when its unique index has stopped working.
+
+    Cheap enough to call on boot: duplicates are impossible while the index is
+    healthy, so the common case is one aggregate query that finds nothing.
+    """
+    duplicates = find_duplicate_price_keys(conn)
+    if not duplicates:
+        return {"duplicates": 0, "rebuilt": False}
+    logger.warning(
+        "Found %d duplicate price keys - the UNIQUE index is not enforcing, "
+        "rebuilding the prices table", duplicates,
+    )
+    report = rebuild_prices_table(conn)
+    report["duplicates"] = duplicates
+    report["rebuilt"] = True
+    report["duplicates_after"] = find_duplicate_price_keys(conn)
+    return report
+
+
 def upsert_prices(conn, records: list[dict]) -> int:
 
     """Bulk upsert price records - idempotent, never duplicates."""
@@ -652,27 +808,64 @@ def upsert_prices(conn, records: list[dict]) -> int:
 
     # Register temp table and INSERT OR IGNORE via DuckDB
 
+    # INSERT OR IGNORE tolerated a repeated business key inside one batch, so
+    # the batch has to be deduplicated before the anti-join runs - the join
+    # cannot see rows its own statement has not inserted yet.
+    business_key = ["market", "commodity", "variety", "grade", "arrival_date"]
+    before_dedupe = len(df)
+    df = df.drop_duplicates(subset=business_key, keep="first")
+    if len(df) != before_dedupe:
+        logger.info(
+            f"upsert_prices: collapsed {before_dedupe - len(df)} repeated key(s) "
+            f"within the batch"
+        )
+
+    # Anti-join rather than INSERT OR IGNORE. Both are idempotent, but OR IGNORE
+    # relies on the UNIQUE index's conflict path - the exact machinery that was
+    # failing - while NOT EXISTS only ever reads the index.
+    insert_sql = """
+        INSERT INTO prices
+            (state, district, market, commodity, variety, grade,
+             arrival_date, min_price, max_price, modal_price)
+        SELECT
+            state, district, market, commodity, variety, grade,
+            arrival_date, min_price, max_price, modal_price
+        FROM _new_prices n
+        WHERE NOT EXISTS (
+            SELECT 1 FROM prices p
+            WHERE p.market = n.market
+              AND p.commodity = n.commodity
+              AND p.variety IS NOT DISTINCT FROM n.variety
+              AND p.grade IS NOT DISTINCT FROM n.grade
+              AND p.arrival_date = n.arrival_date
+        )
+    """
+
+    def _unregister() -> None:
+        # A statement that failed with a FATAL error can leave the connection
+        # unable to answer anything else, including this.
+        try:
+            conn.unregister("_new_prices")
+        except Exception:
+            pass
+
     conn.register("_new_prices", df)
 
-    result = conn.execute("""
+    try:
+        result = conn.execute(insert_sql)
+    except Exception as exc:
+        _unregister()
+        if not _is_index_fault(exc):
+            raise
+        logger.error(
+            f"Price insert hit an inconsistent index ({exc}); rebuilding the "
+            f"prices table and retrying once"
+        )
+        rebuild_prices_table(conn)
+        conn.register("_new_prices", df)
+        result = conn.execute(insert_sql)
 
-        INSERT OR IGNORE INTO prices
-
-            (state, district, market, commodity, variety, grade,
-
-             arrival_date, min_price, max_price, modal_price)
-
-        SELECT
-
-            state, district, market, commodity, variety, grade,
-
-            arrival_date, min_price, max_price, modal_price
-
-        FROM _new_prices
-
-    """)
-
-    conn.unregister("_new_prices")
+    _unregister()
 
     count = result.fetchone()[0] if result else 0
 

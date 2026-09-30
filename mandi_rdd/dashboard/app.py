@@ -40,6 +40,8 @@ See mandi_rdd/styles/design.css and mandi_rdd/dashboard/theme.py
 
 
 
+import os
+
 import sys
 
 from pathlib import Path
@@ -1326,6 +1328,138 @@ st.html(_TOPBAR_HTML)
 
 
 
+# ═══════════════════════════════════════════════════════════
+# Live freshness strip
+# ═══════════════════════════════════════════════════════════
+# Every figure on every page is served by the production API. This strip says
+# how old that warehouse actually is - in the same words the API uses - and
+# the tick below re-renders the page on a timer so nothing on screen is a
+# snapshot somebody had to remember to refresh.
+
+try:
+    LIVE_REFRESH_SECONDS = max(0, int(os.environ.get("MANDIIQ_UI_REFRESH_SECONDS", "60")))
+except ValueError:
+    LIVE_REFRESH_SECONDS = 60
+
+
+def _behind_wording(behind):
+    """Human wording for the signed days-behind value /health reports."""
+    if behind is None:
+        return "age unknown"
+    behind = int(behind)
+    if behind < 0:
+        return "%d days in the future (impossible)" % -behind
+    if behind == 0:
+        return "current as of today"
+    return "%d day(s) behind" % behind
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _live_snapshot() -> dict:
+    """Freshness of the warehouse behind every figure on this page."""
+    from mandi_rdd.dashboard import data_access as _da
+    live = _da.get_health() or {}
+    # /health already carries the whole provenance block, so the second request
+    # is only made for builds old enough not to have it - one round trip is
+    # what stands between a visitor and the first paint.
+    has_provenance = live.get("days_behind") is not None or live.get("data_max_date")
+    quality = {} if has_provenance else (_da.get_data_quality() or {})
+    behind = quality.get("days_behind")
+    if behind is None:
+        behind = live.get("days_behind")
+    status = live.get("status")
+    if not status:
+        # An older build does not report a status, so derive it the same way the
+        # API does instead of assuming everything is fine.
+        if not live.get("n_prices"):
+            status = "empty"
+        elif behind is None:
+            status = "unknown"
+        elif int(behind) < 0:
+            status = "degraded"
+        else:
+            status = "stale" if int(behind) > 3 else "healthy"
+    return {
+        "status": status,
+        "max_date": quality.get("max_date") or live.get("data_max_date"),
+        "min_date": quality.get("min_date") or live.get("data_min_date"),
+        "behind": behind,
+        "future": quality.get("n_future_dates", live.get("n_future_dates")) or 0,
+        "n_prices": live.get("n_prices"),
+        "n_commodities": live.get("n_commodities"),
+        "last_run": live.get("last_run_utc"),
+        "last_outcome": live.get("last_outcome"),
+        "refresh_runs": live.get("refresh_runs"),
+        "refresh_failures": live.get("refresh_failures"),
+        "last_refresh_error": live.get("last_refresh_error"),
+        "interval_s": live.get("refresh_interval_s"),
+        "version": live.get("version"),
+    }
+
+
+def _request_ingest() -> bool:
+    """Ask production to ingest now. The run lock makes this safe to repeat."""
+    import requests as _rq
+    from mandi_rdd.dashboard import data_access as _da
+    try:
+        return _rq.post(f"{_da._get_api_base()}/refresh", timeout=25).status_code == 200
+    except Exception:
+        return False
+
+
+_live = _live_snapshot()
+if _live["status"] != "healthy":
+    _blurb = {
+        "stale": "The newest arrival date is more than three days old, so every figure here is behind reality.",
+        "degraded": "The warehouse holds arrival dates that cannot be true, so affected commodities are unreliable.",
+        "empty": "The warehouse has no price rows at all.",
+        "unknown": "The API did not report how old its data is.",
+    }.get(_live["status"], "Data freshness is not what it should be.")
+    _facts = ["data through <b>%s</b>" % (_live["max_date"] or "unknown"),
+              _behind_wording(_live["behind"])]
+    if _live["n_prices"]:
+        _facts.append("{:,} rows".format(int(_live["n_prices"])))
+    if _live["future"]:
+        _facts.append("<b>%s impossible date(s)</b>" % _live["future"])
+    if _live["last_refresh_error"]:
+        _facts.append("last refresh error: %s" % str(_live["last_refresh_error"])[:180])
+    st.html(
+        '<style>'
+        '.mandiq-live-banner{display:flex;gap:14px;align-items:flex-start;margin:0 0 18px;'
+        'padding:13px 18px;border:1px solid rgba(%(RUST_RGB)s,0.45);border-left:3px solid %(RUST)s;'
+        'border-radius:10px;background:rgba(%(RUST_RGB)s,0.07);}'
+        '.mandiq-live-banner .dot{width:9px;height:9px;border-radius:50%%;background:%(RUST)s;'
+        'margin-top:5px;flex:0 0 auto;box-shadow:0 0 0 3px rgba(%(RUST_RGB)s,0.18);}'
+        '.mandiq-live-banner .title{font-family:IBM Plex Mono,monospace;font-size:0.72rem;'
+        'letter-spacing:0.12em;text-transform:uppercase;color:%(RUST)s;}'
+        '.mandiq-live-banner .body{font-family:IBM Plex Mono,monospace;font-size:0.72rem;'
+        'line-height:1.65;color:%(PAPER)s;margin-top:5px;}'
+        '</style>'
+        '<div class="mandiq-live-banner"><div class="dot"></div>'
+        '<div><div class="title">Live data: %(STATUS)s</div>'
+        '<div class="body">%(BLURB)s %(FACTS)s</div></div></div>'
+        % dict(
+            RUST=RUST,
+            RUST_RGB="%d,%d,%d" % (int(RUST[1:3], 16), int(RUST[3:5], 16), int(RUST[5:7], 16)),
+            PAPER=PAPER,
+            STATUS=_live["status"],
+            BLURB=_blurb,
+            FACTS=" &middot; ".join(_facts),
+        )
+    )
+
+
+if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
+    @st.fragment(run_every=LIVE_REFRESH_SECONDS)
+    def _live_tick():
+        """Re-render the whole page on a timer so no number goes stale."""
+        _live_snapshot.clear()
+        st.rerun(scope="app")
+
+    _live_tick()
+
+
+
 # Build custom sidebar
 
 health = _model_health_status()
@@ -1405,66 +1539,57 @@ with st.sidebar:
 
 
     # ── Live data provenance ──
+    # Every figure in this cockpit is only as good as the warehouse behind it,
+    # so its age is stated in the same words the API uses - and it updates
+    # itself on a timer rather than waiting for someone to press R.
+    st.html('<div class="sidebar-section-header">Live data</div>')
 
-    # Every figure in this cockpit is only as good as the warehouse behind
+    _accent = SAGE if _live["status"] == "healthy" else RUST
+    _sidebar_rows = ("%s rows" % format(int(_live["n_prices"]), ",")) \
+        if _live["n_prices"] else "row count unknown"
+    _lines = [
+        '<span style="color:%s;">&#9679;</span> %s' % (_accent, _live["status"]),
+        'through <span style="color:%s;">%s</span>' % (PAPER, _live["max_date"] or "unknown"),
+        _behind_wording(_live["behind"]) + " &middot; " + _sidebar_rows,
+    ]
+    if _live["future"]:
+        _lines.append("%s impossible date(s)" % _live["future"])
+    if _live["n_commodities"]:
+        _lines.append("%s commodities" % format(int(_live["n_commodities"]), ","))
+    if _live["last_run"]:
+        _lines.append("ingest %s &middot; %s" % (
+            str(_live["last_run"])[:16].replace("T", " "),
+            _live["last_outcome"] or "unknown",
+        ))
+    if _live["refresh_runs"] is not None:
+        _lines.append("self-refresh %d/%d ok" % (
+            int(_live["refresh_runs"]) - int(_live["refresh_failures"] or 0),
+            int(_live["refresh_runs"]),
+        ))
+    if _live["last_refresh_error"]:
+        _lines.append("error: " + str(_live["last_refresh_error"])[:140])
+    if _live["version"]:
+        _lines.append("build " + str(_live["version"]))
+    st.html(
+        '<div style="padding:0 1rem 0.4rem;font-family:IBM Plex Mono,monospace;'
+        'font-size:0.68rem;line-height:1.7;color:' + MUTED + ';">'
+        + "<br>".join(_lines) + '</div>'
+    )
 
-    # it, so the newest arrival date is stated honestly (and flagged when it
+    if st.button("Refresh data now", key="_sidebar_ingest", use_container_width=True):
+        if _request_ingest():
+            _live_snapshot.clear()
+            st.toast("Ingestion started on the server")
+        else:
+            st.toast("Could not reach the API")
 
-    # drifts) instead of implying freshness.
-
-    try:
-
-        from mandi_rdd.dashboard import data_access as _da
-
-        _live = _da.get_health()
-
-        _quality = _da.get_data_quality()
-
-        _max_date = _quality.get("max_date") or _live.get("data_max_date") or "unknown"
-
-        _behind = _quality.get("days_behind")
-
-        if _behind is None:
-
-            _behind = _live.get("days_behind")
-
-        _future = _quality.get("n_future_dates", _live.get("n_future_dates")) or 0
-
-        _n_prices = _live.get("n_prices")
-
-        _stale = _behind is None or _behind > 4
-
-        _accent = RUST if _stale else SAGE
-
-        _behind_txt = "age unknown" if _behind is None else ("%d day(s) behind" % _behind)
-
-        _rows_txt = "%s rows" % format(_n_prices, ",") if _n_prices else "row count unknown"
-
-        _anomaly_txt = ("%d impossible date(s)" % _future) if _future else "no impossible dates"
-
-        st.html(
-
-            '<div class="sidebar-section-header">Live data</div>'
-
-            '<div style="padding:0 1rem 0.4rem;font-family:IBM Plex Mono,monospace;'
-
-            'font-size:0.68rem;line-height:1.6;color:' + MUTED + ';">'
-
-            '<span style="color:' + _accent + ';">&#9679;</span> data through '
-
-            '<span style="color:' + PAPER + ';">' + str(_max_date) + '</span>'
-
-            '<br>' + _behind_txt + ' &middot; ' + _rows_txt +
-
-            '<br>' + _anomaly_txt +
-
-            '</div>'
-
+    if LIVE_REFRESH_SECONDS:
+        st.toggle(
+            "Live updates",
+            value=True,
+            key="live_auto_refresh",
+            help="Re-render every page every %d seconds." % LIVE_REFRESH_SECONDS,
         )
-
-    except Exception:
-
-        pass
 
 
 

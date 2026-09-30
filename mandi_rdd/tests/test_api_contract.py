@@ -34,6 +34,7 @@ EXPECTED_ROUTES = {
     ("/nowcast/{commodity}", "GET"),
     ("/data-quality", "GET"),
     ("/admin/repair-dates", "POST"),
+    ("/admin/rebuild-prices", "POST"),
 }
 
 
