@@ -365,12 +365,13 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> "
         # DuckDB's own default (80% of detected RAM) is the safe choice, so the
         # limit is only overridden when an operator sets it explicitly.
         #   The container is 512 MB and DuckDB sizes its default limit from
-        #   the *host* RAM it can see, which is why the cap exists at all. The
-        #   fix is a cap that leaves the index room to work plus a spill
-        #   directory on the volume, not a cap of 200 MB with nowhere to go.
+        #   the *host* RAM it can see, which is why a cap exists at all. The
+        #   fix is a cap with room above the index plus a spill directory on
+        #   the volume, and a pipeline that never buffers more than one page -
+        #   not a 200 MB cap with nowhere to spill.
         if not read_only:
 
-            limit = os.environ.get("MANDIIQ_MEMORY_LIMIT", "384MB").strip()
+            limit = os.environ.get("MANDIIQ_MEMORY_LIMIT", "256MB").strip()
             try:
 
                 conn.execute(f"SET memory_limit = '{limit}'")
