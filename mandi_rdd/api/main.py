@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.2.0"
+    version: str = "2.3.0"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -462,7 +462,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
     * `/refresh` - Manual re-run of the full pipeline
     """,
-    version="2.2.0",
+    version="2.3.0",
     lifespan=lifespan,
 )
 
