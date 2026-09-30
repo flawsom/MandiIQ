@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 [![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
-[![Tests](https://img.shields.io/badge/tests-151%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-156%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -177,13 +177,13 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**151 tests passing** (1 skipped = warehouse-dependent check):
+**156 tests passing** (1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
 | `test_verification.py` (4 tests) | Path resolution, CSV field-size guard, HTTP client reuse, warehouse integrity |
 | `test_no_mock_data.py` (3 tests) | Fabricated-data markers, mock libraries and mock fixture files in shipping code |
-| `test_storage_repair.py` (18 tests) | Index-fault detection and repair, table rebuild, write self-healing, the memory cap that caused the fault, fault marker surviving a restart, API repair-before-ingest order |
+| `test_storage_repair.py` (23 tests) | Index-fault detection and repair, atomic batched table rebuild that refuses a short copy, write self-healing, the memory cap that caused the fault, fault marker surviving a restart, API repair-before-ingest order |
 | `test_scheduler_integrity.py` (18 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading + persistence, workflow YAML/schedule/secret policy |
 | `test_spec_curve.py` (20 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg, collapsed fits kept out of the FDR family |
 | `test_api_contract.py` (19 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness, index-heal reporting, `/ask` schemas stay stable |
@@ -286,7 +286,7 @@ pytest mandi_rdd/tests/ -v
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **151 passing, 1 skipped ✅** |
+| Tests passing | ≥ 25 | **156 passing, 1 skipped ✅** |
 | API endpoints | ≥ 10 | **38 documented endpoints (47 routes) ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |

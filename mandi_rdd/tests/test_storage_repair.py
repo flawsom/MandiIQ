@@ -289,20 +289,49 @@ def test_the_marker_is_written_before_the_probe(conn, tmp_path, monkeypatch):
     monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
     duckdb_store.upsert_prices(conn, [_record()])
 
-    def _explode(_conn):
-        # Assert the state the next process will inherit, mid-failure.
-        assert duckdb_store.index_fault_flagged() is True, \
-            "the marker must exist before the probe can fail"
-        raise RuntimeError("probe died")
+    real_probe = duckdb_store.probe_price_index
+    calls = {"n": 0}
 
-    monkeypatch.setattr(duckdb_store, "probe_price_index", _explode)
+    def _die_then_work(conn):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # Assert the state the next process will inherit, mid-failure.
+            assert duckdb_store.index_fault_flagged() is True, \
+                "the marker must exist before the probe can fail"
+            raise RuntimeError("probe died")
+        # The rebuild re-probes the index it just created, so a second call is
+        # the real probe and must succeed for the marker to be cleared.
+        return real_probe(conn)
+
+    monkeypatch.setattr(duckdb_store, "probe_price_index", _die_then_work)
     report = duckdb_store.verify_price_index(conn)
 
     assert report["rebuilt"] is True
     assert report["trigger"] == "write_probe"
+    assert report["probed"] is True, "the heal must be proved by its own probe"
     assert duckdb_store.index_fault_flagged() is False
+    assert calls["n"] == 2, "the failed probe is followed by the rebuild's probe"
     assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 1, \
         "the rebuild must keep the rows"
+
+
+def test_a_rebuild_whose_probe_still_fails_is_not_reported_as_healed(
+    conn, tmp_path, monkeypatch
+):
+    """A marker that survives a failed re-probe is how the next run learns."""
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    duckdb_store.upsert_prices(conn, [_record()])
+
+    def _always_explode(_conn):
+        raise RuntimeError("Failed to delete all rows from index")
+
+    monkeypatch.setattr(duckdb_store, "probe_price_index", _always_explode)
+    report = duckdb_store.verify_price_index(conn)
+
+    assert report["rebuilt"] is True
+    assert report["probed"] is False
+    assert duckdb_store.index_fault_flagged() is True, \
+        "an unproved heal must leave the fault recorded"
 
 
 def test_a_healthy_probe_leaves_the_warehouse_untouched(conn, tmp_path, monkeypatch):
@@ -318,6 +347,84 @@ def test_a_healthy_probe_leaves_the_warehouse_untouched(conn, tmp_path, monkeypa
         "SELECT COUNT(*) FROM prices WHERE market = ?", [duckdb_store.PROBE_MARKET]
     ).fetchone()[0] == 0, "the probe row must be gone"
     assert duckdb_store.index_fault_flagged() is False
+
+
+# ── the rebuild must never publish a short or broken copy ───────────────────
+
+
+def test_a_rebuild_that_cannot_copy_everything_keeps_the_original_table(
+    conn, monkeypatch
+):
+    """The failure that emptied the production warehouse must stay impossible.
+
+    The rebuild used to commit the staging copy, then run `DROP TABLE prices`
+    as its own committed statement. When the copy was short - it ran out of
+    memory on the 512 MB container - the delete still went through and the
+    live warehouse was left with an empty prices table. Everything now runs in
+    one transaction, so a failure has to roll back to the original rows.
+    """
+    duckdb_store.upsert_prices(conn, [
+        _record(), _record(commodity="Tomato"), _record(commodity="Potato"),
+    ])
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 3
+
+    broken_ddl = duckdb_store._PRICES_DDL.replace(
+        "min_price DOUBLE,", "min_price DOUBLE_typo,"
+    )
+    monkeypatch.setattr(duckdb_store, "_PRICES_DDL", broken_ddl)
+
+    with pytest.raises(Exception):
+        duckdb_store.rebuild_prices_table(conn)
+
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 3, (
+        "a failed rebuild must leave the original rows in place"
+    )
+
+
+def test_a_rebuild_refuses_to_publish_a_short_copy(conn, monkeypatch):
+    """A copy far smaller than the original is corruption, not a dedupe."""
+    duckdb_store.upsert_prices(conn, [
+        _record(), _record(commodity="Tomato"), _record(commodity="Potato"),
+    ])
+    monkeypatch.setattr(duckdb_store, "_REBUILD_MIN_COPY_RATIO", 5.0)
+
+    with pytest.raises(RuntimeError, match="refusing to publish"):
+        duckdb_store.rebuild_prices_table(conn)
+
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 3
+
+
+def test_a_successful_rebuild_keeps_every_row_and_proves_the_index(conn):
+    """The healthy path copies every row, swaps atomically, and re-probes."""
+    duckdb_store.upsert_prices(conn, [
+        _record(), _record(commodity="Tomato"), _record(commodity="Potato"),
+    ])
+
+    report = duckdb_store.rebuild_prices_table(conn)
+
+    assert report["rows_before"] == 3
+    assert report["rows_after"] == 3
+    assert report["rows_removed"] == 0
+    assert report["probed"] is True, "the new index must be proved by a write"
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 3
+    assert conn.execute(
+        "SELECT COUNT(*) FROM prices WHERE market = ?", [duckdb_store.PROBE_MARKET]
+    ).fetchone()[0] == 0, "the probe row must be gone"
+
+
+def test_a_rebuild_copies_across_several_batches(conn, monkeypatch):
+    """The copy is batched, so the window boundaries have to cover the table."""
+    monkeypatch.setattr(duckdb_store, "_REBUILD_BATCH_ROWS", 2)
+    duckdb_store.upsert_prices(conn, [
+        _record(arrival_date=f"2026-09-{day:02d}")
+        for day in range(1, 8)
+    ])
+
+    report = duckdb_store.rebuild_prices_table(conn)
+
+    assert report["rows_before"] == 7
+    assert report["rows_after"] == 7, "every batch window must be copied"
+    assert report["probed"] is True
 
 
 # ── self-healing writes ─────────────────────────────────────────────────────

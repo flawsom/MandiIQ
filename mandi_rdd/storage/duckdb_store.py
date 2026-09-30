@@ -160,10 +160,16 @@ _CORRUPTION_MARKERS = (
     "corrupt", "cannot be used",
 )
 # Markers of an inconsistent ART index. Recoverable by rebuilding the table.
+# These are deliberately specific: the previous list included the bare word
+# "index", so any error message that merely mentioned an index (including the
+# status file's own "index_health" key and unrelated SQL) was classified as a
+# fault. The marker gates a full table rebuild, so a false positive is not
+# harmless - it is expensive and, when the rebuild was not atomic, destructive.
 _INDEX_FAULT_MARKERS = (
-    "failed to delete",
-    "invalidated",
-    "index",
+    "failed to delete all rows from index",
+    "database has been invalidated",
+    "database instance is invalidated",
+    "index corruption",
 )
 # Files already probed successfully by this process: the first open verifies
 # the ART indexes, later opens share the same instance and skip the scan.
@@ -176,6 +182,18 @@ def _integrity_checked(path: Path) -> bool:
 
 def _mark_integrity_checked(path: Path) -> None:
     _INTEGRITY_CHECKED.add(str(path))
+
+
+def reset_connection_state(path: Optional[Path] = None) -> None:
+    """Forget that a database file has been verified.
+
+    Callers that replace the file under the process - a restore from backup -
+    must call this, otherwise the next get_connection() skips the integrity
+    probe because the *old* file was verified once, and then hands out
+    connections against stale state.
+    """
+    target = str(path or DB_PATH)
+    _INTEGRITY_CHECKED.discard(target)
 
 
 def _matches(err: Exception, markers: tuple) -> bool:
@@ -229,46 +247,128 @@ _PRICES_INDEXES = (
 )
 
 
+# How far a rebuild copy may fall short of the original before it is treated
+# as a failed copy rather than a dedupe. A real dedupe removes a handful of
+# rows; a copy interrupted by an out-of-memory kill can be arbitrarily short.
+_REBUILD_MIN_COPY_RATIO = 0.9
+# Rows copied per INSERT ... SELECT by the rebuild. Bounded so a 1.6M-row table
+# does not need its working set in memory all at once, and so each page is
+# committed inside one transaction that can be rolled back as a unit.
+_REBUILD_BATCH_ROWS = 200_000
+
+
 def rebuild_prices_table(conn) -> dict:
-    """Rebuild `prices`, and with it every ART index over it.
+    """Rebuild `prices`, and with it every ART index over it - atomically.
 
     The only reliable repair for an inconsistent index: DuckDB re-derives the
     index from the data, so whatever the old index had wrong is discarded. The
     lowest id wins for each business key, so ids stay stable and the table keeps
     being 1:1 with the records that were already there.
+
+    This used to be destructive: the staging copy was inserted, committed, then
+    `prices` was dropped while the rename happened afterwards. A copy that ran
+    out of memory was therefore published as an empty table, because the DROP
+    had already committed by the time the failure surfaced. Everything now runs
+    in one transaction, the copy is verified before the swap, and any failure
+    rolls back to the original table.
     """
     before = int(conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0)
 
     conn.execute("DROP TABLE IF EXISTS prices_rebuild")
     conn.execute(_PRICES_DDL.format(table="prices_rebuild"))
-    conn.execute(
-        """
-        INSERT INTO prices_rebuild
-            (id, state, district, market, commodity, variety, grade,
-             arrival_date, min_price, max_price, modal_price)
-        SELECT id, state, district, market, commodity, variety, grade,
-               arrival_date, min_price, max_price, modal_price
-        FROM prices
-        QUALIFY row_number() OVER (
-            PARTITION BY market, commodity, variety, grade, arrival_date
-            ORDER BY id
-        ) = 1
-        """
-    )
-    after = int(conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0] or 0)
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        # Copy in batches so the working set stays bounded. The row_number()
+        # keeps the lowest id for each business key, so duplicates that the
+        # broken index was failing to prevent collapse instead of aborting the
+        # rebuild with a constraint error.
+        # Window boundaries come from the source table, so the copy advances
+        # through the whole id space even when a window's rows are all deduped
+        # away. A window shorter than one batch on its own is still a complete
+        # window, which is what stops the loop from ending early.
+        bounds = [
+            int(r[0])
+            for r in conn.execute(
+                "SELECT MAX(id) FROM prices GROUP BY id // ? ORDER BY 1",
+                [_REBUILD_BATCH_ROWS],
+            ).fetchall()
+            if r[0] is not None
+        ]
+        last_id = 0
+        for upper in bounds:
+            cursor = conn.execute(
+                """
+                INSERT INTO prices_rebuild
+                    (id, state, district, market, commodity, variety, grade,
+                     arrival_date, min_price, max_price, modal_price)
+                SELECT id, state, district, market, commodity, variety, grade,
+                       arrival_date, min_price, max_price, modal_price
+                FROM (
+                    SELECT *, row_number() OVER (
+                        PARTITION BY market, commodity, variety, grade, arrival_date
+                        ORDER BY id
+                    ) AS _rn
+                    FROM prices
+                    WHERE id > ? AND id <= ?
+                )
+                WHERE _rn = 1
+                ORDER BY id
+                ON CONFLICT DO NOTHING
+                """,
+                [last_id, upper],
+            )
+            copied = int(cursor.fetchone()[0] or 0)
+            last_id = upper
+            logger.debug("Prices rebuild: window ending at %s copied %s rows", upper, copied)
 
-    conn.execute("DROP TABLE prices")
-    conn.execute("ALTER TABLE prices_rebuild RENAME TO prices")
+        after = int(conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0] or 0)
+
+        # Refuse to publish a short copy. A real dedupe removes a few rows; a
+        # copy killed by memory pressure can lose most of the table, and that
+        # must roll back to the original rather than become the warehouse.
+        if before and after < int(before * _REBUILD_MIN_COPY_RATIO):
+            raise RuntimeError(
+                f"refusing to publish a rebuild that copied {after} of {before} "
+                f"rows (below {_REBUILD_MIN_COPY_RATIO:.0%} of the original)"
+            )
+
+        conn.execute("DROP TABLE prices")
+        conn.execute("ALTER TABLE prices_rebuild RENAME TO prices")
+        conn.execute("COMMIT")
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception as rollback_err:  # the connection itself may be dead
+            logger.error(f"Could not roll back the prices rebuild: {rollback_err}")
+        raise
+
     for idx_sql in _PRICES_INDEXES:
         try:
             conn.execute(idx_sql)
         except Exception as exc:  # an index is a convenience, not a contract
             logger.warning(f"Could not recreate {idx_sql}: {exc}")
 
+    # Prove the new index works before calling the repair done. The probe uses
+    # the index the way a write does, on a connection that has already survived
+    # the rebuild, so a rebuild that produced another broken index is not
+    # reported as a heal.
+    probed = False
+    try:
+        probe_price_index(conn)
+        probed = True
+        clear_index_fault()
+    except Exception as exc:
+        logger.error(
+            "The prices index still fails a write probe after rebuilding; "
+            "leaving the fault recorded (%s)",
+            exc,
+        )
+
     report = {
         "rows_before": before,
         "rows_after": after,
         "rows_removed": before - after,
+        "probed": probed,
     }
     logger.warning(
         "Rebuilt the prices table after an index fault: %d rows kept, %d "
@@ -870,7 +970,9 @@ def ensure_price_index(conn, force: bool = False) -> dict:
     report["rebuilt"] = True
     report["trigger"] = "recorded_index_fault" if force else "duplicate_keys"
     report["duplicates_after"] = find_duplicate_price_keys(conn)
-    clear_index_fault()
+    if report.get("probed"):
+        # rebuild_prices_table already proved the new index with a write probe.
+        clear_index_fault()
     return report
 
 
@@ -911,7 +1013,8 @@ def verify_price_index(conn, probe: bool = True) -> dict:
         report["rebuilt"] = True
         report["trigger"] = "write_probe"
         report["duplicates_after"] = find_duplicate_price_keys(conn)
-        clear_index_fault()
+        if report.get("probed"):
+            clear_index_fault()
         return report
 
     clear_index_fault()
@@ -1034,11 +1137,32 @@ def upsert_prices(conn, records: list[dict]) -> int:
         _unregister()
         if not _is_index_fault(exc):
             raise
+        # Record the fault on the volume before attempting anything else. A
+        # "Failed to delete all rows from index" error is fatal - DuckDB
+        # invalidates the whole database instance, so the connection this
+        # failed on can never repair or retry - and the marker is what tells
+        # the next run to rebuild.
+        note_index_fault(exc)
         logger.error(
             f"Price insert hit an inconsistent index ({exc}); rebuilding the "
             f"prices table and retrying once"
         )
-        rebuild_prices_table(conn)
+        try:
+            rebuilt = rebuild_prices_table(conn)
+        except Exception as rebuild_err:
+            # Dead connection or a failed rebuild: nothing more can be done
+            # with this connection. The recorded fault makes the next run's
+            # pre-flight heal the table before it writes.
+            logger.error(
+                "Could not rebuild the prices table on this connection (%s); "
+                "the recorded fault will be healed before the next run writes",
+                rebuild_err,
+            )
+            raise
+        logger.info(
+            "Rebuilt %s rows in place (%s removed); retrying the insert once",
+            rebuilt.get("rows_after"), rebuilt.get("rows_removed"),
+        )
         conn.register("_new_prices", df)
         result = conn.execute(insert_sql)
 

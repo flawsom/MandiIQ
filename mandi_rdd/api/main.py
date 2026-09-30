@@ -862,13 +862,26 @@ async def admin_rebuild_prices():
     "Failed to delete all rows from index" and ingestion cannot make progress.
     Rebuilding re-derives the index from the data. Duplicate business keys are
     collapsed to their lowest id, so the row count can only fall.
+
+    This runs the same verified heal the pipeline runs: it forces the rebuild,
+    proves the new index with a write probe, and only then clears the recorded
+    fault. It used to call rebuild_prices_table() directly, which never cleared
+    the marker - so a manual heal left /health reporting a fault that was
+    already repaired, and the next run rebuilt the whole table a second time.
     """
     conn = get_connection()
     init_schema(conn)
     try:
-        from mandi_rdd.storage.duckdb_store import rebuild_prices_table
-        report = rebuild_prices_table(conn)
+        from mandi_rdd.storage.duckdb_store import (
+            ensure_price_index,
+            index_fault_flagged,
+        )
+        report = ensure_price_index(conn, force=True)
         report["data_max_date"] = _cached_date_quality(conn).get("max_date")
+        # There is no separate marker state to report: a successful rebuild
+        # with a passing probe clears it, so this is False after a clean heal.
+        report["index_fault_pending"] = index_fault_flagged()
+        _note_index_health(report, source="admin_rebuild")
         return report
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1633,6 +1646,86 @@ def _r2_download() -> bytes:
     logger.info("R2 restore: downloaded %d bytes from s3://%s/%s", len(data), bucket, key)
     return data
 
+
+def _r2_download_to(dest: Path) -> int:
+    """Stream the R2 backup to `dest` without holding it in memory.
+
+    The whole-file download this replaces held the compressed backup in RAM and
+    then decompressed it in one gulp - roughly twice the database size at peak
+    on a 512 MB container, which is why the first restore attempt was killed
+    and answered 503. This writes 8 MB at a time to disk instead.
+    """
+    import urllib.request
+    import hmac
+    import hashlib
+
+    bucket = os.environ.get("R2_BUCKET") or os.environ.get("R2_BUCKET_NAME") or ""
+    account_id = os.environ.get("R2_ACCOUNT_ID") or ""
+    access_key = os.environ.get("R2_ACCESS_KEY_ID") or ""
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY") or ""
+    if not all([bucket, account_id, access_key, secret_key]):
+        missing = [k for k, v in [
+            ("R2_BUCKET", bucket), ("R2_ACCOUNT_ID", account_id),
+            ("R2_ACCESS_KEY_ID", access_key), ("R2_SECRET_ACCESS_KEY", secret_key),
+        ] if not v]
+        raise ValueError(f"R2 restore: missing credentials: {', '.join(missing)}")
+
+    endpoint = f"https://{account_id}.r2.cloudflarestorage.com"
+    key = "mandi_iq.duckdb.gz"
+    url = f"{endpoint}/{bucket}/{key}"
+    region = "auto"
+    service = "s3"
+    now = datetime.datetime.utcnow()
+    amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+    date_stamp = now.strftime("%Y%m%d")
+    payload_hash = hashlib.sha256(b"").hexdigest()
+    canonical_headers = (
+        f"host:{account_id}.r2.cloudflarestorage.com\n"
+        f"x-amz-content-sha256:{payload_hash}\n"
+        f"x-amz-date:{amz_date}\n"
+    )
+    signed_headers = "host;x-amz-content-sha256;x-amz-date"
+    canonical_request = (
+        f"GET\n/{bucket}/{key}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    )
+    algorithm = "AWS4-HMAC-SHA256"
+    credential_scope = f"{date_stamp}/{region}/{service}/aws4_request"
+    string_to_sign = (
+        f"{algorithm}\n{amz_date}\n{credential_scope}\n"
+        f"{hashlib.sha256(canonical_request.encode()).hexdigest()}"
+    )
+
+    def _sign(key_bytes: bytes, msg: str) -> bytes:
+        return hmac.new(key_bytes, msg.encode(), hashlib.sha256).digest()
+
+    k_signing = _sign(
+        _sign(_sign(_sign(f"AWS4{secret_key}".encode(), date_stamp), region), service),
+        "aws4_request",
+    )
+    signature = hmac.new(k_signing, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    auth_header = (
+        f"{algorithm} Credential={access_key}/{credential_scope}, "
+        f"SignedHeaders={signed_headers}, Signature={signature}"
+    )
+    req = urllib.request.Request(url, headers={
+        "Host": f"{account_id}.r2.cloudflarestorage.com",
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": amz_date,
+        "Authorization": auth_header,
+        "User-Agent": "MandiIQ/1.0",
+    })
+    written = 0
+    with urllib.request.urlopen(req, timeout=600) as resp, open(dest, "wb") as out:
+        while True:
+            chunk = resp.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            out.write(chunk)
+            written += len(chunk)
+    logger.info("R2 restore: streamed %d bytes from s3://%s/%s", written, bucket, key)
+    return written
+
+
 @app.post("/admin/restore-from-r2", tags=["Admin"])
 async def admin_restore_from_r2():
     """Restore the DuckDB database from the latest Cloudflare R2 backup.
@@ -1647,8 +1740,15 @@ async def admin_restore_from_r2():
     Returns:
         dict with status, message, bytes downloaded, and file size.
     """
+    import gzip
+    import shutil as _shutil
+    from mandi_rdd.storage.duckdb_store import (DB_PATH, get_connection,
+                                                reset_connection_state)
+
+    gz_path = DB_PATH.with_suffix(".duckdb.gz.download")
+    staged = DB_PATH.with_suffix(".duckdb.restored")
     try:
-        compressed = _r2_download()
+        bytes_downloaded = _r2_download_to(gz_path)
     except ValueError as e:
         return {"status": "error", "message": str(e)}
     except urllib.error.HTTPError as e:
@@ -1658,24 +1758,69 @@ async def admin_restore_from_r2():
         }
     except (TimeoutError, urllib.error.URLError, OSError) as e:
         return {"status": "error", "message": f"R2 download failed: {e}"}
-    # Decompress
+
+    # Decompress in a stream, not in one gulp: the old code held the whole
+    # compressed file and then the whole database in memory at once, which is
+    # what killed the container mid-restore.
     try:
-        decompressed = gzip.decompress(compressed)
+        with gzip.open(gz_path, "rb") as src, open(staged, "wb") as out:
+            _shutil.copyfileobj(src, out, length=8 * 1024 * 1024)
+        bytes_decompressed = staged.stat().st_size
     except Exception as e:
         return {"status": "error", "message": f"gzip decompression failed: {e}"}
-    # Replace the local DuckDB file
+    finally:
+        try:
+            gz_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    # Verify the backup actually holds prices before it is allowed to replace
+    # the live warehouse. A truncated or empty backup must never be published
+    # as the database, which is the same mistake the old rebuild made.
+    staged_rows = 0
     try:
-        from mandi_rdd.storage.duckdb_store import DB_PATH
-        # Write to a temp file first, then rename (atomic on same filesystem)
-        tmp = DB_PATH.with_suffix(".duckdb.tmp")
-        tmp.write_bytes(decompressed)
-        tmp.replace(DB_PATH)
+        check = get_connection(db_path=staged, read_only=True)
+        try:
+            check.execute("SELECT 1")
+            tables = [r[0] for r in check.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()]
+            if "prices" in tables:
+                staged_rows = int(
+                    check.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0
+                )
+        finally:
+            check.close()
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"the backup could not be opened: {e}",
+        }
+    if staged_rows <= 0:
+        return {
+            "status": "error",
+            "message": (
+                "the backup contains no price rows; refusing to replace the "
+                "live warehouse with it"
+            ),
+            "bytes_decompressed": bytes_decompressed,
+        }
+
+    # Move the live file aside, then swap. Keeping the old file (rather than
+    # unlinking it) means a failed restart can still be rolled back by hand.
+    backup_path = DB_PATH.with_suffix(".duckdb.before-restore")
+    try:
+        if DB_PATH.exists():
+            DB_PATH.replace(backup_path)
+        staged.replace(DB_PATH)
+        reset_connection_state(DB_PATH)
         logger.info(
-            "R2 restore: replaced %s with %d bytes from R2 backup",
-            DB_PATH, len(decompressed),
+            "R2 restore: replaced %s with %d bytes / %d price rows from R2",
+            DB_PATH, bytes_decompressed, staged_rows,
         )
     except Exception as e:
         return {"status": "error", "message": f"File replacement failed: {e}"}
+
     # Refresh the commodity list for the health endpoint
     try:
         conn = get_connection()
@@ -1688,8 +1833,9 @@ async def admin_restore_from_r2():
     return {
         "status": "ok",
         "message": "Database restored from R2 backup.",
-        "bytes_downloaded": len(compressed),
-        "bytes_decompressed": len(decompressed),
+        "bytes_downloaded": bytes_downloaded,
+        "bytes_decompressed": bytes_decompressed,
+        "price_rows": staged_rows,
         "db_path": str(DB_PATH),
     }
 

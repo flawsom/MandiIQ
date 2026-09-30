@@ -1073,7 +1073,7 @@ ruff check mandi_rdd/
 
 **Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
 
-**151 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
+**156 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
 
 **Suite layout** (`mandi_rdd/tests/`):
 

@@ -36,6 +36,84 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The two failure modes that took production down on 2026-09-30, healed
+      # before this workflow tries to ingest into them:
+      #
+      #   * a recorded index fault (/health.index_fault_pending) means writes
+      #     to prices are still dying on an inconsistent ART index;
+      #   * an empty warehouse (n_prices == 0) means a rebuild published a
+      #     short copy, which is how 1.6M rows disappeared.
+      #
+      # Both are repairable over HTTP - rebuild the table, or restore the last
+      # R2 backup - and neither has an operator watching for it. Anything that
+      # cannot be healed fails the job so a human sees it, but the common case
+      # now recovers itself on the next hour instead of waiting for one.
+      - name: Auto-heal a recorded index fault or an empty warehouse
+        env:
+          API_BASE: ${{ env.API_BASE }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+
+          base = os.environ["API_BASE"].rstrip("/")
+
+          def get(path, timeout=30):
+              with urllib.request.urlopen(f"{base}{path}", timeout=timeout) as r:
+                  return json.load(r)
+
+          def post(path, timeout=600):
+              req = urllib.request.Request(f"{base}{path}", method="POST")
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return json.load(r)
+
+          try:
+              health = get("/health")
+          except Exception as e:
+              print(f"::warning::/health unreachable ({e}); leaving recovery to the next run")
+              raise SystemExit(0)
+
+          problems = []
+
+          if health.get("index_fault_pending"):
+              print("index_fault_pending is set - asking the API to rebuild the prices index")
+              try:
+                  report = post("/admin/rebuild-prices")
+                  print("rebuild-prices:", json.dumps(report)[:400])
+                  health = get("/health")
+                  if health.get("index_fault_pending"):
+                      problems.append("the index fault survived a rebuild")
+                  else:
+                      print("index fault cleared")
+              except Exception as e:
+                  problems.append(f"rebuild-prices failed: {e}")
+              finally:
+                  # The API serialises the pipeline behind a run lock; give the
+                  # rebuild a moment to release it before /refresh.
+                  time.sleep(5)
+
+          n_prices = int(health.get("n_prices") or 0)
+          if n_prices == 0:
+              print("the warehouse holds no price rows - restoring the last R2 backup")
+              try:
+                  report = post("/admin/restore-from-r2")
+                  print("restore-from-r2:", json.dumps(report)[:400])
+                  health = get("/health")
+                  n_prices = int(health.get("n_prices") or 0)
+                  if n_prices == 0:
+                      problems.append("the warehouse is still empty after restoring from R2")
+                  else:
+                      print(f"warehouse restored: {n_prices} price rows")
+              except Exception as e:
+                  problems.append(f"restore-from-r2 failed: {e}")
+
+          if problems:
+              for problem in problems:
+                  print(f"::error::{problem}")
+              raise SystemExit(1)
+
+          print(f"warehouse healthy enough to ingest into ({n_prices} price rows)")
+          PY
+
       - name: Trigger the production ingest
         id: trigger
         run: |

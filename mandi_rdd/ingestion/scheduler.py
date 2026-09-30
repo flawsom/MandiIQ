@@ -151,6 +151,7 @@ def _run_ingestion_locked(
     with pipeline_metrics.step("index_health"):
         try:
             from mandi_rdd.storage.duckdb_store import (
+                clear_index_fault,
                 heal_price_index,
                 index_fault_flagged,
                 rebuild_prices_table,
@@ -162,6 +163,10 @@ def _run_ingestion_locked(
             # loop into one bad run followed by a repair.
             index_report = heal_price_index(conn)
             if not index_report.get("rebuilt") and _last_run_had_index_fault():
+                # heal_price_index() forces the rebuild whenever the fault
+                # marker is present; this covers a marker that was lost, and
+                # the previous run's recorded error is the only remaining
+                # evidence.
                 logger.error(
                     "The previous ingestion run died on an inconsistent prices "
                     "index; rebuilding the table before touching it again"
@@ -169,11 +174,8 @@ def _run_ingestion_locked(
                 index_report = rebuild_prices_table(conn)
                 index_report["rebuilt"] = True
                 index_report["trigger"] = "previous_run_index_fault"
-                try:
-                    from mandi_rdd.storage.duckdb_store import clear_index_fault
+                if index_report.get("probed"):
                     clear_index_fault()
-                except Exception:
-                    pass
             index_report["fault_flagged"] = index_fault_flagged()
             summary["steps"]["index_health"] = index_report
         except Exception as e:
@@ -579,12 +581,20 @@ def _run_ingestion_locked(
 
 
 
-INDEX_FAULT_MARKERS = (
-    "failed to delete all rows from index",
-    "database has been invalidated",
-    "database instance is invalidated",
-    "index corruption",
-)
+# One source of truth: the storage layer's list, because a false positive here
+# triggers a full prices-table rebuild. This module used to keep its own copy,
+# and the storage layer's broader list included the bare word "index", so any
+# status record that mentioned an index - including the record's own
+# "index_health" key - counted as a fatal fault.
+try:
+    from mandi_rdd.storage.duckdb_store import _INDEX_FAULT_MARKERS as INDEX_FAULT_MARKERS
+except Exception:  # pragma: no cover - storage always imports in production
+    INDEX_FAULT_MARKERS = (
+        "failed to delete all rows from index",
+        "database has been invalidated",
+        "database instance is invalidated",
+        "index corruption",
+    )
 
 
 def _last_run_had_index_fault(status_path: Path = None) -> bool:

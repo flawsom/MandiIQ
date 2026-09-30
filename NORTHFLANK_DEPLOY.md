@@ -132,3 +132,33 @@
 # The repair swaps month and day for stored future dates (the inverse of the
 # month-first mis-parse: 2026-12-09 -> 2026-09-12) and drops rows that stay
 # impossible. /health reports `n_future_dates` so the result is verifiable.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Recovering the warehouse
+# ─────────────────────────────────────────────────────────────────────────────
+# The rebuild that repairs an inconsistent prices index is atomic: it copies
+# `prices` into a staging table in one transaction, refuses to publish a copy
+# smaller than 90% of the original, and swaps only after a write probe proves
+# the new index. An interrupted rebuild rolls back to the original table.
+# Before 2026-09-30 it did not: the copy was committed and `prices` was dropped
+# as its own statement, so a copy killed by memory pressure was published as an
+# empty warehouse - which is how 1.6M rows were lost.
+#
+# Two recovery paths, both plain HTTP so a workflow can run them:
+#
+#   curl -sS -X POST "https://p01--mandiiq--x4n8x4gkmzht.code.run/admin/rebuild-prices"
+#     For an inconsistent index. Forces the rebuild, probes it, and only then
+#     clears the recorded fault, so /health.index_fault_pending goes false.
+#
+#   curl -sS -X POST "https://p01--mandiiq--x4n8x4gkmzht.code.run/admin/restore-from-r2"
+#     For an empty or ruined warehouse. Streams the gzipped R2 backup to disk
+#     (8 MB at a time - the old code held the compressed file and then the
+#     whole database in RAM, which is what got the first attempt OOM-killed),
+#     refuses to swap in a backup with zero price rows, and keeps the previous
+#     file as mandi_iq.duckdb.before-restore.
+#
+# The hourly refresh-live-data.yml workflow now runs both of these
+# automatically when /health says index_fault_pending, or when n_prices is 0.
+# If the upstream feed (api.data.gov.in) is unreachable, /health reports a
+# degraded run and the warehouse keeps serving what it has - the pipeline
+# skips the price fetch and still refreshes rainfall, RDD and the forecast.
