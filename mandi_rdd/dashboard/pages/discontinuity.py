@@ -90,9 +90,13 @@ def render():
         return
 
     if df.empty:
+        # Honest, and pointed at what does work: the hosted dashboard ships
+        # without a local warehouse (the DuckDB file is not in the repository),
+        # and the API publishes no rainfall series yet.
         st.markdown(
-            '<div class="interpretation-box insig-box">No rainfall departure data available yet. '
-            'Run the ingestion pipeline to populate the warehouse.</div>',
+            '<div class="interpretation-box insig-box">No rainfall departures in the local '
+            'warehouse. The hosted dashboard ships without one, and the API publishes no '
+            'rainfall series yet - it serves prices, forecasts and risk scores instead.</div>',
             unsafe_allow_html=True,
         )
         return

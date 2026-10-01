@@ -54,6 +54,54 @@ def get_prices(state=None, district=None, commodity=None, limit=100):
         return df.to_dict("records") if hasattr(df, "to_dict") else []
 
 
+def get_prices_frame(commodity=None, state=None, district=None, limit=5000):
+    """Prices as a DataFrame: the API first, the local warehouse as fallback.
+
+    Pages used to query DuckDB directly for this. Streamlit Community Cloud
+    serves the repository from an immutable layer and the DuckDB file is
+    gitignored, so that query returns nothing there even though the API holds
+    the rows - and the page then told the visitor "no price records" about data
+    that plainly exists. The API returns at most 5000 rows (newest first), which
+    is a full recent window for a trend or a district distribution.
+    """
+    import pandas as pd
+
+    rows = get_prices(state=state, district=district, commodity=commodity, limit=limit)
+    df = pd.DataFrame(rows or [])
+    if df.empty:
+        return df
+    if "arrival_date" in df.columns:
+        df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce")
+    for col in ("modal_price", "min_price", "max_price"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
+def get_commodities(limit: int = 300) -> list:
+    """Commodity names that have data: the API first, local tables as fallback.
+
+    A commodity picker built only from the local warehouse is empty on the
+    hosted dashboard, which is how the Forecast page came up with nothing to
+    select and nothing to draw.
+    """
+    names = []
+    try:
+        for rec in get_freshness() or []:
+            name = (rec or {}).get("commodity")
+            if name:
+                names.append(str(name).title())
+    except Exception:
+        names = []
+    if not names:
+        try:
+            from mandi_rdd.storage.duckdb_store import get_curated_commodities
+            names = [str(r).title() for r in (get_curated_commodities() or [])]
+        except Exception:
+            names = []
+    return sorted(set(names))[:limit]
+
+
 def get_rdd_result(commodity: str) -> dict:
     import requests
     api_base = _get_api_base()

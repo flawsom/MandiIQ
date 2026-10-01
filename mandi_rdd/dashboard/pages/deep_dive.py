@@ -92,7 +92,9 @@ def render(**kwargs):
                 st.markdown(f"*Showing {len(df)} records*")
             else:
                 st.markdown(
-                    '<div class="interpretation-box insig-box">No data - run the ingestion pipeline first.</div>',
+                    '<div class="interpretation-box insig-box">No rows in the local warehouse. '
+                    'This explorer runs the pipeline\'s SQL against it, so it needs a local '
+                    'database - the hosted dashboard does not ship one.</div>',
                     unsafe_allow_html=True,
                 )
         except Exception as e:

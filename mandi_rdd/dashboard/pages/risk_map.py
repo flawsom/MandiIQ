@@ -42,12 +42,15 @@ def render():
     # ── Filters ──
     available_commodities = ["All"]
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection, get_curated_commodities
-        conn = get_connection()
-        result = get_curated_commodities()
-        if result:
-            available_commodities = ["All"] + [r.title() for r in result]
-        conn.close()
+        # API first: a picker built only from the local warehouse is empty on the
+        # hosted dashboard, which carries no DuckDB file at all.
+        from mandi_rdd.dashboard import data_access as _da
+        names = _da.get_commodities()
+        if not names:
+            from mandi_rdd.storage.duckdb_store import get_curated_commodities
+            names = [str(r).title() for r in (get_curated_commodities() or [])]
+        if names:
+            available_commodities = ["All"] + names
     except Exception:
         pass
 
@@ -98,14 +101,17 @@ def render():
     if df is None or len(df) == 0:
         st.markdown("""
             <div class="glass" style="padding:2rem;text-align:center;">
-                <h3 style="color:#bababa;margin-top:0;font-size:1.1rem;">No districts in the database</h3>
+                <h3 style="color:#bababa;margin-top:0;font-size:1.1rem;">No district ledger on this deployment</h3>
                 <p style="color:#7e7e7e;font-size:0.85rem;">
-                    Run the ingestion pipeline to populate district data:<br/>
-                    <code style="color:#d7ff00;">python -m mandi_rdd.ingestion.ingest</code>
+                    This page joins rainfall departures to districts from the warehouse, and the
+                    hosted dashboard deliberately ships without one. Prices, forecasts and risk
+                    scores are served by the API instead - see the Executive Overview and
+                    Analyst Lab pages.
                 </p>
                 <p style="color:#7e7e7e;font-size:0.75rem;">
-                    Requires <strong>DATA_GOV_IN_API_KEY</strong> - get one free at
-                    <a href="https://api.data.gov.in/manage" style="color:#d7ff00;">api.data.gov.in</a>
+                    Running locally, populate a warehouse with
+                    <code style="color:#d7ff00;">python -m mandi_rdd.ingestion.ingest</code>
+                    (requires <strong>DATA_GOV_IN_API_KEY</strong>).
                 </p>
             </div>
         """, unsafe_allow_html=True)

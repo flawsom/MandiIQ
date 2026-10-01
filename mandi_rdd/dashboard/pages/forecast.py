@@ -65,19 +65,20 @@ def render():
     )
 
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection, get_curated_commodities
-        conn = get_connection()
-        result = get_curated_commodities()
-        if result:
-            commodities = [r.title() for r in result]
-        else:
+        # API first: the hosted dashboard carries no local warehouse, so a picker
+        # built only from DuckDB came up empty and the page had nothing to draw.
+        from mandi_rdd.dashboard import data_access as _da
+        commodities = _da.get_commodities()
+        if not commodities:
+            from mandi_rdd.storage.duckdb_store import get_connection
+            conn = get_connection()
             commodities = [
                 c[0].title()
                 for c in conn.execute(
                     "SELECT DISTINCT commodity FROM prices ORDER BY commodity LIMIT 20"
                 ).fetchall()
             ]
-        conn.close()
+            conn.close()
     except Exception as e:
         st.markdown(
             f'<div class="interpretation-box insig-box">Could not load commodities: {e}</div>',
@@ -85,20 +86,19 @@ def render():
         )
         return
 
+    if not commodities:
+        st.markdown(
+            '<div class="interpretation-box insig-box">No commodities to choose from: the API '
+            'reported none and this deployment carries no local warehouse.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
     selected = st.selectbox("Select commodity", commodities, index=0)
 
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection
-        c = get_connection()
-        df = c.execute(
-            """
-            SELECT state, district, market, arrival_date, modal_price, min_price, max_price
-            FROM prices
-            WHERE LOWER(commodity) = LOWER(?)
-            """,
-            [selected],
-        ).fetchdf()
-        c.close()
+        from mandi_rdd.dashboard import data_access as _da
+        df = _da.get_prices_frame(commodity=selected, limit=5000)
     except Exception as e:
         st.markdown(
             f'<div class="interpretation-box insig-box">Could not load prices for {selected}: {e}</div>',
@@ -108,7 +108,8 @@ def render():
 
     if df.empty:
         st.markdown(
-            '<div class="interpretation-box insig-box">No price records for this commodity yet. Run the ingestion pipeline first.</div>',
+            f'<div class="interpretation-box insig-box">No price records for {selected} came back '
+            'from the API or from a local warehouse.</div>',
             unsafe_allow_html=True,
         )
         return

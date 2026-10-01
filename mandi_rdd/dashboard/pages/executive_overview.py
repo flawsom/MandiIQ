@@ -257,19 +257,30 @@ def render(**kwargs):
         unsafe_allow_html=True,
     )
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection
-        conn = get_connection()
-        df = conn.execute(
-            "SELECT arrival_date, AVG(modal_price) as avg_price, MIN(modal_price) as min_price, MAX(modal_price) as max_price FROM prices WHERE commodity = ? GROUP BY arrival_date ORDER BY arrival_date",
-            [selected_commodity],
-        ).fetchdf()
-        conn.close()
+        # API first: the hosted dashboard has no local warehouse (the DuckDB file
+        # is gitignored), so a direct query drew nothing on exactly the page a
+        # visitor lands on.
+        from mandi_rdd.dashboard import data_access as _da
+        _raw = _da.get_prices_frame(commodity=selected_commodity, limit=5000)
+        if not _raw.empty and {"arrival_date", "modal_price"} <= set(_raw.columns):
+            df = (
+                _raw.dropna(subset=["arrival_date", "modal_price"])
+                .groupby("arrival_date")["modal_price"]
+                .agg(["mean", "min", "max"])
+                .rename(columns={"mean": "avg_price", "min": "min_price", "max": "max_price"})
+                .reset_index()
+                .sort_values("arrival_date")
+            )
+        else:
+            df = _raw
         if len(df) > 5:
             color = commodity_color(selected_commodity)
             fig = make_themed_figure()
             fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["avg_price"], mode="lines", name="Avg", line=dict(color=color, width=2)))
-            fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["max_price"], mode="lines", name="Max", line=dict(color=color, width=1, dash="dash", opacity=0.6)))
-            fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["min_price"], mode="lines", name="Min", line=dict(color="#7e7e7e", width=1, dash="dash", opacity=0.5)))
+            # opacity belongs on the trace, not on Line - Plotly rejects
+            # line=dict(opacity=...), which kept this chart from ever drawing.
+            fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["max_price"], mode="lines", name="Max", line=dict(color=color, width=1, dash="dash"), opacity=0.6))
+            fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["min_price"], mode="lines", name="Min", line=dict(color="#7e7e7e", width=1, dash="dash"), opacity=0.5))
             fig.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=350)
             st.markdown('<div class="glass" style="padding:1.2rem;">', unsafe_allow_html=True)
             st.plotly_chart(fig, use_container_width=True)
@@ -280,9 +291,11 @@ def render(**kwargs):
                 'Run the ingestion pipeline first.</div>',
                 unsafe_allow_html=True,
             )
-    except Exception:
+    except Exception as exc:
+        # Say what broke. A bare "unavailable" here hid a KeyError for as long as
+        # the branch was unreachable, which on this deployment was every run.
         st.markdown(
-            '<div class="interpretation-box insig-box">Price trend unavailable - run ingestion first.</div>',
+            f'<div class="interpretation-box insig-box">Price trend unavailable: {exc}</div>',
             unsafe_allow_html=True,
         )
 

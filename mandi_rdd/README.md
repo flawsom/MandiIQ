@@ -185,7 +185,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**226 test items passing** (208 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
+**230 test items passing** (212 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -202,6 +202,7 @@ pytest mandi_rdd/tests/ -v
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
 | `test_consumer_check.py` (11 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, plus an unrepaired index fault as a blocker |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_dashboard_data.py` (4 tests) | The dashboard's API-first data access: prices arrive as a usable DataFrame from the API, a silent API yields an empty frame rather than a crash, commodity pickers come from the API before the local warehouse |
 | `test_dashboard_boot.py` (9 tests) | Headless Streamlit run at the production refresh interval (a rerun loop shows up as a run that never settles), one settled run paints the chrome + sidebar + page body with exactly one banner, the shell cannot fix-position its header or hide every button, the live tick throttles its own rerun, a build that cannot date its data is never called healthy, every page imports, route table intact |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
@@ -430,7 +431,9 @@ If you prefer to deploy the dashboard separately on Streamlit Cloud:
 5. Click **Deploy**
 6. After ~5 minutes, you'll get a URL: `https://your-app-name.streamlit.app`
 
-> **Note:** The dashboard connects to a local DuckDB database that must be populated by the scheduler. If you deployed the API on Render, the dashboard will have data after running `POST /refresh`. If deploying dashboard-only, run `python -m mandi_rdd.ingestion.scheduler` locally first to populate the database, then upload it - or point the dashboard to the Render-hosted API.
+> **Note - where the cockpit's data actually comes from.** The DuckDB file is gitignored (`mandi_rdd/data/*.duckdb`), so a Streamlit Cloud deploy has **no local warehouse**: a page that queries DuckDB directly renders an empty state there, no matter how healthy the pipeline is. Price, freshness, RDD, forecast, risk, recommendation and analytics reads therefore go through `dashboard/data_access.py`, which asks the **API** first and only falls back to a local warehouse (the hosted instances hold the real data).
+>
+> Three pages are genuinely warehouse-only and say so in their empty state rather than telling you to run a pipeline you cannot run on the hosted layer: **Discontinuity** and **Risk Map** need the rainfall/district join, and **Deep Dive** runs the pipeline's SQL. Serving those on the hosted dashboard needs the API to publish a rainfall/NDVI series (and a query surface for Deep Dive) - until then, run the dashboard locally against a populated warehouse for that trio.
 
 ---
 
