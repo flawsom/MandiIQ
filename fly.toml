@@ -11,6 +11,9 @@ primary_region = "ord"
   PYTHONPATH = "/app"
   PORT = "8080"
   MANDIIQ_DB_PATH = "/data/mandi_iq.duckdb"
+  # Refresh the warehouse every 30 minutes instead of hourly, so a daily
+  # Agmarknet release is picked up within minutes of landing.
+  MANDIIQ_REFRESH_INTERVAL_MINUTES = "30"
   # Required env vars (set via fly secrets):
   # DATA_GOV_IN_API_KEY
   # GEMINI_API_KEY (optional)

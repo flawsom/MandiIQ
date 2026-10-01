@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420" width="1600" height="420" role="img" aria-label="MandiIQ - causal price intelligence for India's agricultural markets">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#050505"/>
+      <stop offset="55%" stop-color="#080a06"/>
+      <stop offset="100%" stop-color="#0b0d08"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="78%" cy="12%" r="70%">
+      <stop offset="0%" stop-color="#d7ff00" stop-opacity="0.20"/>
+      <stop offset="55%" stop-color="#d7ff00" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#d7ff00" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lime" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d7ff00"/>
+      <stop offset="100%" stop-color="#8fae00"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fill-opacity="0.05"/>
+    </pattern>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.6"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="420" fill="url(#bg)"/>
+  <rect width="1600" height="420" fill="url(#dots)"/>
+  <rect width="1600" height="420" fill="url(#glow)"/>
+  <rect x="0.5" y="0.5" width="1599" height="419" fill="none" stroke="#ffffff" stroke-opacity="0.07"/>
+
+  <!-- mandi skyline: a market roofline, drawn once, very low contrast -->
+  <g opacity="0.13" fill="none" stroke="#d7ff00" stroke-width="1.1">
+    <path d="M980 300 L1050 240 L1120 300 Z"/>
+    <path d="M1120 300 L1190 240 L1260 300 Z"/>
+    <path d="M1260 300 L1330 240 L1400 300 Z"/>
+    <path d="M1400 300 L1470 240 L1540 300 Z"/>
+    <path d="M960 300 H1560" stroke-opacity="0.5"/>
+  </g>
+
+  <!-- mark: warehouse roofline + rising bars -->
+  <g transform="translate(96,96)">
+    <rect x="0" y="0" width="104" height="104" rx="26" fill="#0e1109" stroke="#d7ff00" stroke-opacity="0.35"/>
+    <path d="M20 62 L40 40 L60 62 L84 62" fill="none" stroke="url(#lime)" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <rect x="26" y="70" width="9" height="16" rx="2.5" fill="#d7ff00" fill-opacity="0.55"/>
+    <rect x="41" y="64" width="9" height="22" rx="2.5" fill="#d7ff00" fill-opacity="0.75"/>
+    <rect x="56" y="56" width="9" height="30" rx="2.5" fill="#d7ff00"/>
+    <rect x="71" y="70" width="9" height="16" rx="2.5" fill="#d7ff00" fill-opacity="0.4"/>
+  </g>
+
+  <text x="236" y="150" font-family="Space Grotesk, Inter, Segoe UI, system-ui, sans-serif" font-size="76" font-weight="700" fill="#ffffff" letter-spacing="-1.5">MandiIQ</text>
+  <text x="238" y="186" font-family="IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16.5" fill="#d7ff00" letter-spacing="3.4">CAUSAL PRICE INTELLIGENCE FOR INDIA&#8217;S MANDIS</text>
+
+  <text x="238" y="228" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="17.5" fill="#bababa">A regression-discontinuity engine on the &#8722;19% rainfall-deficiency threshold,</text>
+  <text x="238" y="254" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="17.5" fill="#bababa">served from a live DuckDB warehouse with conformal intervals, drift monitors and tail risk.</text>
+
+  <!-- live pill -->
+  <g transform="translate(1216,54)">
+    <rect x="0" y="0" width="288" height="38" rx="19" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.10"/>
+    <circle cx="24" cy="19" r="5" fill="#2ecc71"/>
+    <circle cx="24" cy="19" r="9" fill="#2ecc71" fill-opacity="0.18"/>
+    <text x="42" y="25" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#bababa">/health &#183; live warehouse fed</text>
+  </g>
+
+  <!-- stat chips -->
+  <g font-family="IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace">
+    <g transform="translate(96,302)">
+      <rect x="0" y="0" width="262" height="72" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.10"/>
+      <text x="22" y="30" font-size="22" font-weight="600" fill="#ffffff">1,994,318</text>
+      <text x="22" y="54" font-size="12.5" fill="#7e7e7e" letter-spacing="1.4">PRICE ROWS IN THE WAREHOUSE</text>
+    </g>
+    <g transform="translate(374,302)">
+      <rect x="0" y="0" width="246" height="72" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.10"/>
+      <text x="22" y="30" font-size="22" font-weight="600" fill="#ffffff">423</text>
+      <text x="22" y="54" font-size="12.5" fill="#7e7e7e" letter-spacing="1.4">COMMODITIES TRACKED</text>
+    </g>
+    <g transform="translate(636,302)">
+      <rect x="0" y="0" width="262" height="72" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.10"/>
+      <text x="22" y="30" font-size="22" font-weight="600" fill="#ffffff">36 / 667</text>
+      <text x="22" y="54" font-size="12.5" fill="#7e7e7e" letter-spacing="1.4">STATES AND DISTRICTS COVERED</text>
+    </g>
+    <g transform="translate(914,302)">
+      <rect x="0" y="0" width="230" height="72" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.10"/>
+      <text x="22" y="30" font-size="22" font-weight="600" fill="#ffffff">45</text>
+      <text x="22" y="54" font-size="12.5" fill="#7e7e7e" letter-spacing="1.4">FASTAPI ROUTES</text>
+    </g>
+    <g transform="translate(1160,302)">
+      <rect x="0" y="0" width="230" height="72" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#d7ff00" stroke-opacity="0.32"/>
+      <text x="22" y="30" font-size="22" font-weight="600" fill="#d7ff00">181</text>
+      <text x="22" y="54" font-size="12.5" fill="#7e7e7e" letter-spacing="1.4">TESTS PASSING</text>
+    </g>
+  </g>
+
+  <rect x="0" y="416" width="1600" height="4" fill="url(#lime)" opacity="0.55"/>
+</svg>

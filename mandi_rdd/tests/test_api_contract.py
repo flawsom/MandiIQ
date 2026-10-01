@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import warnings
+from pathlib import Path
 
 import pytest
 
@@ -99,6 +100,55 @@ def test_health_reports_self_refresh_bookkeeping(app_module):
         "refresh_failures",
         "refresh_interval_s",
     } <= fields
+
+
+def test_recovery_is_only_claimed_by_builds_that_can_survive_it(app_module):
+    """`safe_recovery` is the gate in front of an unattended rebuild of the
+    prices table and a restore from R2. It used to be the literal `True` on
+    every build, so on 2026-10-01 the workflow handed a non-atomic 2.3.0
+    container a rebuild it could not survive (OOM, then `503 no healthy
+    upstream` on every route). It has to come from the running build."""
+    assert app_module._recovery_is_safe() is True  # master advertises 2.4.0
+    floor = app_module.SAFE_RECOVERY_VERSION
+    assert floor == (2, 4, 0)
+    assert app_module._version_tuple("2.3.0") < floor
+    assert app_module._version_tuple("2.4.0") >= floor
+    assert app_module._version_tuple("2.10.0") >= floor
+    assert app_module._version_tuple("2.3.9") < floor
+    assert app_module._version_tuple("3.0.0") >= floor
+    # An unreadable version must fail closed, not inherit the old optimism.
+    assert app_module._version_tuple("") < floor
+    assert app_module._version_tuple(None) < floor
+
+
+def test_auto_heal_refuses_builds_that_cannot_survive_a_rebuild():
+    """The workflow must check the deployed version, not just the flag: a flag
+    already deployed on an old build cannot be corrected by editing the API."""
+    workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/refresh-live-data.yml").read_text(encoding="utf-8")
+    assert "safe_recovery" in workflow
+    assert "if build < (2, 4, 0):" in workflow, "the version gate was removed"
+    assert "/admin/rebuild-prices" in workflow
+    assert "/admin/restore-from-r2" in workflow
+
+
+def test_the_boot_path_does_not_race_the_health_check():
+    """An empty warehouse used to start the full pipeline in its own thread
+    from `lifespan`, i.e. before the readiness probe could pass. That is the
+    heaviest work this service does, and on the 512 MB tier the resulting OOM
+    is a crash loop - which the platform edge reports as `503 no healthy
+    upstream` on every route. The repair belongs to the scheduled refresh and
+    to the admin endpoints, both of which run while the container is serving,
+    and `MANDIIQ_SELF_REFRESH=0` has to mean nothing runs in this container."""
+    source = (
+        Path(__file__).resolve().parents[2] / "mandi_rdd/api/main.py"
+    ).read_text(encoding="utf-8")
+    assert "_auto_pipeline" not in source, "the boot pipeline thread came back"
+    boot = source.split("if should_trigger_pipeline:", 1)[1].split(
+        "metrics_push.start_push_thread()", 1
+    )[0]
+    assert "_self_refresh_enabled()" in boot, "the boot path ignores the self-refresh switch"
+    assert "_self_refresh_initial_delay_s()" in boot, "the boot path no longer defers"
+    assert "run_ingestion" not in boot, "the boot path must not run the pipeline itself"
 
 
 @pytest.mark.parametrize(

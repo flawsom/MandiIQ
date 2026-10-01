@@ -4,10 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>MandiIQ - Heartbeat &amp; Dashboard Monitor</title>
+<meta name="description" content="MandiIQ heartbeat: dashboard cache freshness, hash lineage and recent workflow runs, read live from the production API and GitHub.">
+<link rel="canonical" href="https://mandiiq.unifies.codes/heartbeat-dashboard.html">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@300;400;500;600&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Barlow:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/site.css">
 <style>
 :root{--bg-base:#000;--bg-surface:#0a0a0a;--bg-surface-glass:rgba(255,255,255,0.03);--bg-surface-glass-hover:rgba(255,255,255,0.07);--font-display:"Space Grotesk",system-ui,-apple-system,sans-serif;--font-body:"IBM Plex Sans","Inter",system-ui,sans-serif;--font-mono:"IBM Plex Mono","JetBrains Mono",monospace;--font-numeric:"Barlow","IBM Plex Sans",sans-serif;--color-primary:#d7ff00;--color-paper:#fff;--color-text-high:#bababa;--color-text-med:#7e7e7e;--color-text-low:#555;--color-success:#2ecc71;--color-warning:#f39c12;--color-danger:#e74c3c;--hairline:rgba(255,255,255,0.07);--hairline-strong:rgba(255,255,255,0.14);--duration-base:350ms;--ease-out:cubic-bezier(0.16,1,0.3,1);--space-sm:.5rem;--space-md:1rem;--space-lg:2rem;--space-xl:4rem}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -65,12 +68,13 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 </style>
 </head>
 <body>
+<div data-site-nav></div>
 <div class="dot-grid"></div>
 <div class="container">
 <div class="header">
 <a href="/" class="back-link">&larr; Back to MandiIQ</a>
 <h1><span class="accent">&hearts;</span> Heartbeat &amp; Dashboard Monitor</h1>
-<p>Live status from the hourly heartbeat workflow, dashboard cache freshness, and <code>md5_hash</code> stability tracking.</p>
+<p>Live status from the 30-minute heartbeat workflow, dashboard cache freshness, and <code>md5_hash</code> stability tracking.</p>
 <span class="status-badge" id="liveBadge"><span class="dot gray"></span><span id="liveLabel">Checking...</span></span>
 </div>
 <div class="error-banner" id="errorBanner"><span id="errorMessage">Failed to fetch data.</span><button class="retry" onclick="refreshAll()">Retry</button></div>
@@ -98,12 +102,16 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <li><strong>File Age</strong> - How long since the dashboard JSON file was last modified on disk.</li>
 </ul>
 <p style="margin-top:var(--space-sm);"><strong>Data sources:</strong> <code style="color:var(--color-text-high);">GET /admin/dashboard-status</code> and <code>GET /repos/flawsom/MandiIQ/actions/workflows/dashboard-heartbeat.yml/runs</code>.</p>
-<p style="margin-top:var(--space-sm);">&#8902; A green dot means the last heartbeat checked in within 70 minutes.<br>&#8902; The hash timeline shows stability: repeated identical hashes = no changes; a new hash = dashboard was updated.</p>
-<p style="margin-top:var(--space-sm);color:var(--color-warning);font-size:0.8rem;">⚠️ <strong>CORS note:</strong> If you see a persistent error banner, the Render API may not be sending <code>Access-Control-Allow-Origin</code> headers. The API must allow requests from your domain for this page to work.</p></div></div>
+<p style="margin-top:var(--space-sm);">&#8902; A green dot means the last heartbeat checked in within 70 minutes.<br>&#8902; The hash timeline shows stability: repeated identical hashes = no changes; a new hash = dashboard was updated.<br>&#8902; The footer names the instance that answered this poll; the monitor fails over from the primary to the mirror automatically.</p>
+<p style="margin-top:var(--space-sm);color:var(--color-warning);font-size:0.8rem;">⚠️ <strong>If the banner persists:</strong> this page reads the API cross-origin, so the host in the message must send <code>Access-Control-Allow-Origin</code> for this domain. A 503 there means the instance itself is down rather than misconfigured - the monitor will have tried the other instance first.</p></div></div>
 <div class="last-updated"><span class="live-dot"></span>Last updated: <span id="lastUpdated">just now</span> &middot; <a href="#" onclick="refreshAll();return false;" style="color:var(--color-primary);text-decoration:none;">&#10227; Refresh</a></div>
 </div>
 <script>
-const A='https://p01--mandiiq--x4n8x4gkmzht.code.run',G=A+'/proxy/github/repos/flawsom/MandiIQ',W='dashboard-heartbeat.yml',IV=3e4,STALE=70;let hist=[],lastFetch=null;
+/* Two instances serve this API behind two hostnames; the shared shell probes
+   /health and reports the first that answers, so a platform 503 on the primary
+   no longer blanks the monitor. HOSTS[0] is only the starting guess. */
+const HOSTS=['https://p01--mandiiq--x4n8x4gkmzht.code.run','https://p01--mandiiq--zbvjrztgjqgw.code.run'],W='dashboard-heartbeat.yml',IV=3e4,STALE=70;let A=HOSTS[0],G=A+'/proxy/github/repos/flawsom/MandiIQ',hist=[],lastFetch=null;
+async function useHealthyHost(){const s=window.MandiiqShell;if(!s||!s.resolveApi)return;try{const hit=await s.resolveApi();if(hit&&hit.base){A=hit.base;G=hit.base+'/proxy/github/repos/flawsom/MandiIQ';}}catch(e){/* keep the last known host */}}
 function ago(d){if(!d)return'never';let t=new Date(d);if(isNaN(t))return'never';let s=Math.floor((Date.now()-t)/1e3);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';}
 function fmt(d){if(!d)return'\u2014';let t=new Date(d);return isNaN(t)?'\u2014':t.toLocaleString();}
 async function gs(){let r=await fetch(A+'/admin/dashboard-status');if(!r.ok)throw Error('Status '+r.status);return r.json();}
@@ -131,12 +139,14 @@ function render(d){
  rc.textContent='(last '+d._runs.length+')';let h2='';
  for(let r of d._runs){let cls=r.conclusion==='success'?'ok':r.conclusion==='failure'?'fail':'pending',ic=r.conclusion==='success'?'\u2713':r.conclusion==='failure'?'\u2717':'\u25CC';h2+='<tr><td><a href="'+r.html_url+'" target="_blank" style="color:var(--color-primary);text-decoration:none;">#'+r.run_number+'</a></td><td class="'+cls+'">'+ic+' '+(r.conclusion||'running')+'</td><td>'+r.event+'</td><td class="hash">'+(r.head_commit?r.head_commit.id.slice(0,12):'\u2014')+'</td><td title="'+fmt(r.created_at)+'">'+ago(r.created_at)+'</td></tr>';}
  body.innerHTML=h2;}
-async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;lastFetch=new Date();render(s);document.getElementById('lastUpdated').textContent=lastFetch.toLocaleString();}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message;document.getElementById('errorBanner').style.display='block';}}
+async function refreshAll(){document.getElementById('errorBanner').style.display='none';document.getElementById('workflowBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--color-text-low);"><div class="loading"><div class="spinner"></div>Loading...</div></td></tr>';document.getElementById('hashTimeline').innerHTML='<div class="empty"><div class="loading"><div class="spinner"></div>Fetching...</div></div>';try{await useHealthyHost();let[s,r]=await Promise.all([gs(),gr()]);s._runs=r;lastFetch=new Date();render(s);document.getElementById('lastUpdated').textContent=lastFetch.toLocaleString()+' \u00b7 '+A.replace(/^https:\/\//,'').split('--')[2].replace('.code.run','');}catch(e){console.error(e);document.getElementById('errorMessage').textContent='Failed: '+e.message+' ('+A+')';document.getElementById('errorBanner').style.display='block';}}
 let timer;async function tick(){if(document.hidden)return;await refreshAll();timer=setTimeout(tick,IV);}document.addEventListener("visibilitychange",()=>{if(document.hidden&&timer)clearTimeout(timer);else tick();});tick();
 // Live countdown until next auto-refresh (1s tick)
 setInterval(()=>{if(!lastFetch)return;let rs=document.getElementById('refreshSub');if(!rs)return;let left=Math.max(0,Math.ceil((IV-(Date.now()-lastFetch))/1e3));rs.textContent=document.hidden?'paused':'next refresh in '+left+'s';},1e3);
 </script>
 <!-- Canvas Cursor Effect -->
 <script src="cursor-effect.js"></script>
+<div data-site-footer></div>
+<script src="./assets/site.js"></script>
 </body>
 </html>

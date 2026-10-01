@@ -1,6 +1,12 @@
 # Smart heartbeat that only refreshes the dashboard cache when the file changed.
 #
-# Every 6 hours:
+# Every 30 minutes, to line up with refresh-live-data.yml. The work here is
+# one GET plus a hash comparison, and a webhook only when the hash moved, so
+# running it in step with the real refresh cadence costs nothing and is what
+# makes the heartbeat page's 70-minute staleness threshold mean something.
+# At the old 6-hour cadence the page reported "stale" permanently.
+#
+# Each run:
 #   1. Fetches /admin/dashboard-status from the production API
 #   2. Compares the md5_hash against the last known hash
 #      (stored in a GitHub Actions Variable via `gh variable set/get`)
@@ -23,7 +29,7 @@ name: Dashboard Heartbeat
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # every 6 hours (the API refreshes hourly internally)
+    - cron: "*/30 * * * *"  # every 30 minutes, matching the refresh cadence
   workflow_dispatch:
     inputs:
       reason:

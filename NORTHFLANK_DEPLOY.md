@@ -25,16 +25,17 @@
 # - R2_SECRET_ACCESS_KEY=<your R2 secret key>
 # - R2_BUCKET=mandiiq-data
 # - MANDIIQ_SELF_REFRESH=1                     (optional; disable with 0)
-# - MANDIIQ_REFRESH_INTERVAL_MINUTES=60        (optional; min 5)
+# - MANDIIQ_REFRESH_INTERVAL_MINUTES=30        (optional; min 5)
 # - MANDIIQ_REFRESH_INITIAL_DELAY_S=90         (optional; min 5)
 # - MANDIIQ_PRICE_SOURCES=<mirror|resource_id,..>  (optional; extra price hosts)
 #     api.data.gov.in is always tried first, so this only adds fallbacks - it
 #     never displaces the documented API. Any host must serve the same
 #     data.gov.in response shape ({"records": [...], "total": n}).
-# - MANDIIQ_CEDA_API_KEY=<token>                   (recommended; see below)
-#     Token for the CEDA (Ashoka University) Agmarknet mirror. This is the one
-#     daily Agmarknet host that answers cloud networks, so it is what keeps the
-#     warehouse advancing while api.data.gov.in stays unreachable.
+# - MANDIIQ_CEDA_API_KEY=<token>                   (optional; see below)
+#     Token for the CEDA (Ashoka University) Agmarknet archive. It is the one
+#     Agmarknet host that answers a cloud network, but it is an ARCHIVE - daily
+#     coverage ends around 2025-10 - so it backfills history and cannot make the
+#     newest date current. Arm it to fill gaps, not to restore freshness.
 # - MANDIIQ_CEDA_LOOKBACK_DAYS=7                   (optional)
 # - MANDIIQ_CEDA_MAX_CALLS=150                     (optional)
 # - MANDIIQ_DUCKDB_MEMORY_LIMIT=192MB              (optional; rebuild ceiling)
@@ -72,6 +73,35 @@
 # still serving. `/data-quality` only exists on builds from 2026-09-30 onward.
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Two instances, and which one the site is reading
+# ─────────────────────────────────────────────────────────────────────────────
+# Two services run the same image behind two hostnames:
+#
+#   primary  https://p01--mandiiq--x4n8x4gkmzht.code.run
+#   mirror   https://p01--mandiiq--zbvjrztgjqgw.code.run
+#
+# On 2026-10-01 the primary answered `503 no healthy upstream` on /health, /
+# and /docs while the mirror answered /health normally - the edge had no
+# healthy container behind it. Every docs page and the landing page pointed at
+# the primary alone, so the whole public surface went dark with it.
+# docs/assets/site.js now probes /health on each host in order, remembers the
+# first that answers (sessionStorage), re-points the host-qualified nav and
+# footer links at the winner, and labels the nav LED with the instance - the
+# landing pill and the live console both read it through
+# window.MandiiqShell.resolveApi(). The mirror is a failover, not an equal: it
+# has been observed running an older build than the primary, so when the pages
+# fall back they say so instead of quietly mixing two builds' numbers.
+#
+# Check both by hand:
+#   for h in x4n8x4gkmzht zbvjrztgjqgw; do
+#     curl -s -o /dev/null -w "$h %{http_code}\n" --max-time 15 \
+#       "https://p01--mandiiq--$h.code.run/health"
+#   done
+# A 503 here (rather than a JSON body) is the platform edge reporting no
+# healthy container: it is a service-level restart/deploy problem, not a bug in
+# the pipeline, and no client-side change can fix it.
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Keeping the service awake
 # ─────────────────────────────────────────────────────────────────────────────
 # Free-tier hosts suspend idle services, which is why the first visitor used to
@@ -87,15 +117,19 @@
 #
 # A third, external option is UptimeRobot pointed at /health every 5 minutes.
 #
-# .github/workflows/refresh-live-data.yml triggers POST /refresh hourly and then
-# verifies /health and /data-quality, so a frozen warehouse fails a workflow
-# within the hour instead of going unnoticed for weeks.
+# .github/workflows/refresh-live-data.yml picks whichever instance answers
+# /health, then triggers POST /refresh on it every 15
+# minutes and then verifies /health and /data-quality, so a frozen warehouse
+# fails a workflow within the quarter hour instead of going unnoticed for
+# weeks. A self-throttle step skips a run whose predecessor is younger than
+# MIN_REFRESH_GAP_MINUTES (20), and `force: true` on a manual dispatch bypasses
+# it - so a burst of workflows cannot stack up pipeline runs on a free tier.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Self-refresh (the reason the data was frozen before 2026-09-30)
 # ─────────────────────────────────────────────────────────────────────────────
 # The container refreshes its own warehouse. On boot it waits 90 s and then
-# runs the full pipeline, repeating every 60 minutes. Nothing external has to
+# runs the full pipeline, repeating every 30 minutes. Nothing external has to
 # be alive for the numbers to be current; the GitHub cron is a second belt,
 # not the mechanism.
 #
@@ -120,14 +154,28 @@
 #
 # Tunables (all optional):
 #   MANDIIQ_SELF_REFRESH=0                  disable the in-process scheduler
-#   MANDIIQ_REFRESH_INTERVAL_MINUTES=60     how often it runs (min 5)
+#   MANDIIQ_REFRESH_INTERVAL_MINUTES=30     how often it runs (min 5)
 #   MANDIIQ_REFRESH_INITIAL_DELAY_S=90      delay before the first run (min 5)
+#
+# Boot used to be the exception to all of that. If `prices` looked empty at
+# startup, `lifespan` started the FULL pipeline in its own thread immediately -
+# i.e. the heaviest work this service does began before the readiness probe
+# could pass, on the same 512 MB the probe had to fit in. An OOM there is a
+# crash loop, and the platform edge reports a crash loop as
+# `503 no healthy upstream` on every route, which is unrecoverable from here.
+#
+# That thread is gone. Boot now only logs what it found, and the work goes to
+# whatever runs while the container is already serving: the scheduler tick
+# below (after MANDIIQ_REFRESH_INITIAL_DELAY_S), POST /refresh, or the admin
+# recovery endpoints. MANDIIQ_SELF_REFRESH=0 now means no pipeline runs in the
+# container at all, boot included - so an operator who sets it to stop the
+# in-container rebuilds is no longer surprised by one at startup.
 #
 # Each tick is a full pipeline run (prices + rainfall + NDVI + RDD + forecast).
 # On the 512 MB free tier that is the heaviest thing this service does; if the
 # container starts OOM-restarting, raise MANDIIQ_REFRESH_INTERVAL_MINUTES to
 # 360 rather than disabling the scheduler entirely - the GitHub workflow will
-# still nudge it hourly from outside.
+# still nudge it from outside every 15 minutes.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data integrity operations
@@ -168,7 +216,24 @@
 #     refuses to swap in a backup with zero price rows, and keeps the previous
 #     file as mandi_iq.duckdb.before-restore.
 #
-# The hourly refresh-live-data.yml workflow now runs both of these
+# Both are gated on the build that is actually running, because a flag can be
+# wrong and a version cannot:
+#
+#   * /health.safe_recovery is derived from app.version (>= 2.4.0), not the
+#     literal `True` it used to be. Before that, a build could advertise a
+#     capability it did not have.
+#   * refresh-live-data.yml independently refuses to run recovery unless the
+#     deployed `version` is >= 2.4.0. A flag on an already-deployed build cannot
+#     be corrected by editing this repo, and on 2026-10-01 a 2.3.0 container
+#     with a recorded index fault was sent /admin/rebuild-prices, OOM-killed
+#     during the rebuild, and answered `503 no healthy upstream` on every route
+#     afterwards. Refusing leaves the warehouse stale and serving, which is
+#     recoverable; a crash loop is not.
+#
+# So: deploy 2.4.0 and the next scheduled run clears index_fault_pending by
+# itself. Until then the workflow skips the repair and says why.
+#
+# The refresh-live-data.yml workflow now runs both of these
 # automatically when /health says index_fault_pending, or when n_prices is 0.
 # If the upstream feed (api.data.gov.in) is unreachable, /health reports a
 # degraded run and the warehouse keeps serving what it has - the pipeline
@@ -221,22 +286,63 @@
 # run is reported degraded, /health shows status "stale", and the warehouse
 # keeps serving what it has instead of pretending.
 #
-# The reachable replacement is CEDA (Centre for Economic Data and Analysis,
-# Ashoka University), which republishes Agmarknet from an India-hosted API:
+# CEDA (Centre for Economic Data and Analysis, Ashoka University) is the one
+# Agmarknet mirror that answers a cloud network. It is reachable, it works,
+# and it is NOT a live feed. Measured on 2026-10-01 with a valid token:
 #
 #   POST https://api.ceda.ashoka.edu.in/v1/agmarknet/prices
-#     -> daily {date, commodity_id, census_state_id, census_district_id,
-#               market_id, min_price, max_price, modal_price}
+#     {"commodity_id": 1, "state_id": 0, "from_date": ..., "to_date": ...}
+#     -> {"output": {"type": "success", "message": "Data exists",
+#                     "data": [{date, commodity_id, census_state_id,
+#                               census_district_id, market_id,
+#                               min_price, max_price, modal_price}]}}
 #
-# Request a token at https://api.ceda.ashoka.edu.in/documentation/ (the
-# endpoints answer 401 "no api key passed" without one), set
-# MANDIIQ_CEDA_API_KEY, and the scheduler fills the last
-# MANDIIQ_CEDA_LOOKBACK_DAYS (default 7) of daily prices on any run where the
-# documented feed yields nothing. Rows land in the same `prices` table with
-# market = district name and variety/grade = "Agmarknet daily (CEDA)", so they
-# never collide with the variety-level rows the primary feed writes.
+#   * coverage: full daily rows up to about 2025-10. Every window after that
+#     answers `"message": "No data exists"` with an empty data array
+#     (2025-07: 31 rows; 2025-09: 31 rows; 2025-10: 28 rows; 2025-11 onward: 0).
+#     The archive is roughly eleven months behind, so it can FILL HISTORY but
+#     it can never make the newest date current.
+#   * ids: 453 commodities, 36 states, 640 districts. Onion is 23, Tomato 78,
+#     Wheat 1, Potato 24. Only real ids return rows - an unknown id and an
+#     empty window are indistinguishable in the response.
+#   * rate limit: a short burst of calls earns HTTP 429 with
+#     `Retry-After: 1833`, i.e. a 30 minute lockout. That is why requests are
+#     paced (MANDIIQ_CEDA_MIN_INTERVAL_S, default 1s) and why a long
+#     Retry-After is raised as CedaRateLimited instead of being slept through.
 #
-# Verify both paths from production, without waiting for the next tick:
+# So arming CEDA buys a backfill, not freshness. Set MANDIIQ_CEDA_API_KEY (a
+# token comes from https://api.ceda.ashoka.edu.in/documentation/) when you
+# want to fill gaps in the historical record; it will not close the gap
+# between the newest date in the warehouse and today. Do not describe it as
+# the live fallback in any status page - the honest report is "archive only".
+#
+# Rows land in the same `prices` table with market = district name and
+# variety/grade = "Agmarknet daily (CEDA)", so they never collide with the
+# variety-level rows the primary feed writes. The walk is bounded by
+# MANDIIQ_CEDA_MAX_CALLS and resumable through the same `ingest_cursors`
+# table (`source = 'prices_ceda'`).
+#
+# eNAM (enam.gov.in) answers HTTP 200 from a cloud network and its Agmarknet
+# dashboard is current - the page carries today's date at render time. The data
+# behind it does not. Measured 2026-10-01 from an external network:
+#
+#   * the controller the dashboard's own JavaScript calls is `Agm_ctrl`;
+#     `Ajax_ctrl` only serves the CSV export form. Both return HTTP 500 with an
+#     empty body.
+#   * the dashboard hands out a `ci_session` cookie, and the 500 comes back
+#     with that cookie attached - so it is not a missing-session problem.
+#   * POST and GET, with and without Referer/Origin/X-Requested-With/Accept, at
+#     `/index.php/Agm_ctrl/...` and with a trailing slash: 500 with an empty
+#     body every time, in about one second, from nginx + CodeIgniter.
+#
+# That is the application refusing the caller (a server-side or geo condition),
+# not a malformed request, so eNAM is not a usable live source from here. It is
+# still probed - /admin/source-probe posts the page's own price query with the
+# session it just minted and reports `cookie_minted`, `rows` and a verdict - so
+# if eNAM starts answering, the next probe says so and an adapter is worth
+# writing. Until then the honest reading is: dashboard reachable, data 500.
+#
+# Verify every path from production without waiting for the next tick:
 #
 #   curl -sS "$API/admin/source-probe" | python3 -m json.tool
 #
@@ -245,8 +351,3 @@
 # single verdict field `can_ingest_live_data`. /health also carries
 # `last_price_source` and `mirror_configured`, so "stale because upstream is
 # dark" and "stale because we are misconfigured" stop looking identical.
-#
-# When the CEDA token is set, the fallback runs inside the normal pipeline -
-# no extra cron entry, no manual step. Its walk is bounded by
-# MANDIIQ_CEDA_MAX_CALLS and resumable through the same `ingest_cursors`
-# table (`source = 'prices_ceda'`), so one tick cannot run for hours.

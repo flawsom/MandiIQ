@@ -583,21 +583,30 @@ async def lifespan(app: FastAPI):
             pass
 
     if should_trigger_pipeline:
-        logger.warning("Data is stale or missing - triggering auto-pipeline in background...")
-        
-        def _auto_pipeline():
-            import time as _t
-            _start = _t.time()
-            try:
-                from mandi_rdd.ingestion.scheduler import run_ingestion
-                logger.info("Auto-pipeline starting...")
-                summary = run_ingestion()
-                duration = round(_t.time() - _start, 1)
-                logger.info(f"Auto-pipeline finished in {duration}s: {summary.get('status')}")
-            except Exception as e:
-                logger.error(f"Auto-pipeline failed: {e}")
-        
-        threading.Thread(target=_auto_pipeline, daemon=True).start()
+        # This used to start the FULL pipeline in its own thread the moment the
+        # warehouse looked empty - which is exactly when the container can least
+        # afford it. On the 512 MB free tier that is the heaviest thing this
+        # service does, and it ran before the readiness probe could pass, so an
+        # OOM there is a crash loop the platform edge reports as
+        # `503 no healthy upstream` on every route.
+        #
+        # Repairing an empty warehouse is POST /refresh (bounded by
+        # MANDIIQ_PRICE_FETCH_MAX_SECONDS), POST /admin/rebuild-prices and POST
+        # /admin/restore-from-r2 - all of which run while the container is
+        # already serving. The self-refresh scheduler below picks the work up on
+        # its own schedule, so nothing is lost by not racing the health check.
+        if _self_refresh_enabled():
+            logger.warning(
+                "Data is stale or missing - the self-refresh scheduler will run "
+                "the pipeline in %ss, after the readiness probe can pass",
+                _self_refresh_initial_delay_s(),
+            )
+        else:
+            logger.warning(
+                "Data is stale or missing and MANDIIQ_SELF_REFRESH=0, so this "
+                "container will not run a pipeline; POST /refresh to run one by "
+                "hand, or POST /admin/restore-from-r2 to restore the warehouse"
+            )
 
     metrics_push.start_push_thread()
 
@@ -671,6 +680,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Recovery capability ──
+
+# 2.4.0 is the first build that can repair the warehouse without risking it:
+# the prices rebuild is atomic and memory-capped (mandi_rdd/storage/
+# duckdb_store.py) and the R2 restore streams to disk instead of holding the
+# archive in RAM. The auto-heal workflow refuses to trigger either operation
+# unless the running build advertises this.
+#
+# `safe_recovery` used to be the literal `True` on every build, so the workflow
+# handed a non-atomic 2.3.0 container a rebuild it could not survive. On
+# 2026-10-01 that container crash-looped and the platform edge answered
+# `503 no healthy upstream` on /health, / and /docs. A capability that gates a
+# destructive repair has to be derived from the build that is actually running.
+SAFE_RECOVERY_VERSION = (2, 4, 0)
+
+
+def _version_tuple(value) -> tuple:
+    """Parse "2.4.0" / "2.4.0-rc1" into a comparable (major, minor, patch)."""
+    parts = []
+    for chunk in str(value or "").split("."):
+        digits = "".join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def _recovery_is_safe() -> bool:
+    """Whether THIS build may rebuild or restore the warehouse unattended."""
+    return _version_tuple(getattr(app, "version", None)) >= SAFE_RECOVERY_VERSION
 
 
 # ── Endpoints ──
@@ -763,7 +804,7 @@ async def health():
             last_index_repair=index_repair,
             last_index_check=index_check,
             index_fault_pending=_index_fault_pending(),
-            safe_recovery=True,
+            safe_recovery=_recovery_is_safe(),
             last_price_source=last_price_source,
             mirror_configured=_ceda_configured(),
             refresh_runs=int(_REFRESH_STATE["runs"]),
@@ -884,6 +925,127 @@ async def spec_curve_endpoint(commodity: str, cutoff: float = Query(-19.0)):
         conn.close()
 
 
+@app.post("/admin/backfill-ceda", tags=["Admin"])
+async def admin_backfill_ceda(
+    max_calls: int = Query(25, ge=1, le=400, description="Calls to spend in this pass (paced ~1/s)."),
+    window_days: int = Query(90, ge=1, le=730, description="Days covered by each window."),
+    until_date: Optional[str] = Query(None, description="Stop once the window would end before this date (YYYY-MM-DD)."),
+    commodity: Optional[str] = Query(None, description="Limit the pass to one commodity name."),
+    dry_run: bool = Query(False, description="Read the archive without writing rows."),
+):
+    """Fill history from the CEDA archive, walking backwards from the oldest row.
+
+    The scheduled CEDA step asks for the trailing ``MANDIIQ_CEDA_LOOKBACK_DAYS``
+    window, which is the right question for a live mirror and the wrong one for
+    this one: CEDA's daily coverage stops around 2025-10, so "the last seven
+    days" is a window the archive can never answer. Arming the token therefore
+    changed nothing - every tick asked about the future of a frozen archive.
+
+    A backfill has to ask about the past, so this walks backwards. The window
+    ends the day before the oldest arrival date the warehouse holds; a pass
+    that lands rows moves that date, which is what makes the next pass continue
+    where this one stopped. There is no cursor to drift - the warehouse is the
+    cursor - and re-reading a window is harmless because upserts are idempotent.
+    ``until_date`` (or MANDIIQ_CEDA_BACKFILL_FLOOR, default 2001-01-01) is the
+    floor where the walk stops and reports itself complete.
+
+    Rows land with market = district name and grade "Agmarknet daily (CEDA)",
+    so they are never confused with the variety-level rows the primary feed
+    writes. This endpoint cannot make the newest date current, and does not
+    claim to: it only moves the oldest one.
+    """
+    if not _ceda_configured():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "MANDIIQ_CEDA_API_KEY is not set, so the CEDA archive cannot be "
+                "read. A token comes from "
+                "https://api.ceda.ashoka.edu.in/documentation/"
+            ),
+        )
+
+    from mandi_rdd.ingestion.fetch_ceda import iter_ceda_pages
+    from mandi_rdd.storage.duckdb_store import upsert_prices
+
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        before = _cached_date_quality(conn) or {}
+        oldest_raw = before.get("min_date")
+        if not oldest_raw:
+            return {
+                "status": "no_anchor",
+                "reason": "the warehouse holds no dated price rows to walk back from",
+                "oldest_date": None,
+            }
+
+        oldest = datetime.date.fromisoformat(str(oldest_raw)[:10])
+        window_end = oldest - datetime.timedelta(days=1)
+        floor = datetime.date.fromisoformat(
+            until_date
+            or os.environ.get("MANDIIQ_CEDA_BACKFILL_FLOOR", "2001-01-01")
+        )
+        if window_end < floor:
+            return {
+                "status": "complete",
+                "reason": (
+                    f"the oldest row ({oldest.isoformat()}) is at or before the "
+                    f"floor ({floor.isoformat()}) - nothing older to fetch"
+                ),
+                "oldest_date": oldest.isoformat(),
+                "floor": floor.isoformat(),
+            }
+
+        window_start = window_end - datetime.timedelta(days=max(1, window_days) - 1)
+        cursor: dict = {}
+        seen = 0
+        inserted = 0
+        for page in iter_ceda_pages(
+            lookback_days=window_days,
+            max_calls=max_calls,
+            start_index=0,
+            cursor_out=cursor,
+            commodity_names={commodity.lower()} if commodity else None,
+            window_end=window_end,
+        ):
+            seen += len(page)
+            if not dry_run:
+                inserted += upsert_prices(conn, page)
+
+        after = before if dry_run else (_cached_date_quality(conn) or {})
+        newest_oldest = after.get("min_date")
+        return {
+            "status": "dry_run" if dry_run else "ok",
+            "window": {"from": window_start.isoformat(), "to": window_end.isoformat()},
+            "floor": floor.isoformat(),
+            "oldest_date_before": oldest.isoformat(),
+            "oldest_date_after": newest_oldest,
+            "rows_returned": seen,
+            "rows_written": inserted,
+            # The walk always spends its whole budget unless the host refused
+            # it, so an empty cursor is the signal that it never ran.
+            "requests": max_calls if cursor else 0,
+            "pairs_per_pass": cursor.get("total"),
+            "next_index": cursor.get("offset"),
+            "next_window_end": (
+                (datetime.date.fromisoformat(str(newest_oldest)[:10]) - datetime.timedelta(days=1)).isoformat()
+                if newest_oldest
+                else None
+            ),
+            "hint": (
+                "Call this again to keep walking backwards; each pass moves the "
+                "oldest arrival date in the warehouse. It cannot advance the "
+                "newest date - that needs a live source."
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"backfill failed: {e}")
+    finally:
+        conn.close()
+
+
 @app.post("/admin/rebuild-prices", tags=["Admin"])
 async def admin_rebuild_prices():
     """Rebuild the prices table to clear an inconsistent ART index.
@@ -920,6 +1082,128 @@ async def admin_rebuild_prices():
         conn.close()
 
 
+def _probe_enam(timeout: float = 15.0) -> dict:
+    """Probe eNAM, the last live candidate that answers a cloud network.
+
+    The dashboard (``enam.gov.in/dashboard/agmarknet``) returns HTTP 200 and
+    carries the current date at render time, so the page alone looks like a
+    live feed. The data behind it does not. The controller the dashboard's own
+    JavaScript calls is ``Agm_ctrl`` - ``Ajax_ctrl`` only serves the CSV export
+    form - and both answer HTTP 500 with an empty body on every request shape
+    available from outside India: POST and GET, with and without Referer,
+    Origin, X-Requested-With and Accept, and with the ``ci_session`` cookie
+    minted by that same dashboard a moment earlier. A 500 that fast, on every
+    shape, at every path spelling (``/index.php/...`` and a trailing slash
+    included), is the application refusing the caller rather than the request
+    being malformed.
+
+    So this probe mints the session and posts the page's own price query, and
+    reports what came back instead of calling a reachable page a reachable
+    feed. A JSON body means eNAM can serve rows and an adapter is worth
+    writing; an empty 500 is the evidence that it cannot.
+    """
+    page_url = "https://enam.gov.in/dashboard/agmarknet"
+    data_url = "https://enam.gov.in/Agm_ctrl/trade_data_list"
+    agent = "Mozilla/5.0 (compatible; MandiIQ-source-probe)"
+
+    started = time.monotonic()
+    cookie = None
+    try:
+        page = urllib.request.Request(page_url, headers={"User-Agent": agent})
+        with urllib.request.urlopen(page, timeout=timeout) as response:
+            for raw in response.headers.get_all("Set-Cookie") or []:
+                if raw.startswith("ci_session="):
+                    cookie = raw.split(";", 1)[0]
+                    break
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status": None,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "serves_json": False,
+            "cookie_minted": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "verdict": "the eNAM dashboard itself is unreachable from here",
+        }
+
+    # The window the dashboard sends: the last seven days as DD-MM-YYYY. Every
+    # filter empty, which is what the page does on first paint.
+    today = datetime.date.today()
+    body = (
+        "language=en&stateName=&districtName=&apmcName=&commodityName="
+        f"&fromDate={(today - datetime.timedelta(days=7)).strftime('%d-%m-%Y')}"
+        f"&toDate={today.strftime('%d-%m-%Y')}"
+    ).encode()
+    headers = {
+        "User-Agent": agent,
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": page_url,
+        "Origin": "https://enam.gov.in",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    if cookie:
+        headers["Cookie"] = cookie
+
+    request = urllib.request.Request(data_url, data=body, method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = response.read(262144)
+            elapsed = int((time.monotonic() - started) * 1000)
+            text = payload.decode("utf-8", "replace").lstrip()
+            is_json = text[:1] in "{["
+            rows = None
+            if is_json:
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, dict) and isinstance(parsed.get("data"), list):
+                        rows = len(parsed["data"])
+                except Exception:
+                    rows = None
+            return {
+                "ok": bool(is_json),
+                "status": response.status,
+                "latency_ms": elapsed,
+                "serves_json": is_json,
+                "cookie_minted": bool(cookie),
+                "rows": rows,
+                "controller": "Agm_ctrl/trade_data_list",
+                "verdict": (
+                    f"live candidate - eNAM served {rows if rows is not None else 'a JSON'} "
+                    "row(s); an adapter for it would make the warehouse current"
+                    if is_json
+                    else "answered a page, not data"
+                ),
+            }
+    except urllib.error.HTTPError as exc:
+        return {
+            "ok": False,
+            "status": exc.code,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "serves_json": False,
+            "cookie_minted": bool(cookie),
+            "controller": "Agm_ctrl/trade_data_list",
+            "error": f"HTTP {exc.code}",
+            "verdict": (
+                "the dashboard is up but every data call returns an empty "
+                f"HTTP {exc.code}, session cookie included - not a usable live source"
+                if exc.code >= 500
+                else f"blocked with HTTP {exc.code}"
+            ),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status": None,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "serves_json": False,
+            "cookie_minted": bool(cookie),
+            "controller": "Agm_ctrl/trade_data_list",
+            "error": f"{type(exc).__name__}: {exc}",
+            "verdict": "the data controller is unreachable from this network",
+        }
+
+
 @app.get("/admin/source-probe", tags=["Admin"])
 async def admin_source_probe(timeout: float = 20.0):
     """Ask every configured price source whether it can be reached from here.
@@ -942,7 +1226,12 @@ async def admin_source_probe(timeout: float = 20.0):
             "ceda": {},
             "live_paths": {
                 "data_gov_in": "primary - unreachable from cloud networks",
-                "ceda_mirror": "fallback - reachable, needs MANDIIQ_CEDA_API_KEY",
+                "ceda_mirror": (
+                    "reachable, needs MANDIIQ_CEDA_API_KEY - but ARCHIVE ONLY: "
+                    "measured coverage ends around 2025-10, so it backfills "
+                    "history and cannot make the newest date current"
+                ),
+                "enam": "reachable live dashboard; data endpoints session-gated",
             },
         }
         try:
@@ -962,6 +1251,10 @@ async def admin_source_probe(timeout: float = 20.0):
                 "error": f"{type(exc).__name__}: {exc}",
             }
         try:
+            report["enam"] = _probe_enam(timeout=min(timeout, 15.0))
+        except Exception as exc:  # pragma: no cover - defensive
+            report["enam"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        try:
             status_path = (
                 Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
             )
@@ -977,18 +1270,41 @@ async def admin_source_probe(timeout: float = 20.0):
                 }
         except Exception:
             pass
-        # The verdict the caller actually needs: can this deployment move data?
+        # The verdict the caller actually needs, split in two because the
+        # sources are not interchangeable: one set can move today's date, the
+        # other can only fill the past. Reporting them as a single "can ingest"
+        # boolean is how "the mirror is armed" got mistaken for "the data will
+        # be current".
         data_gov_ok = any(s.get("ok") for s in report["sources"])
         ceda = report.get("ceda") or {}
         ceda_ok = bool(ceda.get("configured") and ceda.get("reachable"))
-        report["can_ingest_live_data"] = bool(data_gov_ok or ceda_ok)
+        enam = report.get("enam") or {}
+        enam_ok = bool(enam.get("ok"))
+
+        report["can_ingest_live_data"] = bool(data_gov_ok or enam_ok)
+        report["can_backfill_history_only"] = bool(ceda_ok and not report["can_ingest_live_data"])
+
         if not report["can_ingest_live_data"]:
-            report["hint"] = (
-                "No reachable price source. api.data.gov.in is blocked from cloud "
-                "networks; request a free token at "
-                "https://api.ceda.ashoka.edu.in/documentation/ and set "
-                "MANDIIQ_CEDA_API_KEY to restore the daily feed."
-            )
+            parts = [
+                "No source measured here can advance the newest date. "
+                "api.data.gov.in is blocked from cloud networks."
+            ]
+            if ceda_ok:
+                parts.append(
+                    "The CEDA mirror is armed and reachable, but its archive ends "
+                    "around 2025-10 - it backfills history and will not close the "
+                    "gap to today."
+                )
+            else:
+                parts.append(
+                    "CEDA is not armed; setting MANDIIQ_CEDA_API_KEY lets it "
+                    "backfill history (token from "
+                    "https://api.ceda.ashoka.edu.in/documentation/)."
+                )
+            enam_verdict = enam.get("verdict")
+            if enam_verdict:
+                parts.append(f"eNAM: {enam_verdict}.")
+            report["hint"] = " ".join(parts)
         return report
 
     return await anyio.to_thread.run_sync(run)

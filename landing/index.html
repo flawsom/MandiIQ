@@ -3,21 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Margin Intelligence System - Loss Prevention Platform</title>
+    <title>MandiIQ - Causal Price Intelligence Platform</title>
+    <meta name="description" content="MandiIQ is causal price intelligence for India's agricultural mandis: a regression-discontinuity engine on the rainfall-deficiency threshold, over a live warehouse of daily mandi prices.">
+    <link rel="canonical" href="https://mandiiq.unifies.codes/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MandiIQ - Causal Price Intelligence Platform">
+    <meta property="og:description" content="Regression discontinuity on the rainfall-deficiency threshold, over a live warehouse of India's mandi prices.">
+    <meta property="og:url" content="https://mandiiq.unifies.codes/">
+    <meta property="og:image" content="https://mandiiq.unifies.codes/social-preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="../docs/assets/site.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ═══════════════════════════════════════════════════════════
-           1. DESIGN TOKENS - MandiIQ Inspired
+           1. DESIGN TOKENS - MandiIQ
            ═══════════════════════════════════════════════════════════ */
         :root {
             --bg-base: #000000;
             --bg-surface: #0a0a0a;
             --bg-glass: rgba(255,255,255,0.03);
             --bg-glass-hover: rgba(255,255,255,0.06);
-            --bg-surface-glass: rgba(255,255,255,0.02);
 
             --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
             --font-body: "IBM Plex Sans", "Inter", system-ui, sans-serif;
@@ -31,6 +39,7 @@
             --color-text-low: #555555;
             --color-rust: #D9663B;
             --color-sage: #8FAE89;
+            --color-warm: #D4A94E;
 
             --hairline: rgba(255,255,255,0.07);
             --hairline-strong: rgba(255,255,255,0.14);
@@ -140,12 +149,49 @@
         }
         .nav-link:hover { color: var(--color-primary); }
 
+        /* ── SlotButton ── */
+        .slot-btn {
+            position: relative; display: inline-block;
+            color: var(--color-paper); text-decoration: none;
+            overflow: hidden;
+            padding: 0.45rem 1.2rem;
+            border: 1px solid var(--hairline-strong); border-radius: 999px;
+            background: transparent; cursor: pointer;
+            font-family: var(--font-mono); font-size: 0.72rem;
+            font-weight: 500; letter-spacing: 0.08em;
+            transition: background-color var(--duration-base) var(--ease-soft),
+                        border-color var(--duration-base) var(--ease-soft);
+        }
+        .slot-btn:hover { background-color: var(--color-primary); border-color: var(--color-primary); }
+        .slot-text-wrapper {
+            position: relative; display: block;
+            transition: transform 0.45s var(--ease-bounce);
+        }
+        .slot-text-default { display: block; transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce); }
+        .slot-text-hover {
+            position: absolute; top: 100%; left: 0; width: 100%; display: block;
+            color: var(--bg-base); font-weight: 600;
+            pointer-events: none; opacity: 0;
+            transform: translateY(-50%) scale(0.95);
+            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
+        }
+        .slot-btn:hover .slot-text-wrapper { transform: translateY(-100%); }
+        .slot-btn:hover .slot-text-default { opacity: 0; transform: scale(0.9); }
+        .slot-btn:hover .slot-text-hover { opacity: 1; transform: translateY(-50%) scale(1); }
+        .slot-btn::after {
+            content: ""; position: absolute; bottom: -1px; left: 50%;
+            width: 0; height: 1px;
+            background: var(--color-primary);
+            transition: width 0.4s var(--ease-bounce), left 0.4s var(--ease-bounce);
+            pointer-events: none;
+        }
+        .slot-btn:hover::after { width: 80%; left: 10%; }
+
         /* ═══════════════════════════════════════════════════════════
            3. HERO
            ═══════════════════════════════════════════════════════════ */
         .hero {
             padding: 5rem 0 3rem;
-            position: relative;
             min-height: 80vh;
             display: flex; flex-direction: column; justify-content: center;
         }
@@ -192,45 +238,18 @@
             font-size: 1.05rem; color: var(--color-text-high);
             max-width: 700px; line-height: 1.7; margin-bottom: 2.5rem;
         }
+        .hero-desc code {
+            font-family: var(--font-mono); font-size: 0.85rem;
+            color: var(--color-primary);
+            background: rgba(215,255,0,0.06);
+            padding: 0.05rem 0.35rem; border-radius: 3px;
+        }
+        .hero-desc a {
+            color: var(--color-primary);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
         .hero-actions { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
-
-        /* ── SlotButton ── */
-        .slot-btn {
-            position: relative; display: inline-block;
-            color: var(--color-paper); text-decoration: none;
-            overflow: hidden;
-            padding: 0.6rem 1.5rem;
-            border: 1px solid var(--hairline-strong); border-radius: 999px;
-            background: transparent; cursor: pointer;
-            font-family: var(--font-mono); font-size: 0.78rem;
-            font-weight: 500; letter-spacing: 0.08em;
-            transition: background-color var(--duration-base) var(--ease-soft),
-                        border-color var(--duration-base) var(--ease-soft);
-        }
-        .slot-btn:hover { background-color: var(--color-primary); border-color: var(--color-primary); }
-        .slot-text-wrapper {
-            position: relative; display: block;
-            transition: transform 0.45s var(--ease-bounce);
-        }
-        .slot-text-default { display: block; transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce); }
-        .slot-text-hover {
-            position: absolute; top: 100%; left: 0; width: 100%; display: block;
-            color: var(--bg-base); font-weight: 600;
-            pointer-events: none; opacity: 0;
-            transform: translateY(-50%) scale(0.95);
-            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
-        }
-        .slot-btn:hover .slot-text-wrapper { transform: translateY(-100%); }
-        .slot-btn:hover .slot-text-default { opacity: 0; transform: scale(0.9); }
-        .slot-btn:hover .slot-text-hover { opacity: 1; transform: translateY(-50%) scale(1); }
-        .slot-btn::after {
-            content: ""; position: absolute; bottom: -1px; left: 50%;
-            width: 0; height: 1px;
-            background: var(--color-primary);
-            transition: width 0.4s var(--ease-bounce), left 0.4s var(--ease-bounce);
-            pointer-events: none;
-        }
-        .slot-btn:hover::after { width: 80%; left: 10%; }
 
         .btn-outline {
             display: inline-block;
@@ -244,7 +263,6 @@
         }
         .btn-outline:hover { color: var(--color-paper); border-color: var(--color-paper); }
 
-        /* Tech Pills */
         .tech-pills {
             display: flex; flex-wrap: wrap; gap: 0.5rem;
             margin-top: 2.5rem;
@@ -278,103 +296,14 @@
             font-family: var(--font-display); font-weight: 400;
             font-size: 1.6rem; color: var(--color-paper);
             text-transform: uppercase; letter-spacing: 0.05em;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-sub {
+            color: var(--color-text-med);
+            margin-bottom: 1.5rem; max-width: 700px;
         }
 
-        /* ── Glass Cards ── */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.2rem; margin-bottom: 3rem;
-        }
-        .glass-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
-            border: 1px solid var(--hairline); border-radius: 8px;
-            padding: 1.6rem;
-            transition: transform 0.35s var(--ease-bounce), border-color 0.35s ease, box-shadow 0.35s ease;
-            position: relative;
-        }
-
-
-        .glass-card::before {
-            content: ""; position: absolute;
-            top: -1px; left: -1px;
-            width: 10px; height: 10px;
-            border-top: 1.5px solid var(--color-primary);
-            border-left: 1.5px solid var(--color-primary);
-            opacity: 0; transition: opacity var(--duration-base) ease;
-            pointer-events: none;
-        }
-        .glass-card::after {
-            content: ""; position: absolute;
-            bottom: -1px; right: -1px;
-            width: 10px; height: 10px;
-            border-bottom: 1.5px solid var(--color-primary);
-            border-right: 1.5px solid var(--color-primary);
-            opacity: 0; transition: opacity var(--duration-base) ease;
-            pointer-events: none;
-        }
-        .glass-card:hover::before, .glass-card:hover::after { opacity: 1; }
-        .glass-card:hover { border-color: rgba(215,255,0,0.15); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-
-        /* ── Glass backdrop (replication prompt §4) ── */
-        .glass {
-            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
-            backdrop-filter: blur(14px) saturate(140%);
-            -webkit-backdrop-filter: blur(14px) saturate(140%);
-            border: 1px solid var(--hairline);
-            border-radius: 8px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            transition: transform 0.35s var(--ease-bounce), box-shadow 0.35s ease, border-color 0.35s ease;
-        }
-        .glass:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 14px 44px rgba(0,0,0,0.7), 0 0 0 1px rgba(215,255,0,0.15);
-            border-color: var(--color-primary);
-        }
-        .card-label {
-            font-family: var(--font-mono); font-size: 0.7rem;
-            color: var(--color-text-med); text-transform: uppercase;
-            letter-spacing: 0.08em; margin-bottom: 0.6rem;
-        }
-        .card-value {
-            font-family: var(--font-mono); font-size: 2rem;
-            font-weight: 500; color: var(--color-paper); line-height: 1.1;
-            margin-bottom: 0.4rem;
-        }
-        .card-value.accent { color: var(--color-primary); }
-        .card-meta { font-size: 0.78rem; color: var(--color-text-med); }
-
-        /* ── Ledger Table ── */
-        .table-responsive {
-            width: 100%; overflow-x: auto;
-            border: 1px solid var(--hairline);
-            background: rgba(10,10,10,0.4); border-radius: 4px;
-        }
-        .ledger { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-        .ledger th {
-            padding: 0.9rem 1.2rem; color: var(--color-paper);
-            border-bottom: 1px solid var(--hairline-strong);
-            font-family: var(--font-mono); font-size: 0.7rem;
-            text-transform: uppercase; letter-spacing: 0.08em;
-            font-weight: 500; background: rgba(0,0,0,0.3);
-            text-align: left;
-        }
-        .ledger th:last-child { text-align: right; }
-        .ledger td {
-            padding: 0.9rem 1.2rem; color: var(--color-text-high);
-            border-bottom: 1px solid var(--hairline);
-        }
-        .ledger td:last-child { text-align: right; font-family: var(--font-mono); font-weight: 500; }
-        .ledger tr:last-child td { border-bottom: none; }
-        .ledger tbody tr:hover td { background: rgba(255,255,255,0.015); color: var(--color-paper); }
-        .loss { color: var(--color-rust); }
-        .profit { color: var(--color-sage); }
-        .muted { color: var(--color-text-low); }
-
-        /* ═══════════════════════════════════════════════════════════
-           5. CLIFF CHART
-           ═══════════════════════════════════════════════════════════ */
+        /* ── Chart Card ── */
         .chart-card {
             background: rgba(10,10,10,0.4);
             border: 1px solid var(--hairline); border-radius: 8px;
@@ -382,138 +311,152 @@
         }
         .chart-card svg { width: 100%; height: auto; display: block; }
 
-        /* ═══════════════════════════════════════════════════════════
-           6. FOOTER
-           ═══════════════════════════════════════════════════════════ */
-        footer {
-            padding: 2.5rem 0; display: flex;
-            align-items: center; justify-content: space-between;
-            font-family: var(--font-mono); font-size: 0.7rem;
-            color: var(--color-text-low); letter-spacing: 0.05em;
+        /* ── RDD Scatter Point Reveal Animation ──
+           Each point fades in sequentially after the frame-drawing completes.
+           sp-0 through sp-10 with 100ms stagger. Points start invisible.
+           ============================================================ */
+        @keyframes pointReveal {
+            0%   { opacity: 0; transform: scale(0); }
+            60%  { opacity: 0.9; transform: scale(1.15); }
+            100% { opacity: 1; transform: scale(1); }
         }
-        .footer-links { display: flex; gap: 1.5rem; }
-        .footer-link {
-            color: var(--color-text-med); text-decoration: none;
-            text-transform: uppercase;
-            transition: color var(--duration-base) var(--ease-soft);
+        .rdd-point {
+            opacity: 0;
+            animation: pointReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transform-box: fill-box;
+            transform-origin: center;
         }
-        .footer-link:hover { color: var(--color-primary); }
+        .sp-0  { animation-delay: 2.8s; }
+        .sp-1  { animation-delay: 2.9s; }
+        .sp-2  { animation-delay: 3.0s; }
+        .sp-3  { animation-delay: 3.1s; }
+        .sp-4  { animation-delay: 3.2s; }
+        .sp-5  { animation-delay: 3.3s; }
+        .sp-6  { animation-delay: 3.4s; }
+        .sp-7  { animation-delay: 3.5s; }
+        .sp-8  { animation-delay: 3.6s; }
+        .sp-9  { animation-delay: 3.7s; }
+        .sp-10 { animation-delay: 3.8s; }
 
-        /* ═══════════════════════════════════════════════════════════
-           7. SCROLL REVEAL
-           ═══════════════════════════════════════════════════════════ */
-        .reveal {
-            opacity: 0; transform: translateY(30px);
-            transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1),
-                        transform 0.8s cubic-bezier(0.16,1,0.3,1);
+        /* Error bars follow their corresponding point */
+        .rdd-ebar {
+            opacity: 0;
+            animation: ebarReveal 0.35s ease-out forwards;
         }
-        .reveal.is-visible { opacity: 1; transform: translateY(0); }
+        @keyframes ebarReveal {
+            0%   { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        .eb-0  { animation-delay: 2.85s; }
+        .eb-1  { animation-delay: 3.05s; }
+        .eb-2  { animation-delay: 3.25s; }
+        .eb-3  { animation-delay: 3.45s; }
+        .eb-4  { animation-delay: 3.65s; }
+        .eb-5  { animation-delay: 3.85s; }
 
-        /* ── Crosshair Panel (replication prompt §3) ── */
-        .crosshair-panel { position: relative; border: 1px solid var(--hairline); background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 4px; }
-        .crosshair-panel::before {
-            content: ""; position: absolute; top: 0; left: 0;
-            width: 8px; height: 8px;
-            border-top: 1px solid var(--color-primary);
-            border-left: 1px solid var(--color-primary);
-            pointer-events: none;
+        /* Regression lines animate after points */
+        @keyframes lineDraw {
+            0%   { stroke-dashoffset: 1000; opacity: 0; }
+            50%  { opacity: 0.5; }
+            100% { stroke-dashoffset: 0; opacity: 1; }
         }
-        .crosshair-panel::after {
-            content: ""; position: absolute; top: 0; right: 0;
-            width: 8px; height: 8px;
-            border-top: 1px solid var(--color-primary);
-            border-right: 1px solid var(--color-primary);
-            pointer-events: none;
+        .rdd-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            opacity: 0;
+            animation: lineDraw 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .crosshair-panel-inner::before {
-            content: ""; position: absolute; bottom: 0; left: 0;
-            width: 8px; height: 8px;
-            border-bottom: 1px solid var(--color-primary);
-            border-left: 1px solid var(--color-primary);
-            pointer-events: none;
-        }
-        .crosshair-panel-inner::after {
-            content: ""; position: absolute; bottom: 0; right: 0;
-            width: 8px; height: 8px;
-            border-bottom: 1px solid var(--color-primary);
-            border-right: 1px solid var(--color-primary);
-            pointer-events: none;
-        }
+        .l-0 { animation-delay: 3.5s; }
+        .l-1 { animation-delay: 3.8s; }
 
-        /* ── Gradient Text (replication prompt) ── */
-        .gradient-text {
-            background: linear-gradient(110deg, var(--color-primary) 0%, var(--color-paper) 50%, var(--color-primary) 100%);
-            background-size: 200% 200%;
-            -webkit-background-clip: text; background-clip: text;
-            -webkit-text-fill-color: transparent; color: transparent;
-            animation: gradient-pan 9s ease infinite;
-        }
-        @keyframes gradient-pan {
-            0%   { background-position: 0% 50%; }
-            50%  { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        /* ── Entrance Animations + Stagger (replication prompt) ── */
-        .fade-in-left { opacity: 0; transform: translateX(-20px); transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-bounce); }
-        .fade-in-right { opacity: 0; transform: translateX(20px); transition: opacity 0.6s var(--ease-soft), transform 0.6s var(--ease-bounce); }
-        .scale-in { opacity: 0; transform: scale(0.92); transition: opacity 0.5s var(--ease-soft), transform 0.5s var(--ease-bounce); }
-        .fade-in-left.is-visible, .fade-in-right.is-visible, .scale-in.is-visible { opacity: 1; transform: none; }
-        .stagger-1 { transition-delay: 0.05s; }
-        .stagger-2 { transition-delay: 0.1s; }
-        .stagger-3 { transition-delay: 0.15s; }
-        .stagger-4 { transition-delay: 0.2s; }
-
-        /* ── Live Dot (replication prompt companion) ── */
-        .live-dot {
-            display: inline-block; width: 8px; height: 8px;
-            border-radius: 50%;
-            background: var(--color-sage);
-            box-shadow: 0 0 0 0 rgba(143,174,137,0.6);
-            animation: live-pulse 2.4s ease-out infinite;
-            margin-right: 6px; vertical-align: middle;
-        }
-        @keyframes live-pulse {
-            0%   { box-shadow: 0 0 0 0 rgba(143,174,137,0.6); }
-            70%  { box-shadow: 0 0 0 10px rgba(143,174,137,0); }
-            100% { box-shadow: 0 0 0 0 rgba(143,174,137,0); }
-        }
-
-        /* ── Surface Mode (replication prompt §8) ── */
-        .theme-surface {
-            --bg-base: #111111;
-            --bg-surface: #1a1a1a;
-            --bg-glass: rgba(255,255,255,0.025);
-            --bg-glass-hover: rgba(255,255,255,0.05);
-            --hairline: rgba(255,255,255,0.06);
-            --hairline-strong: rgba(255,255,255,0.12);
-        }
-        .theme-surface .atmosphere-flash { background: radial-gradient(circle, rgba(215,255,0,0.04) 0%, transparent 70%); }
-        .theme-surface .atmosphere-cloud { background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, transparent 70%); }
-        .theme-surface .dot-grid { background-image: radial-gradient(rgba(255,255,255,0.035) 1.5px, transparent 2px); }
-
-        /* ── Reduced Motion ── */
         @media (prefers-reduced-motion: reduce) {
-            .reveal, .fade-in-left, .fade-in-right, .scale-in { opacity: 1 !important; transform: none !important; transition: none !important; }
-            .atmosphere-flash, .atmosphere-cloud, .atmosphere-drifter, .gradient-text, .live-dot { animation: none !important; }
-            .hero-frame-svg rect, .hero-frame-svg line { animation: none !important; stroke-dashoffset: 0; }
+            .rdd-point, .rdd-ebar, .rdd-line {
+                opacity: 1;
+                animation: none !important;
+            }
         }
 
-        /* ═══════════════════════════════════════════════════════════
-           8. RESPONSIVE
-           ═══════════════════════════════════════════════════════════ */
-        @media (max-width: 600px) {
-            .page-wrap { padding: 0 1.2rem; }
-            header { flex-direction: column; gap: 1rem; align-items: flex-start; }
-            nav { width: 100%; justify-content: flex-start; gap: 1rem; }
-            .hero { padding: 3rem 0 2rem; min-height: auto; }
-            .hero-frame { padding: 1.2rem; }
-            .hero h1 { font-size: 1.6rem; }
-            .kpi-grid { grid-template-columns: 1fr; }
-            .ledger th, .ledger td { padding: 0.6rem 0.8rem; font-size: 0.8rem; }
-            footer { flex-direction: column; gap: 1rem; text-align: center; }
+        /* ── Ledger Table ── */
+        .table-responsive {
+            width: 100%; overflow-x: auto;
+            border: 1px solid var(--hairline);
+            background: rgba(10,10,10,0.4); border-radius: 4px;
         }
-            /* Mermaid diagram wrapper */
+        .ledger { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .ledger th {
+            padding: 0.85rem 1.2rem; color: var(--color-paper);
+            border-bottom: 1px solid var(--hairline-strong);
+            font-family: var(--font-mono); font-size: 0.68rem;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            font-weight: 500; background: rgba(0,0,0,0.3);
+            text-align: left;
+        }
+        .ledger th:last-child { text-align: right; }
+        .ledger td {
+            padding: 0.85rem 1.2rem; color: var(--color-text-high);
+            border-bottom: 1px solid var(--hairline);
+        }
+        .ledger td:last-child { text-align: right; font-family: var(--font-mono); font-weight: 500; }
+        .ledger tr:last-child td { border-bottom: none; }
+        .ledger tbody tr:hover td { background: rgba(255,255,255,0.015); color: var(--color-paper); }
+        .loss { color: var(--color-rust); }
+        .profit { color: var(--color-primary); }
+        .muted { color: var(--color-text-low); }
+        .warm { color: var(--color-warm); }
+
+        /* ── Robustness Grid ── */
+        .robustness-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .robo-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
+            border: 1px solid var(--hairline); border-radius: 8px;
+            padding: 1.5rem;
+            transition: border-color 0.35s ease, transform 0.35s var(--ease-bounce);
+            position: relative;
+        }
+        .robo-card::before {
+            content: ""; position: absolute;
+            top: -1px; right: -1px;
+            width: 8px; height: 8px;
+            border-top: 1.5px solid rgba(215,255,0,0.2);
+            border-right: 1.5px solid rgba(215,255,0,0.2);
+            opacity: 0; transition: opacity 0.4s ease;
+            pointer-events: none;
+        }
+        .robo-card:hover::before { opacity: 1; }
+        .robo-card:hover { border-color: rgba(215,255,0,0.12); transform: translateY(-2px); }
+        .robo-title {
+            font-family: var(--font-mono); font-size: 0.72rem;
+            color: var(--color-text-med); text-transform: uppercase;
+            letter-spacing: 0.06em; margin-bottom: 0.3rem;
+        }
+        .robo-status { font-size: 0.9rem; font-weight: 500; }
+        .robo-desc { font-size: 0.78rem; color: var(--color-text-med); margin-top: 0.3rem; }
+
+        /* ── Architecture Flow ── */
+        .arch-flow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 0.4rem; flex-wrap: wrap;
+            padding: 1.5rem;
+            background: rgba(10,10,10,0.3);
+            border: 1px solid var(--hairline); border-radius: 8px;
+        }
+        .arch-node {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--hairline); border-radius: 6px;
+            padding: 0.5rem 0.9rem;
+            font-size: 0.7rem; font-family: var(--font-mono);
+            color: var(--color-text-med); text-align: center;
+        }
+        .arch-node .node-icon { font-size: 0.9rem; display: block; margin-bottom: 0.15rem; }
+        .arch-node.highlight { border-color: var(--color-primary); color: var(--color-primary); }
+        .arch-arrow { color: var(--color-text-low); font-size: 1rem; font-family: var(--font-mono); }
+
+        /* Mermaid diagram wrapper */
         .mermaid-wrapper {
             background: rgba(0,0,0,0.3);
             border-radius: 12px;
@@ -526,7 +469,54 @@
             font-family: "Space Grotesk", "Inter", sans-serif;
         }
 
-</style>
+        /* ── AI Chat Code Block ── */
+        .code-block {
+            font-family: var(--font-mono); font-size: 0.78rem;
+            line-height: 1.7; overflow-x: auto;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           5. FOOTER
+           ═══════════════════════════════════════════════════════════ */
+        footer {
+            padding: 2.5rem 0;
+            font-family: var(--font-mono); font-size: 0.7rem;
+            color: var(--color-text-low); letter-spacing: 0.05em;
+        }
+        .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .footer-link {
+            color: var(--color-text-med); text-decoration: none;
+            text-transform: uppercase;
+            transition: color var(--duration-base) var(--ease-soft);
+        }
+        .footer-link:hover { color: var(--color-primary); }
+
+        /* ═══════════════════════════════════════════════════════════
+           6. SCROLL REVEAL
+           ═══════════════════════════════════════════════════════════ */
+        .reveal {
+            opacity: 0; transform: translateY(30px);
+            transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1),
+                        transform 0.8s cubic-bezier(0.16,1,0.3,1);
+        }
+        .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+        /* ═══════════════════════════════════════════════════════════
+           7. RESPONSIVE
+           ═══════════════════════════════════════════════════════════ */
+        @media (max-width: 600px) {
+            .page-wrap { padding: 0 1.2rem; }
+            header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+            nav { width: 100%; gap: 1rem; flex-wrap: wrap; }
+            .hero { padding: 3rem 0 2rem; min-height: auto; }
+            .hero-frame { padding: 1.2rem; }
+            .hero h1 { font-size: 1.6rem; }
+            .robustness-grid { grid-template-columns: 1fr; }
+            .arch-flow { flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); }
+            .ledger th, .ledger td { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
+        }
+    </style>
     <!-- Mermaid.js for architecture diagrams -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
@@ -553,17 +543,14 @@
 </head>
 <body>
 
-    <!-- Atmosphere / Dot Grid Layer -->
+    <!-- Atmosphere Layer -->
     <div class="dot-grid" aria-hidden="true"></div>
     <div class="atmosphere" aria-hidden="true">
         <div class="atmosphere-flash"></div>
         <div class="atmosphere-cloud"></div>
-        <div class="atmosphere-drifter" style="--x:20%;--y:30%;--s:160px;--d:28s;--op:0.05"></div>
-        <div class="atmosphere-drifter" style="--x:70%;--y:20%;--s:120px;--d:38s;--hue:80;--op:0.04"></div>
-        <div class="atmosphere-drifter" style="--x:50%;--y:75%;--s:180px;--d:42s;--op:0.035"></div>
-        <!-- Two additional drifters per replication prompt: 5 total for full ambient coverage -->
-        <div class="atmosphere-drifter" style="--x:88%;--y:12%;--s:130px;--d:45s;--hue:120;--op:0.035"></div>
-        <div class="atmosphere-drifter" style="--x:8%;--y:65%;--s:100px;--d:30s;--op:0.03"></div>
+        <div class="atmosphere-drifter" style="--x:15%;--y:25%;--s:170px;--d:26s;--op:0.05"></div>
+        <div class="atmosphere-drifter" style="--x:80%;--y:15%;--s:110px;--d:36s;--hue:80;--op:0.045"></div>
+        <div class="atmosphere-drifter" style="--x:45%;--y:80%;--s:190px;--d:44s;--op:0.03"></div>
     </div>
 
     <div class="page-wrap">
@@ -572,16 +559,23 @@
         <header>
             <div class="logo-group">
                 <div class="logo-icon"></div>
-                <span class="logo-text">Margin IQ</span>
+                <span class="logo-text">MandiIQ</span>
             </div>
             <nav>
                 <a class="nav-link" href="#findings" data-scramble>Findings</a>
-                <a class="nav-link" href="#cliff" data-scramble>The Cliff</a>
-                <a class="nav-link" href="https://github.com/flawsom/Margin-Intelligence-System" target="_blank" data-scramble>GitHub</a>
-                <a href="#dashboard" class="slot-btn" style="padding:0.45rem 1.2rem;font-size:0.72rem;">
+                <a class="nav-link" href="#rdd" data-scramble>Causal RDD</a>
+                <a class="nav-link" href="../docs/live.html" data-scramble>Live console</a>
+                <a class="nav-link" href="../docs/heartbeat-dashboard.html" data-scramble>Heartbeat</a>
+                <a class="nav-link" href="https://github.com/flawsom/MandiIQ" target="_blank" data-scramble>GitHub</a>
+                <span class="site-nav__status" data-shell-status="" data-state=""
+                      style="margin-left:6px"
+                      title="Fetching live status from the production API">
+                    <span class="led" aria-hidden="true"></span>connecting
+                </span>
+                <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn">
                     <span class="slot-text-wrapper">
                         <span class="slot-text-default">Dashboard</span>
-                        <span class="slot-text-hover">Launch App →</span>
+                        <span class="slot-text-hover">Open App →</span>
                     </span>
                 </a>
             </nav>
@@ -597,128 +591,108 @@
                     <line x1="50" y1="0" x2="50" y2="5" />
                     <line x1="50" y1="95" x2="50" y2="100" />
                 </svg>
-                <div class="hero-tagline">Superstore Margin Intelligence v2.0</div>
-                <h1>1 in 5 orders <span class="hl-loss">lost money</span>.<br>This system catches them <span class="hl">before they ship</span>.</h1>
+                <div class="hero-tagline">MandiIQ - Mandi Price Intelligence System v1.0</div>
+                <h1>Rainfall crosses <span class="hl-loss">−19%</span> →<br>onion prices <span class="hl" data-live="rdd-headline">show no jump (p = 0.28)</span></h1>
                 <p class="hero-desc">
-                    A production-grade MLOps system that predicts unprofitable discounts,
-                    recommends safe pricing ceilings, and forecasts demand - deployed as a live, monitored API.
-                    Built on the Tableau Sample Superstore dataset.
+                    Automated causal inference + predictive ML + prescriptive recommendations + AI orchestration
+                    on Indian mandi prices. Data sourced daily from <code>data.gov.in</code>
+                    and IMD rainfall records. RDD cutoff at <strong>−19% rainfall deficiency</strong>
+                    (official IMD classification) returns <strong><span data-live="rdd-effect">+₹101</span>, <span data-live="rdd-p">p = 0.28</span></strong> on the current
+                    warehouse - <span data-live="rdd-verdict">no statistically significant discontinuity</span>, and the 30-specification
+                    curve <span data-live="spec-verdict">agrees (0/30 significant, verdict <em>fragile</em>)</span>. Fully automated, nightly, zero manual intervention.
+                    Powered by <strong>OpenRouter</strong> free-tier multi-model AI routing.
+                    <a href="#ask">Ask MandiIQ →</a>
                 </p>
                 <div class="hero-actions">
-                    <a href="#" id="dashboard-link" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
+                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
                         <span class="slot-text-wrapper">
-                            <span class="slot-text-default">Open Interactive Simulator</span>
-                            <span class="slot-text-hover">Launch Dashboard →</span>
+                            <span class="slot-text-default">Open Interactive Dashboard</span>
+                            <span class="slot-text-hover">Launch MandiIQ →</span>
                         </span>
                     </a>
-                    <a href="#cliff" class="btn-outline">Explore Findings</a>
+                    <a href="#rdd" class="btn-outline">Explore RDD Findings</a>
                 </div>
                 <div class="tech-pills">
-                    <span class="tech-pill">Python</span>
-                    <span class="tech-pill">FastAPI</span>
-                    <span class="tech-pill">Streamlit</span>
-                    <span class="tech-pill">XGBoost</span>
-                    <span class="tech-pill">SHAP</span>
-                    <span class="tech-pill">Prophet</span>
+                    <span class="tech-pill">Regression Discontinuity</span>
+                    <span class="tech-pill">Causal Inference</span>
                     <span class="tech-pill">DuckDB</span>
-                    <span class="tech-pill">MLflow</span>
-                    <span class="tech-pill">Docker</span>
+                    <span class="tech-pill">FastAPI</span>
+                    <span class="tech-pill">XGBoost</span>
+                    <span class="tech-pill">Prophet</span>
+                    <span class="tech-pill">OpenRouter</span>
                 </div>
             </div>
         </section>
 
-        <!-- ── Cliff Chart Section ── -->
-        <section id="cliff" class="reveal">
-            <span class="section-label">01 / The Margin Cliff</span>
-            <h2 class="section-title">Where Discounts Destroy Profit</h2>
-            <p style="color:var(--color-text-med);margin-bottom:1.5rem;max-width:700px;">
-                Average profit margin by discount tier. The 20% threshold is where margin flips from
-                positive to negative - the single most important number in the dataset.
+        <!-- ── RDD Discontinuity Plot ── -->
+        <section id="rdd" class="reveal">
+            <span class="section-label">01 / Causal Discontinuity</span>
+            <h2 class="section-title">The Rainfall-Deficiency Cliff</h2>
+            <p class="section-sub">
+                Average onion modal price (₹/quintal) by rainfall departure from normal.
+                The <strong>−19% threshold</strong> is IMD's official classification for
+                "deficient" rainfall - and on the current warehouse the live estimate
+                there is <strong><span data-live="rdd-effect">+₹101</span> with <em>p</em> = <span data-live="rdd-p-bare">0.28</span></strong>: <span data-live="rdd-verdict">no statistically
+                significant jump</span>, with <span data-live="spec-count">0 of 30 specifications significant</span>.
             </p>
+            <p class="section-sub" id="engine-note" style="font-family:var(--font-mono,monospace);font-size:0.78rem;"></p>
             <div class="chart-card">
-                <svg viewBox="0 0 600 240" role="img" aria-label="Line chart showing profit margin declining from +29.5% at 0% discount to -77.4% at 41%+ discount, with the 20% threshold marked as the crossing point.">
-                    <line x1="60" y1="30" x2="60" y2="210" stroke="var(--hairline)" stroke-width="1"/>
-                    <line x1="60" y1="210" x2="560" y2="210" stroke="var(--hairline)" stroke-width="1"/>
-                    <line x1="60" y1="85" x2="560" y2="85" stroke="var(--hairline)" stroke-width="0.5" stroke-dasharray="4,4"/>
-                    <line x1="60" y1="145" x2="560" y2="145" stroke="var(--hairline)" stroke-width="0.5" stroke-dasharray="4,4"/>
-                    <line x1="60" y1="118" x2="560" y2="118" stroke="var(--hairline-strong)" stroke-width="1" stroke-dasharray="2,3"/>
-                    <text x="555" y="115" fill="var(--color-text-low)" font-size="10" font-family="IBM Plex Mono, monospace">0%</text>
-                    <polyline points="110,42 260,78 410,148 530,205" fill="none" stroke="var(--color-rust)" stroke-width="2.5" stroke-linejoin="round"/>
-                    <circle cx="110" cy="42" r="4" fill="var(--color-rust)"/>
-                    <circle cx="260" cy="78" r="4" fill="var(--color-rust)"/>
-                    <circle cx="410" cy="148" r="4" fill="var(--color-rust)"/>
-                    <circle cx="530" cy="205" r="4" fill="var(--color-rust)"/>
-                    <line x1="260" y1="60" x2="260" y2="218" stroke="var(--color-primary)" stroke-width="1.5" stroke-dasharray="6,3"/>
-                    <text x="235" y="230" fill="var(--color-primary)" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">20% threshold</text>
-                    <text x="80" y="45" fill="var(--color-sage)" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">+29.5%</text>
-                    <text x="230" y="72" fill="var(--color-text-med)" font-size="9" font-family="IBM Plex Mono, monospace">+14.8%</text>
-                    <text x="380" y="143" fill="var(--color-rust)" font-size="9" font-family="IBM Plex Mono, monospace">−3.2%</text>
-                    <text x="505" y="202" fill="var(--color-rust)" font-size="9" font-family="IBM Plex Mono, monospace">−77.4%</text>
-                    <text x="110" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">0%</text>
-                    <text x="260" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">1–20%</text>
-                    <text x="410" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">21–40%</text>
-                    <text x="530" y="232" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">41%+</text>
-                    <text x="10" y="130" fill="var(--color-text-low)" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle" transform="rotate(-90,10,130)">Margin %</text>
+                <svg viewBox="0 0 700 280" role="img" aria-label="RDD discontinuity plot">
+                    <line x1="65" y1="30" x2="65" y2="225" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <line x1="65" y1="225" x2="640" y2="225" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <line x1="65" y1="65" x2="640" y2="65" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="105" x2="640" y2="105" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="145" x2="640" y2="145" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="185" x2="640" y2="185" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="305" y1="30" x2="305" y2="240" stroke="#d7ff00" stroke-width="2" stroke-dasharray="6,4"/>
+                    <line x1="65" y1="105" x2="640" y2="105" stroke="rgba(255,255,255,0.14)" stroke-width="0.8" stroke-dasharray="2,4"/>
+                    <circle class="rdd-point sp-0" cx="105" cy="162" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-1" cx="145" cy="148" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-2" cx="185" cy="155" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-3" cx="225" cy="140" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-4" cx="265" cy="145" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-5" cx="345" cy="92" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-6" cx="385" cy="88" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-7" cx="425" cy="78" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-8" cx="465" cy="72" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-9" cx="505" cy="65" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-10" cx="545" cy="62" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <line class="rdd-ebar eb-0" x1="105" y1="155" x2="105" y2="169" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-1" x1="185" y1="148" x2="185" y2="162" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-2" x1="265" y1="138" x2="265" y2="152" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-3" x1="385" y1="80" x2="385" y2="96" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-4" x1="465" y1="64" x2="465" y2="80" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-5" x1="545" y1="54" x2="545" y2="70" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-line l-0" x1="85" y1="148" x2="305" y2="142" stroke="#8FAE89" stroke-width="2.5" stroke-linecap="round"/>
+                    <line class="rdd-line l-1" x1="305" y1="95" x2="600" y2="52" stroke="#D9663B" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="290" y1="142" x2="290" y2="95" stroke="#d7ff00" stroke-width="2" stroke-dasharray="3,3"/>
+                    <text x="165" y="112" fill="#d7ff00" font-size="11" font-family="IBM Plex Mono, monospace" font-weight="600" data-live="svg-rdd">⚠ No sig. jump: ₹101</text>
+                    <text x="275" y="250" fill="#d7ff00" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">Cutoff: −19%</text>
+                    <text x="55" y="68" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹2,000</text>
+                    <text x="55" y="108" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹1,600</text>
+                    <text x="55" y="148" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹1,200</text>
+                    <text x="55" y="188" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹800</text>
+                    <text x="105" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−40%</text>
+                    <text x="185" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−30%</text>
+                    <text x="385" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−10%</text>
+                    <text x="465" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">0%</text>
+                    <text x="545" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">+10%</text>
+                    <text x="10" y="130" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle" transform="rotate(-90,10,130)">Avg Modal Price (₹/qtl)</text>
+                    <text x="350" y="262" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">Rainfall Departure from Normal (%)</text>
+                    <text x="610" y="68" fill="#8FAE89" font-size="9" font-family="IBM Plex Mono, monospace" font-weight="500" text-anchor="end">p = 0.277</text>
+                    <text x="610" y="82" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace" text-anchor="end">not significant</text>
+                    <rect x="460" y="8" width="12" height="3" rx="1.5" fill="#8FAE89"/>
+                    <text x="478" y="13" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace">Normal rainfall</text>
+                    <rect x="565" y="8" width="12" height="3" rx="1.5" fill="#D9663B"/>
+                    <text x="583" y="13" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace">Deficient</text>
                 </svg>
-            </div>
-        </section>
-
-        <!-- ── KPI Dashboard Preview ── -->
-        <section id="dashboard" class="reveal">
-            <span class="section-label">02 / System Metrics</span>
-            <h2 class="section-title">Live Performance Ledger</h2>
-            <div class="kpi-grid">
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Loss Rate</div>
-                    <div class="card-value accent">18.7%</div>
-                    <div class="card-meta">of all orders unprofitable</div>
-                </div>
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Margin at 0% Discount</div>
-                    <div class="card-value">+29.5%</div>
-                    <div class="card-meta">full-price orders</div>
-                </div>
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Margin at 41%+ Discount</div>
-                    <div class="card-value" style="color:var(--color-rust);">−77.4%</div>
-                    <div class="card-meta">deep discount losses</div>
-                </div>
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Forecast MAPE</div>
-                    <div class="card-value">12.78%</div>
-                    <div class="card-meta">Prophet model accuracy</div>
-                </div>
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Classifier ROC-AUC</div>
-                    <div class="card-value">0.77</div>
-                    <div class="card-meta">XGBoost loss predictor</div>
-                </div>
-                <div class="glass-card crosshair-panel">
-                    <div class="crosshair-panel-inner"></div>
-                    <div class="card-label">Records</div>
-                    <div class="card-value">9,994</div>
-                    <div class="card-meta">Tableau Sample Superstore</div>
-                </div>
-            </div>
-            <div style="margin-top:2rem;">
-                <a href="#" id="dashboard-cta" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
-                    <span class="slot-text-wrapper">
-                        <span class="slot-text-default">Launch Interactive Simulator</span>
-                        <span class="slot-text-hover">Open Dashboard →</span>
-                    </span>
-                </a>
             </div>
         </section>
 
         <!-- ── Findings Ledger ── -->
         <section id="findings" class="reveal">
-            <span class="section-label">03 / Headline Findings</span>
-            <h2 class="section-title">What the Data Reveals</h2>
+            <span class="section-label">02 / Empirical Results</span>
+            <h2 class="section-title">Headline Findings</h2>
             <div class="table-responsive">
                 <table class="ledger">
                     <thead>
@@ -728,91 +702,144 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td>Loss rate</td><td class="loss">18.7%</td></tr>
-                        <tr><td>Margin at 0% discount</td><td class="profit">+29.5%</td></tr>
-                        <tr><td>Margin at 41%+ discount</td><td class="loss">−77.4%</td></tr>
-                        <tr><td>Worst category</td><td class="loss">Tables (−9% margin)</td></tr>
-                        <tr><td>Best region</td><td class="profit">West (15% margin)</td></tr>
-                        <tr><td>Classifier ROC-AUC</td><td class="profit">0.77</td></tr>
-                        <tr><td>Forecast MAPE (Prophet)</td><td class="profit">12.78%</td></tr>
-                        <tr><td>Dataset</td><td class="muted">Tableau Sample Superstore · 9,994 orders</td></tr>
+                        <tr><td>RDD discontinuity effect (Onion at −19% cutoff)</td><td class="warm" data-live="row-rdd">+₹101 (p = 0.28) - not significant</td></tr>
+                        <tr><td>Specification curve (30 combos)</td><td class="warm" data-live="row-spec">0 / 30 significant - verdict: fragile</td></tr>
+                        <tr><td>BH-FDR across commodity fits</td><td class="warm" data-live="row-fdr">0 survivors after correction</td></tr>
+                        <tr><td>Bandwidth sensitivity (15–30%)</td><td class="muted" data-live="row-bandwidth">+₹81…+₹101, p = 0.42…0.27 - null in every window</td></tr>
+                        <tr><td>Placebo tests (fake cutoffs)</td><td class="muted" data-live="row-placebo">3 of 4 null; one spurious jump at −37%</td></tr>
+                        <tr><td>McCrary density test</td><td class="muted" data-live="row-density">Not available on the current warehouse</td></tr>
+                        <tr><td>Covariate balance</td><td class="muted" data-live="row-balance">log(observations) p = 0.04 - not clean</td></tr>
+                        <tr><td>Forecast MAPE (Prophet winner)</td><td class="muted" data-live="row-mape">served by 2.4.0</td></tr>
+                        <tr><td>Classifier ROC-AUC</td><td class="muted" data-live="row-auc">served by 2.4.0</td></tr>
+                        <tr><td>Data sources</td><td class="muted">data.gov.in + IMD rainfall</td></tr>
+                        <tr><td>AI Orchestrator</td><td class="warm">OpenRouter free-tier routing</td></tr>
+                        <tr><td>Pipeline freshness</td><td class="profit">Continuous - container every 30 min, externally verified every 15</td></tr>
                     </tbody>
                 </table>
+                <p class="section-sub" id="live-provenance" style="font-family:var(--font-mono,monospace);font-size:0.74rem;margin-top:0.75rem;">
+                    Reading the findings from the API...
+                </p>
+            </div>
+        </section>
+
+        <!-- ── Robustness Checks ── -->
+        <section class="reveal">
+            <span class="section-label">03 / Validation Suite</span>
+            <h2 class="section-title">Statistical Robustness Checks</h2>
+            <p class="section-sub">
+                Every RDD estimate is tested against the full battery before it reaches
+                the dashboard. These are the live results, including the ones that cut
+                against the finding.
+            </p>
+            <div class="robustness-grid">
+                <div class="robo-card">
+                    <div class="robo-title">Bandwidth Sensitivity</div>
+                    <div class="robo-status warm" data-live="robo-bw-status">⚠ Null at 15 / 20 / 25 / 30</div>
+                    <div class="robo-desc" data-live="robo-bw-desc">Point estimate stays positive (+₹81 … +₹101) but p ranges 0.42 … 0.27 - not significant in any window.</div>
+                </div>
+                <div class="robo-card">
+                    <div class="robo-title">Placebo / Falsification</div>
+                    <div class="robo-status warm" data-live="robo-placebo-status">⚠ 1 of 4 spurious at −37%</div>
+                    <div class="robo-desc" data-live="robo-placebo-desc">Three fake cutoffs are null, but the −37% placebo returns a significant +₹297 (p = 0.006) - single-cutoff evidence is thin.</div>
+                </div>
+                <div class="robo-card">
+                    <div class="robo-title">Specification Curve</div>
+                    <div class="robo-status warm" data-live="robo-spec-status">⚠ Fragile (0 / 30)</div>
+                    <div class="robo-desc" data-live="robo-spec-desc">Across bandwidth × kernel × polynomial combinations, 0 of 30 estimates are significant; median +₹50, sign not stable. Verdict: fragile.</div>
+                </div>
+                <div class="robo-card">
+                    <div class="robo-title">Covariate Balance</div>
+                    <div class="robo-status warm" data-live="robo-balance-status">⚠ Not clean</div>
+                    <div class="robo-desc">log(observations) jumps at the cutoff (p = 0.04), so a clean pre-treatment balance cannot be claimed.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── AI Chat / Ask ── -->
+        <section id="ask" class="reveal">
+            <span class="section-label">04 / AI Procurement Chat</span>
+            <h2 class="section-title">Ask MandiIQ</h2>
+            <p class="section-sub">
+                Ask free-text procurement questions in plain English. The AI orchestrator routes
+                across <strong>multiple free-tier OpenRouter models</strong> with automatic
+                circuit-breaker fallback - if one model is rate-limited, the next in the chain
+                serves the request. Answers are grounded in live tool-call results (never fabricated).
+            </p>
+            <div class="chart-card">
+                <div class="code-block">
+                    <div style="margin-bottom:0.8rem;color:var(--color-text-high);font-weight:500;">
+                        <span style="color:var(--color-primary);">$</span> curl -X POST https://your-api.onrender.com/ask <span style="color:var(--color-text-low);">\</span><br>
+                        <span style="color:var(--color-primary);">$</span>   -H 'Content-Type: application/json' <span style="color:var(--color-text-low);">\</span><br>
+                        <span style="color:var(--color-primary);">$</span>   -d '{<span style="color:var(--color-warm);">"query"</span>: <span style="color:var(--color-primary);">"Should I lock in onion procurement in Nashik next month?"</span>, <span style="color:var(--color-warm);">"commodity"</span>: <span style="color:var(--color-primary);">"Onion"</span>, <span style="color:var(--color-warm);">"district"</span>: <span style="color:var(--color-primary);">"Nashik"</span>}'
+                    </div>
+                    <div style="border-top:1px solid var(--hairline);padding-top:0.8rem;color:var(--color-text-med);">
+                        <span style="color:var(--color-text-low);">// Response (grounded, never fabricated):</span><br>
+                        {<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"answer"</span>: <span style="color:var(--color-primary);">"MODERATE RISK (32%): <span data-live="ask-verdict">The rainfall-threshold discontinuity is not significant on the current warehouse (+₹101, p = 0.28).</span> Spike risk comes from the forecast and volatility stack; consider staggering procurement."</span>,<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"model_used"</span>: <span style="color:var(--color-primary);">"google/gemini-2.0-flash-exp:free"</span>,<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"endpoints_used"</span>: [<span style="color:var(--color-primary);">"get_rdd_result"</span>, <span style="color:var(--color-primary);">"get_forecast"</span>, <span style="color:var(--color-primary);">"get_risk_score"</span>]<br>
+                        }<br>
+                        <span style="color:var(--color-text-low);font-size:0.65rem;">⚡ Model auto-selected by circuit breaker · Tool-grounded</span>
+                    </div>
+                </div>
             </div>
         </section>
 
         <!-- ── Architecture ── -->
-        <section class="reveal" style="padding: 3rem 0; border-top: 1px solid var(--hairline);">
-            <div style="max-width: 960px; margin: 0 auto; padding: 0 1.5rem;">
-                <span class="section-label" style="display:block;margin-bottom:0.5rem;">04 / Architecture</span>
-                <h2 class="section-title" style="margin-bottom:0.5rem;">System Architecture</h2>
-                <p style="color:var(--color-text-low);margin-bottom:1.5rem;font-size:0.85rem;max-width:600px;">
-                    Decoupled ELT pipeline: live API ingestion → DuckDB analytical store → causal inference + ML forecast → FastAPI serving → Streamlit dashboard.
-                </p>
-                <div class="mermaid-wrapper">
+        <section class="reveal">
+            <span class="section-label">05 / System Design</span>
+            <h2 class="section-title">Architecture Flow</h2>
+            <p style="color:var(--color-text-low);margin-bottom:1rem;font-size:0.85rem;max-width:640px;">
+                An automated ELT pipeline ingests live mandi prices and rainfall data, runs causal RDD analysis + ML forecasts, serves results through a FastAPI gateway, and renders them in an interactive Streamlit dashboard.
+            </p>
+            <div class="mermaid-wrapper">
 <pre class="mermaid" style="text-align: center;">
 %%{init: {"theme": "dark", "themeVariables": { "primaryColor": "#1a1a2e", "primaryTextColor": "#fff", "lineColor": "#d7ff00", "secondaryColor": "#16213e", "tertiaryColor": "#0f3460"}}}%%
 flowchart LR
-    subgraph Ingest["Ingest"]
-        A1["data.gov.in<br/>Mandi Prices"] --> A2["Fetch + Retry"]
-        B1["IMD Rainfall<br/>Monthly"] --> A2
-    end
-    subgraph Store["Store"]
-        A2 --> C1["DuckDB<br/>Analytical Warehouse"]
-    end
-    subgraph Analyze["Analyze"]
-        C1 --> D1["Causal RDD<br/>Local-linear Regression"]
-        C1 --> D2["ML Forecast<br/>XGBoost + Prophet"]
-    end
-    subgraph Serve["Serve"]
-        D1 --> E1["FastAPI Gateway<br/>10 Endpoints"]
-        D2 --> E1
-        E1 --> F1["Streamlit Dashboard<br/>5 Pages"]
-        E1 --> F2["AI Orchestrator<br/>Multi-model Chat"]
-    end
+    A["data.gov.in<br/>Mandi Prices"]
+    B["IMD Rainfall<br/>Monthly Grids"]
+    C["Ingestion<br/>Pagination + Retry"]
+    D["DuckDB<br/>Analytical Store"]
+    E["RDD Engine<br/>Causal Inference"]
+    F["ML Pipeline<br/>XGBoost + Prophet"]
+    G["Prescriptive<br/>Procurement Advice"]
+    H["FastAPI Gateway<br/>10 Endpoints"]
+    I["Streamlit Dashboard<br/>5 Interactive Pages"]
+    J["AI Orchestrator<br/>Multi-model Router"]
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> G
+    G --> H
+    H --> I
+    H --> J
+    J --> I
 </pre>
-                </div>
             </div>
         </section>
 
         <!-- ── Footer ── -->
         <footer>
-            <div>© 2026 · Superstore Margin Intelligence System</div>
+            <div>
+                Data: <a href="https://data.gov.in/" target="_blank" rel="noopener" class="footer-link" data-scramble>data.gov.in</a> ·
+                <a href="https://github.com/flawsom/MandiIQ" target="_blank" rel="noopener" class="footer-link" data-scramble>GitHub</a> ·
+                <a href="../docs/live.html" class="footer-link" data-scramble>Live console</a> ·
+                <a href="https://p01--mandiiq--x4n8x4gkmzht.code.run/docs" target="_blank" rel="noopener" class="footer-link" data-scramble>API</a>
+            </div>
             <div class="footer-links">
-                <a href="https://github.com/flawsom/Margin-Intelligence-System" target="_blank" class="footer-link" data-scramble>GitHub</a>
-                <a href="https://github.com/flawsom/Margin-Intelligence-System/blob/master/docs/system_design.md" target="_blank" class="footer-link" data-scramble>System Design</a>
+                <span>Local-linear RDD · Triangular kernel · HC2 sandwich SE</span>
+                <span>OpenRouter multi-model with circuit-breaker</span>
+                <span>© 2026 · MandiIQ</span>
             </div>
         </footer>
 
     </div>
 
-    <!-- ── Surface Mode Toggle Button (replication prompt §8) ── -->
-    <button id="surface-toggle" aria-label="Toggle surface mode" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;width:36px;height:36px;border-radius:50%;border:1px solid var(--hairline);background:var(--bg-glass);color:var(--color-text-med);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all var(--duration-base) var(--ease-soft);" title="Toggle surface mode">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-    </button>
-
     <!-- ── Scripts ── -->
     <script>
-        /* Deploy URLs */
-        const DEPLOY = {
-            API: 'https://your-api.onrender.com',
-            DASH: 'https://your-dashboard.onrender.com',
-        };
-        document.getElementById('dashboard-link')?.addEventListener('click', e => {
-            e.preventDefault();
-            window.open(DEPLOY.DASH, '_blank');
-        });
-        document.getElementById('dashboard-cta')?.addEventListener('click', e => {
-            e.preventDefault();
-            window.open(DEPLOY.DASH, '_blank');
-        });
-
         /* Text Scramble */
         class Scrambler {
             constructor(el) {
@@ -867,34 +894,203 @@ flowchart LR
             });
         }, { threshold: 0.1 });
         document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-
-        /* Surface Mode Toggle (replication prompt §8) */
-        (function() {
-            function applySurface(enabled) {
-                document.body.classList.toggle('theme-surface', enabled);
-                const btn = document.getElementById('surface-toggle');
-                if (btn) {
-                    btn.innerHTML = enabled
-                        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
-                        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-                }
-                localStorage.setItem('ambient_surface', enabled ? '1' : '0');
-            }
-            // Restore saved preference
-            if (localStorage.getItem('ambient_surface') === '1') applySurface(true);
-            // Toggle button click
-            document.getElementById('surface-toggle')?.addEventListener('click', function() {
-                applySurface(!document.body.classList.contains('theme-surface'));
-            });
-            // Cross-tab sync
-            window.addEventListener('storage', function(e) {
-                if (e.key === 'ambient_surface') applySurface(e.newValue === '1');
-            });
-        })();
     </script>
-    <!-- Canvas Cursor Effect -->
+
+    <!-- Shared shell: drives the live status pill in the nav from /health. -->
+    <script src="../docs/assets/site.js"></script>
+
     <script>
-    (function(){'use strict';var isTouchOnly=('ontouchstart' in window)&&!window.matchMedia('(pointer: fine)').matches;if(isTouchOnly)return;var CONFIG={friction:0.5,trails:20,size:50,dampening:0.25,tension:0.98};var canvas,ctx,running=true,pos={x:0,y:0},lines=[];function Oscillator(cfg){this.phase=cfg.phase||0;this.offset=cfg.offset||0;this.frequency=cfg.frequency||0.001;this.amplitude=cfg.amplitude||1;}Oscillator.prototype.update=function(){this.phase+=this.frequency;this.value=this.offset+Math.sin(this.phase)*this.amplitude;return this.value;};var colorOsc=new Oscillator({phase:Math.random()*2*Math.PI,amplitude:85,frequency:0.0015,offset:285});function Node(){this.x=0;this.y=0;this.vy=0;this.vx=0;}function Line(spring){this.spring=spring+0.1*Math.random()-0.02;this.friction=CONFIG.friction+0.01*Math.random()-0.002;this.nodes=[];for(var i=0;i<CONFIG.size;i++){var n=new Node();n.x=pos.x;n.y=pos.y;this.nodes.push(n);}}Line.prototype.update=function(){var spring=this.spring,prev=this.nodes[0];prev.vx+=(pos.x-prev.x)*spring;prev.vy+=(pos.y-prev.y)*spring;for(var i=0;i<this.nodes.length;i++){var node=this.nodes[i];if(i>0){var p=this.nodes[i-1];node.vx+=(p.x-node.x)*spring;node.vy+=(p.y-node.y)*spring;node.vx+=p.vx*CONFIG.dampening;node.vy+=p.vy*CONFIG.dampening;}node.vx*=this.friction;node.vy*=this.friction;node.x+=node.vx;node.y+=node.vy;spring*=CONFIG.tension;}};Line.prototype.draw=function(){ctx.beginPath();var n0=this.nodes[0];ctx.moveTo(n0.x,n0.y);for(var i=1;i<this.nodes.length-2;i++){var e=this.nodes[i],t=this.nodes[i+1];ctx.quadraticCurveTo(e.x,e.y,0.5*(e.x+t.x),0.5*(e.y+t.y));}var last=this.nodes[this.nodes.length-2],end=this.nodes[this.nodes.length-1];ctx.quadraticCurveTo(last.x,last.y,end.x,end.y);ctx.stroke();ctx.closePath();};function createLines(){lines=[];for(var i=0;i<CONFIG.trails;i++)lines.push(new Line(0.4+(i/CONFIG.trails)*0.025));}function render(){if(!running)return;ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,canvas.width,canvas.height);ctx.globalCompositeOperation='lighter';ctx.strokeStyle='hsla('+Math.round(colorOsc.update())+',50%,50%,0.2)';ctx.lineWidth=1;for(var i=0;i<lines.length;i++){lines[i].update();lines[i].draw();}requestAnimationFrame(render);}function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}function init(){canvas=document.createElement('canvas');canvas.id='cursor-canvas';canvas.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';document.body.appendChild(canvas);ctx=canvas.getContext('2d');resize();createLines();document.addEventListener('mousemove',function(e){pos.x=e.clientX;pos.y=e.clientY;},{passive:true});document.addEventListener('touchmove',function(e){if(e.touches.length>0){pos.x=e.touches[0].pageX;pos.y=e.touches[0].pageY;}},{passive:true});document.addEventListener('touchstart',function(e){if(e.touches.length>0){pos.x=e.touches[0].pageX;pos.y=e.touches[0].pageY;}},{passive:true});window.addEventListener('resize',resize);document.addEventListener('visibilitychange',function(){if(document.hidden){running=false;}else{running=true;render();}});render();}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();})();
+    /*
+     * Every finding on this page is read from the API, not typed in.
+     *
+     * The section above used to carry a snapshot table (+₹101, p = 0.28, a
+     * 30-combination specification curve) that was accurate when it was written
+     * and wrong a warehouse later: the running build now answers +₹230.22,
+     * p = 0.0258 for the headline fit and +₹70.69, p = 0.628 from the robustness
+     * engine on the same commodity. A published snapshot is not a measurement,
+     * so the text below is a fallback: when the API answers, it is replaced, and
+     * when a route does not exist on the deployed build that is printed instead
+     * of leaving an old number standing.
+     */
+    (function () {
+        "use strict";
+
+        var shell = window.MandiiqShell;
+        var MONTHS = null;
+
+        function fill(key, text) {
+            var nodes = document.querySelectorAll('[data-live="' + key + '"]');
+            for (var i = 0; i < nodes.length; i++) nodes[i].textContent = text;
+        }
+
+        function rupees(v) {
+            var n = Math.abs(Math.round(v));
+            return (v < 0 ? "\u2212\u20b9" : "+\u20b9") + n.toLocaleString("en-IN");
+        }
+
+        function pval(p) {
+            if (p == null) return "p = n/a";
+            return "p " + (p < 0.001 ? "< 0.001" : "= " + p.toFixed(4).replace(/0+$/, "").replace(/\.$/, ""));
+        }
+
+        function getJSON(base, path) {
+            var controller = typeof AbortController === "function" ? new AbortController() : null;
+            var timer = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
+            return fetch(base + path, { cache: "no-store", signal: controller ? controller.signal : undefined })
+                .then(function (res) {
+                    if (timer) clearTimeout(timer);
+                    if (!res.ok) { var e = new Error("HTTP " + res.status); e.status = res.status; throw e; }
+                    return res.json();
+                }, function (err) { if (timer) clearTimeout(timer); throw err; });
+        }
+
+        var MISSING = "not served by this build \u2014 arrives with 2.4.0";
+
+        function paintRdd(rdd, robust) {
+            var effect = rdd && rdd.effect;
+            var p = rdd && rdd.p_value;
+            var significant = p != null && p < 0.05;
+
+            if (effect != null && p != null) {
+                var verdict = significant
+                    ? "shows a jump that clears p < 0.05 at this specification"
+                    : "show no statistically significant jump";
+                fill("rdd-headline", significant ? "show a jump (p = " + p.toFixed(3) + ")" : "show no jump (p = " + p.toFixed(2) + ")");
+                fill("rdd-effect", rupees(effect));
+                fill("rdd-p", pval(p));
+                fill("rdd-p-bare", p.toFixed(3));
+                fill("rdd-verdict", verdict);
+                fill("svg-rdd", (significant ? "\u26a0 Significant: " : "\u26a0 No sig. jump: ") + Math.round(Math.abs(effect)));
+                fill("row-rdd", rupees(effect) + " (" + pval(p) + ") \u2013 " + (significant ? "significant" : "not significant"));
+                fill("ask-verdict", significant
+                    ? "The rainfall-threshold discontinuity is positive and significant on the current warehouse (" + rupees(effect) + ", " + pval(p) + "), but the bandwidth sweep is null in every window \u2014 treat it as fragile."
+                    : "The rainfall-threshold discontinuity is not significant on the current warehouse (" + rupees(effect) + ", " + pval(p) + ").");
+                var row = document.querySelector('[data-live="row-rdd"]');
+                if (row) row.className = significant ? "profit" : "warm";
+            }
+
+            if (robust && robust.bandwidth_sensitivity && robust.bandwidth_sensitivity.length) {
+                var rows = robust.bandwidth_sensitivity.filter(function (r) { return r.p_value != null; });
+                var sig = rows.filter(function (r) { return r.p_value < 0.05; });
+                var lo = rows[rows.length - 1], hi = rows[0];
+                var ps = rows.map(function (r) { return r.p_value; });
+                var statuses = rows.map(function (r) { return r.bandwidth; }).join(" / ");
+                fill("robo-bw-status", (sig.length ? "\u26a0 " + sig.length + " of " + rows.length + " significant" : "\u26a0 Null at " + statuses));
+                fill("robo-bw-desc", "Point estimate runs " + rupees(hi.effect) + " \u2026 " + rupees(lo.effect) +
+                    " but p ranges " + Math.min.apply(null, ps).toFixed(3) + " \u2026 " + Math.max.apply(null, ps).toFixed(3) +
+                    " \u2013 " + (sig.length ? sig.length + " window(s) clear 0.05." : "not significant in any window."));
+                fill("row-bandwidth", rupees(hi.effect) + "\u2026" + rupees(lo.effect) + ", p " + Math.min.apply(null, ps).toFixed(3) +
+                    "\u2026" + Math.max.apply(null, ps).toFixed(3) + " - " + (sig.length ? sig.length + " of " + rows.length + " significant" : "null in every window"));
+                var bRow = document.querySelector('[data-live="row-bandwidth"]');
+                if (bRow) bRow.className = sig.length ? "profit" : "muted";
+            }
+
+            if (robust && robust.placebo_tests && robust.placebo_tests.length) {
+                var pr = robust.placebo_tests.filter(function (r) { return r.p_value != null; });
+                var fired = pr.filter(function (r) { return r.p_value < 0.05; });
+                fill("robo-placebo-status", fired.length ? "\u26a0 " + fired.length + " of " + pr.length + " spurious" : "\u2713 " + pr.length + " of " + pr.length + " null");
+                fill("robo-placebo-desc", fired.length
+                    ? "Fake cutoffs mostly behave, but " + fired.length + " returns a significant effect (p " + Math.min.apply(null, fired.map(function (r) { return r.p_value; })).toFixed(3) + ") \u2013 single-cutoff evidence is thin."
+                    : "All " + pr.length + " fake cutoffs are null (p " + Math.min.apply(null, pr.map(function (r) { return r.p_value; })).toFixed(3) + " \u2026 " + Math.max.apply(null, pr.map(function (r) { return r.p_value; })).toFixed(3) + ") \u2014 the real cutoff is not an artefact of the placebo set.");
+                fill("row-placebo", fired.length ? fired.length + " of " + pr.length + " significant" : pr.length + " of " + pr.length + " null");
+                var pRow = document.querySelector('[data-live="row-placebo"]');
+                if (pRow) pRow.className = fired.length ? "warm" : "profit";
+                var ps2 = document.querySelector('[data-live="robo-placebo-status"]');
+                if (ps2) ps2.className = "robo-status " + (fired.length ? "warm" : "profit");
+            }
+
+            var bal = robust && robust.covariate_balance;
+            if (bal) {
+                var logs = bal.log_n_obs || bal.n_observations;
+                if (logs && logs.p_value != null) {
+                    fill("robo-balance-status", logs.p_value < 0.05 ? "\u26a0 Not clean (p = " + logs.p_value.toFixed(2) + ")" : "\u2713 Balanced (p = " + logs.p_value.toFixed(2) + ")");
+                    fill("row-balance", "log(observations) p = " + logs.p_value.toFixed(3) + " - " + (logs.p_value < 0.05 ? "not clean" : "clean"));
+                    var bs = document.querySelector('[data-live="robo-balance-status"]');
+                    if (bs) bs.className = "robo-status " + (logs.p_value < 0.05 ? "warm" : "profit");
+                    var bR = document.querySelector('[data-live="row-balance"]');
+                    if (bR) bR.className = logs.p_value < 0.05 ? "warm" : "profit";
+                }
+            }
+
+            var density = robust && robust.density_test;
+            if (density) {
+                fill("row-density", density.density_p_value == null
+                    ? "Not available on the current warehouse (reported as unavailable, not as a pass)"
+                    : "density jump p = " + Number(density.density_p_value).toFixed(3));
+            }
+
+            var engine = robust && robust.main_effect;
+            if (engine != null) {
+                var engineNote = document.getElementById("engine-note");
+                if (engineNote) {
+                    engineNote.textContent = "Same warehouse, different specification: the robustness engine reports " +
+                        rupees(engine) + " (" + pval(robust.p_value) + ") for the same commodity. Both are shown on purpose.";
+                }
+            }
+        }
+
+        function markMissing() {
+            ["row-spec", "row-fdr", "row-mape", "row-auc", "robo-spec-status", "robo-spec-desc", "spec-count"].forEach(function (key) {
+                document.querySelectorAll('[data-live="' + key + '"]').forEach(function (el) { el.textContent = MISSING; });
+            });
+            fill("spec-verdict", "is " + MISSING);
+        }
+
+        function provenance(text) {
+            var el = document.getElementById("live-provenance");
+            if (el) el.textContent = text;
+        }
+
+        function boot() {
+            if (!shell || !shell.resolveApi) {
+                provenance("The shared shell did not load, so these figures are the published snapshot.");
+                return;
+            }
+            shell.resolveApi().then(function (hit) {
+                var base = hit.base;
+                var when = new Date().toLocaleString();
+                return Promise.all([
+                    getJSON(base, "/rdd-result/Onion").catch(function () { return null; }),
+                    getJSON(base, "/robustness/Onion").catch(function () { return null; }),
+                ]).then(function (res) {
+                    if (!res[0] && !res[1]) {
+                        provenance("The API did not answer /rdd-result or /robustness, so the figures below are the published snapshot, not live values.");
+                        return;
+                    }
+                    paintRdd(res[0], res[1]);
+                    // Clear the snapshot for every figure the deployed build cannot
+                    // answer BEFORE trying: a 404 must never leave an old number
+                    // standing as if it were current. /forecast and /risk-score are
+                    // not fetched at all - guessing a payload shape this build has
+                    // never served is the exact invention this page is fixing.
+                    markMissing();
+                    Promise.all([
+                        getJSON(base, "/spec-curve/Onion").then(function (d) { return d; }, function (e) { return e; }),
+                        getJSON(base, "/fdr").then(function (d) { return d; }, function (e) { return e; }),
+                    ]).then(function (extra) {
+                        var spec = extra[0], fdr = extra[1];
+                        if (spec && !spec.status && spec.summary) {
+                            fill("spec-count", spec.summary.n_significant + " of " + spec.summary.n_estimated + " specifications significant");
+                            fill("spec-verdict", "agrees (" + spec.summary.n_significant + "/" + spec.summary.n_estimated + " significant, verdict " + spec.summary.verdict + ")");
+                            fill("robo-spec-status", "\u26a0 " + String(spec.summary.verdict || "fragile").replace(/^./, function (c) { return c.toUpperCase(); }) + " (" + spec.summary.n_significant + " / " + spec.summary.n_estimated + ")");
+                            fill("robo-spec-desc", "Across bandwidth \u00d7 kernel \u00d7 polynomial combinations, " + spec.summary.n_significant + " of " + spec.summary.n_estimated + " estimates are significant; median " + rupees(spec.summary.median_effect) + ".");
+                            fill("row-spec", spec.summary.n_significant + " / " + spec.summary.n_estimated + " significant - verdict: " + spec.summary.verdict);
+                        }
+                        if (fdr && !fdr.status && fdr.n_hypotheses != null) {
+                            fill("row-fdr", fdr.n_significant_fdr + " survivors of " + fdr.n_hypotheses + " fits after correction (" + fdr.n_significant_raw + " raw at alpha " + fdr.alpha + ")");
+                        }
+                        provenance("Findings read live from the " + hit.label + " instance (" + base + ") at " + when +
+                            ". Figures move with the warehouse; stale text is replaced, and missing routes are named.");
+                    });
+                });
+            }, function () {
+                provenance("Neither API instance answered, so the figures below are the published snapshot from an earlier warehouse \u2014 treat them as history, not as current values.");
+            });
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+        else boot();
+    })();
     </script>
 </body>
 </html>

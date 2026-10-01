@@ -30,6 +30,10 @@ services:
         value: mandi_rdd/data/mandi_iq.duckdb
       - key: PORT
         value: "8000"
+      - key: MANDIIQ_REFRESH_INTERVAL_MINUTES
+        value: "30"
+      - key: MANDIIQ_CEDA_API_KEY
+        sync: false
       - key: DATA_GOV_IN_API_KEY
         sync: false
       - key: GEMINI_API_KEY

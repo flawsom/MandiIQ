@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 [![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
-[![Tests](https://img.shields.io/badge/tests-170%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-179%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -177,7 +177,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**170 tests passing** (1 skipped = warehouse-dependent check):
+**182 test items passing** (169 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -185,7 +185,7 @@ pytest mandi_rdd/tests/ -v
 | `test_no_mock_data.py` (3 tests) | Fabricated-data markers, mock libraries and mock fixture files in shipping code |
 | `test_storage_repair.py` (23 tests) | Index-fault detection and repair, atomic batched table rebuild that refuses a short copy, write self-healing, the memory cap that caused the fault, fault marker surviving a restart, API repair-before-ingest order |
 | `test_scheduler_integrity.py` (24 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, host-fallback price sources, source diagnostics, operator source override, resumable backfill cursor, index-fault marker reading + persistence, workflow YAML/schedule/secret policy |
-| `test_ceda_mirror.py` (8 tests) | CEDA Agmarknet mirror: inert without a token, rows normalised into the `prices` shape, bounded resumable walk, a bad cell not killing a sweep, cached catalogue, probe reporting reachability |
+| `test_ceda_mirror.py` (15 tests) | CEDA Agmarknet mirror: inert without a token, rows normalised into the `prices` shape, bounded resumable walk, a bad cell not killing a sweep, cached catalogue, probe reporting reachability, the real `output` envelope unwrapped, rate-limit handling (long `Retry-After` surfaces instead of blocking the tick) |
 | `test_spec_curve.py` (20 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg, collapsed fits kept out of the FDR family |
 | `test_api_contract.py` (19 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness, index-heal reporting, `/ask` schemas stay stable |
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
@@ -287,7 +287,7 @@ pytest mandi_rdd/tests/ -v
 | Classifier ROC-AUC | ≥ 0.75 | **0.81 ✅** |
 | Forecast MAPE (best model) | ≤ 15% | **11.2% ✅** |
 | Pipeline runs unattended | 7+ consecutive days | **⏳ Pending deployment** |
-| Tests passing | ≥ 25 | **170 passing, 1 skipped ✅** |
+| Tests passing | ≥ 25 | **179 passing, 1 skipped ✅** |
 | API endpoints | ≥ 10 | **38 documented endpoints (47 routes) ✅** |
 | Dashboard pages | 5 pages, causal centerpiece | **5 pages ✅** |
 | Orchestrator availability across free-model rate limits | >99% query availability via fallback chain | **⏳ Pending Phase 11 build** |

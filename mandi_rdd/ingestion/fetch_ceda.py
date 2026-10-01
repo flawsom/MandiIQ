@@ -24,8 +24,14 @@ Ashoka University), which republishes Agmarknet over an India-hosted API:
     POST https://api.ceda.ashoka.edu.in/v1/agmarknet/prices
     body: {commodity_id:int, state_id:int, district_id:[int], market_id:[int],
            from_date:"yyyy-mm-dd", to_date:"yyyy-mm-dd"}
-    -> {"data":[{date, commodity_id, census_state_id, census_district_id,
-                 market_id, min_price, max_price, modal_price}]}
+    -> {"output": {"type": "success", "message": "Data exists",
+                    "data": [{date, commodity_id, census_state_id,
+                              census_district_id, market_id,
+                              min_price, max_price, modal_price}]}}
+
+Note the envelope: the records live under ``output.data``, not at the top
+level, and ``message`` is the only signal distinguishing "no rows matched"
+from "the archive does not cover this window".
 
 plus ``/agmarknet/commodities`` and ``/agmarknet/geographies`` for the id ->
 name maps, and ``/agmarknet/markets`` for market names. District ids are
@@ -61,6 +67,50 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = os.environ.get("MANDIIQ_CEDA_BASE_URL", "https://api.ceda.ashoka.edu.in/v1")
 DEFAULT_LOOKBACK_DAYS = 7
+# The mirror answers 429 once calls come faster than it likes. Requests are
+# therefore spaced by _min_interval() and a 429 is retried with backoff rather
+# than raised: an unthrottled sweep would otherwise abort the whole ingest step
+# on the first rate limit and report it as a source failure.
+_MIN_INTERVAL_DEFAULT_S = 1.0
+_RATE_LIMIT_MAX_RETRIES = 4
+# Observed in production use: a burst of calls earns `429` with
+# `Retry-After: 1833`, i.e. a 30 minute lockout. Honour short waits inline, but
+# never sleep for half an hour inside a pipeline tick - a run that blocks that
+# long looks like a hang. Anything longer is surfaced as CedaRateLimited so the
+# caller can record "mirror busy" and let the next tick try again.
+_RATE_LIMIT_MAX_WAIT_S = 5.0
+
+
+class CedaRateLimited(RuntimeError):
+    """The mirror asked us to wait longer than a pipeline tick can afford."""
+
+    def __init__(self, retry_after_s: float, path: str):
+        self.retry_after_s = retry_after_s
+        self.path = path
+        super().__init__(
+            f"CEDA rate-limited {path}: retry after {retry_after_s:.0f}s"
+        )
+_pace_lock = threading.Lock()
+_last_request_at = [0.0]
+
+
+def _min_interval() -> float:
+    try:
+        return max(0.0, float(os.environ.get("MANDIIQ_CEDA_MIN_INTERVAL_S", _MIN_INTERVAL_DEFAULT_S)))
+    except (TypeError, ValueError):
+        return _MIN_INTERVAL_DEFAULT_S
+
+
+def _pace() -> None:
+    """Keep consecutive calls at least _min_interval() apart."""
+    gap = _min_interval()
+    if gap <= 0:
+        return
+    with _pace_lock:
+        wait = gap - (time.monotonic() - _last_request_at[0])
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at[0] = time.monotonic()
 # Label written into variety/grade. Constant, so re-reading a day upserts onto
 # itself instead of accumulating near-duplicates.
 SOURCE_LABEL = "Agmarknet daily (CEDA)"
@@ -103,45 +153,81 @@ def _request(path: str, body: Optional[dict] = None, timeout: float = 45.0) -> d
     ]
     last_error: Optional[Exception] = None
     for headers in header_variants + [None]:
-        url = f"{BASE_URL}{path}"
-        if headers is None:
-            # Last resort: the query-parameter spelling.
-            sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}api_key={urllib.parse.quote(key)}"
-            headers = {}
-        request = urllib.request.Request(
-            url,
-            data=data,
-            method="POST" if body is not None else "GET",
-            headers={
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                **headers,
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=timeout, context=_SSL_CTX) as f:
-                return json.loads(f.read())
-        except urllib.error.HTTPError as exc:
-            last_error = exc
-            if exc.code in (401, 403):
-                continue  # try the next spelling of the token
-            raise
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            last_error = exc
-            break
+        for attempt in range(_RATE_LIMIT_MAX_RETRIES + 1):
+            url = f"{BASE_URL}{path}"
+            if headers is None:
+                # Last resort: the query-parameter spelling.
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}api_key={urllib.parse.quote(key)}"
+                send_headers = {}
+            else:
+                send_headers = headers
+            request = urllib.request.Request(
+                url,
+                data=data,
+                method="POST" if body is not None else "GET",
+                headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    **send_headers,
+                },
+            )
+            _pace()
+            try:
+                with urllib.request.urlopen(request, timeout=timeout, context=_SSL_CTX) as f:
+                    return json.loads(f.read())
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code in (401, 403):
+                    break  # wrong token spelling - try the next one
+                if exc.code in (429, 500, 502, 503, 504) and attempt < _RATE_LIMIT_MAX_RETRIES:
+                    # Respect Retry-After when it is set, otherwise back off
+                    # exponentially. 429 is a pacing signal, not a failure.
+                    hinted = exc.headers.get("Retry-After") if exc.headers else None
+                    try:
+                        delay = float(hinted) if hinted else 0.0
+                    except (TypeError, ValueError):
+                        delay = 0.0
+                    if delay <= 0:
+                        delay = min(30.0, 2.0 ** attempt)
+                    if delay > _RATE_LIMIT_MAX_WAIT_S:
+                        raise CedaRateLimited(delay, path) from exc
+                    logger.warning(
+                        "CEDA %s on %s; retrying in %.1fs (attempt %d/%d)",
+                        exc.code, path, delay, attempt + 1, _RATE_LIMIT_MAX_RETRIES,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                # A transport-level failure is not a token problem: trying the
+                # other header spellings would just fail the same way.
+                last_error = exc
+                break
     if last_error is not None:
         raise last_error
     raise RuntimeError("CEDA request failed for an unknown reason")
 
 
 def _rows(payload) -> list:
-    """The record list out of a CEDA response, whatever wrapper it uses."""
+    """The record list out of a CEDA response, whatever wrapper it uses.
+
+    Every CEDA endpoint answers ``{"output": {"type", "message", "data"}}``,
+    and ``data`` is only present when the query matched something. ``output``
+    therefore has to be searched like any other wrapper: without it the
+    extraction found no list, every endpoint looked empty, and the mirror
+    reported "0 rows" for data it had actually received - a silent failure
+    that reads exactly like "the archive has nothing for this window".
+
+    The empty case is deliberately indistinguishable here (``[]``); callers
+    that need to tell "no rows" from "malformed response" should inspect
+    ``message`` via :func:`response_message`.
+    """
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
-        for key in ("data", "records", "results"):
+        for key in ("output", "data", "records", "results"):
             value = payload.get(key)
             if isinstance(value, list):
                 return value
@@ -150,6 +236,19 @@ def _rows(payload) -> list:
                 if inner:
                     return inner
     return []
+
+
+def response_message(payload) -> Optional[str]:
+    """CEDA's own ``message`` field, e.g. "Data exists" or "No data exists"."""
+    node = payload
+    for _ in range(3):
+        if not isinstance(node, dict):
+            return None
+        message = node.get("message")
+        if isinstance(message, str):
+            return message
+        node = node.get("output", node.get("data"))
+    return None
 
 
 def _first(mapping: dict, *names):
@@ -238,14 +337,22 @@ def iter_ceda_pages(
     start_index: int = 0,
     cursor_out: Optional[dict] = None,
     commodity_names: Optional[set] = None,
+    window_end: Optional[date] = None,
 ):
-    """Yield pages of Agmarknet daily rows for the last ``lookback_days``.
+    """Yield pages of Agmarknet daily rows for a window ending ``window_end``.
 
     One call per (commodity, state) pair covers every district in that state,
     so a full sweep of ~26 commodities x 36 states is ~900 calls - too many for
     a refresh tick, which is why ``max_calls`` bounds a pass and the walk
     resumes where it stopped on the next one (same contract as the data.gov.in
     walk: the cursor only moves forward, and a completed pass wraps to 0).
+
+    ``window_end`` shifts the whole window into the past. The default (today)
+    is the right question for a live mirror and the wrong one for this archive:
+    CEDA's daily coverage stops around 2025-10, so "the last 7 days" always
+    answers "No data exists" and arming the token changed nothing. A backfill
+    passes the day before the oldest arrival date the warehouse holds instead,
+    which walks the archive backwards while leaving the live question alone.
 
     Yields lists of dicts already shaped like ``prices`` rows.
     """
@@ -261,7 +368,7 @@ def iter_ceda_pages(
         if max_calls is not None
         else os.environ.get("MANDIIQ_CEDA_MAX_CALLS", "150")
     )
-    to_date = date.today()
+    to_date = window_end or date.today()
     from_date = to_date - timedelta(days=max(1, lookback))
 
     try:
@@ -291,6 +398,7 @@ def iter_ceda_pages(
     index = max(0, int(start_index or 0)) % len(pairs)
     calls = 0
     kept = 0
+    interrupted = False
     while calls < budget:
         commodity_id, state_id, districts = pairs[index]
         try:
@@ -305,6 +413,18 @@ def iter_ceda_pages(
                 },
             )
             rows = _rows(payload)
+        except CedaRateLimited as exc:
+            # The host locked us out - usually a ~30 minute Retry-After. Every
+            # remaining call in this pass would be refused too, so stop asking
+            # and let the next tick resume from the same index. Spending the
+            # rest of the budget on guaranteed refusals is how a sweep turns
+            # into a self-inflicted lockout.
+            logger.warning(
+                "CEDA refused the sweep mid-pass (%s); resuming at index %d later",
+                exc, index,
+            )
+            interrupted = True
+            break
         except Exception as exc:
             # One bad cell must not kill the sweep; the next tick retries it.
             logger.warning(
@@ -321,10 +441,11 @@ def iter_ceda_pages(
     # Wrapping back to the start is what "this pass covered everything from
     # where it began" looks like - not a call count, which is capped by the
     # budget and says nothing about coverage.
-    completed = index == 0
+    completed = index == 0 and not interrupted
     logger.info(
         "CEDA mirror: %d calls, %d rows, next index %d (pass %s)",
-        calls, kept, index, "complete" if completed else "partial",
+        calls, kept, index,
+        "rate-limited" if interrupted else ("complete" if completed else "partial"),
     )
     if cursor_out is not None:
         cursor_out.update(

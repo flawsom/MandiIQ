@@ -5,11 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MandiIQ Live Console - real-time mandi price intelligence</title>
 <meta name="description" content="Live MandiIQ console: real mandi prices, rainfall-driven discontinuity estimates, conformal forecasts and tail risk straight from the production API. Nothing cached, nothing mocked.">
-<link rel="canonical" href="https://flawsom.github.io/MandiIQ/live.html">
+<link rel="canonical" href="https://mandiiq.unifies.codes/live.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MandiIQ Live Console - real-time mandi price intelligence">
+<meta property="og:description" content="Live mandi prices, rainfall-discontinuity estimates, conformal intervals and tail risk, read straight from the production MandiIQ API every 60 seconds.">
+<meta property="og:url" content="https://mandiiq.unifies.codes/live.html">
+<meta property="og:image" content="https://mandiiq.unifies.codes/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/site.css">
 <style>
   :root {
     --bg: #000000;
@@ -85,6 +92,7 @@
 </style>
 </head>
 <body>
+<div data-site-nav></div>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -139,16 +147,32 @@
     </div>
   </section>
 
+  <section class="panel">
+    <h2>Ingestion provenance</h2>
+    <p class="hint">Which source actually served the newest rows, and whether the fallback path is armed. A warehouse that is behind because upstream is dark looks different from one that is behind because nothing is configured - this is where that shows.</p>
+    <div class="provenance" id="provenance-strip">
+      <span class="shell-pill" data-state="">reading /health...</span>
+    </div>
+  </section>
+
   <footer>
     <div>Source of truth: <a id="api-link" href="https://p01--mandiiq--x4n8x4gkmzht.code.run/docs">the production MandiIQ API</a> - every figure above is fetched live from it on each refresh. Nothing is cached, hardcoded or mocked.</div>
-    <div>Underlying data: data.gov.in Agmarknet daily mandi prices, IMD/Datameet rainfall departures, Sentinel-2 NDVI. Date integrity is validated on ingest: impossible (future-dated) rows are rejected and repaired.</div>
     <div>Analysis: regression discontinuity on the -19% rainfall deficiency threshold, split-conformal intervals, PSI/KS drift monitors, EVT (GPD) tail risk, cross-fitted DoubleML, Kalman nowcast.</div>
-    <div><a href="./index.html">Back to the product page</a> - <a href="https://mandiiq.streamlit.app">full Streamlit cockpit</a> - <a href="https://github.com/flawsom/MandiIQ">repository</a></div>
   </footer>
 </div>
+<div data-site-footer></div>
+<script src="./assets/site.js"></script>
 
 <script>
-const API = "https://p01--mandiiq--x4n8x4gkmzht.code.run";
+/* The console reads whichever instance is answering. The shared shell probes
+   /health on each host and returns the first that responds, so a host serving
+   a platform 503 degrades this page to the other instance instead of blanking
+   it. HOSTS[0] is only the starting guess. */
+const HOSTS = [
+  "https://p01--mandiiq--x4n8x4gkmzht.code.run",
+  "https://p01--mandiiq--zbvjrztgjqgw.code.run",
+];
+let API = HOSTS[0];
 const AUTO_SECONDS = 60;
 let countdown = AUTO_SECONDS;
 let refreshTimer = null;
@@ -158,11 +182,22 @@ const fmt = new Intl.NumberFormat("en-IN");
 const inr = (v) => (v == null || isNaN(v)) ? "-" : "₹" + Math.round(v).toLocaleString("en-IN");
 const num = (v, d = 2) => (v == null || isNaN(v)) ? "-" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: d });
 
+async function apiBase() {
+  const shell = window.MandiiqShell;
+  if (!shell || !shell.resolveApi) return API;
+  try {
+    const hit = await shell.resolveApi();
+    if (hit && hit.base) { API = hit.base; return hit.base; }
+  } catch (err) { /* neither instance answered - keep the last known base */ }
+  return API;
+}
+
 async function getJSON(path, timeoutMs = 20000) {
+  const base = await apiBase();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(API + path, { signal: controller.signal, cache: "no-store" });
+    const res = await fetch(base + path, { signal: controller.signal, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } finally {
@@ -243,6 +278,63 @@ function svgRdd(plot) {
     <line class="cutoff" x1="${sx(cut).toFixed(1)}" y1="${pad.t}" x2="${sx(cut).toFixed(1)}" y2="${h - pad.b}"/>
     <text class="axis-label" x="${sx(cut).toFixed(1)}" y="${h - 12}" text-anchor="middle" fill="#d9663b">cutoff ${cut}%</text>
   </svg>`;
+}
+
+function pill(text, state, title) {
+  return `<span class="shell-pill" data-state="${state || ""}" title="${title || text}">${text}</span>`;
+}
+
+/*
+ * Provenance is the difference between "stale because the upstream feed is
+ * unreachable from every cloud network" and "stale because nobody configured
+ * a fallback". Those two states used to look identical from the outside, so
+ * both the serving source and whether the mirror is armed are surfaced here.
+ */
+function renderProvenance(h) {
+  const host = $("provenance-strip");
+  if (!host) return;
+  const parts = [];
+  const source = h.last_price_source;
+  const armed = h.mirror_configured;
+
+  parts.push(source
+    ? pill("prices served by " + source, "ok", "The source that produced the newest rows in the warehouse.")
+    : pill("no price source reported yet", "warn",
+        "This build has not recorded which host served prices. Deploy version 2.4.0 or later to see it."));
+
+  // "armed" is deliberately not "live". The only reachable mirror is an
+  // archive whose daily coverage ends roughly eleven months back, so it can
+  // fill history and can never make the newest date current. Saying "fallback
+  // mirror armed" without that caveat is how a stale warehouse gets read as a
+  // healthy one.
+  parts.push(armed
+    ? pill("history backfill armed", "ok",
+        "A reachable secondary source is configured. It is an archive (coverage ends around 2025-10), so it fills history rather than advancing the newest date.")
+    : pill("no backfill source configured", "warn",
+        "Set MANDIIQ_CEDA_API_KEY to fill historical gaps. Note that it is an archive: it will not make the newest date current."));
+
+  // Two instances serve this API behind two hostnames, and they can disagree:
+  // the mirror has already been observed running an older build than the
+  // primary. Naming the instance that answered stops a reader attributing one
+  // host's numbers to the other.
+  parts.push(API === HOSTS[0]
+    ? pill("served by the primary instance", "ok", API)
+    : pill("served by the mirror instance", "warn",
+        "The primary instance (" + HOSTS[0] + ") did not answer /health, so every figure on this page came from " + API + ". It may run an older build."));
+
+  if (h.index_fault_pending) {
+    parts.push(pill("price index fault recorded", "warn",
+      "An inconsistent index was detected; the next run rebuilds the table before writing more rows."));
+  } else {
+    parts.push(pill("price index clean", "ok", "The index verified clean on the last check."));
+  }
+
+  if (h.safe_recovery === false) {
+    parts.push(pill("automatic recovery disabled", "warn",
+      "safe_recovery is false, so the scheduled rebuild/restore will not run unattended."));
+  }
+
+  host.innerHTML = parts.join("");
 }
 
 function card(label, big, note) {
@@ -330,6 +422,7 @@ async function loadHealth() {
   // p < 0.05, the raw count of "significant" effects is not a finding until
   // Benjamini-Hochberg says how many survive.
   const fdr = await getJSON("/fdr").catch(() => null);
+  renderProvenance(h);
   setPill($("status-pill"), "status: " + (h.status || "unknown"), h.status === "healthy" ? "ok" : "warn");
   setPill($("api-pill"), "v" + (h.version || "?"));
   const behind = h.days_behind;
@@ -436,7 +529,12 @@ async function refreshAll() {
 
 $("refresh").addEventListener("click", refreshAll);
 $("commodity").addEventListener("change", (e) => loadCommodity(e.target.value));
-$("api-link").href = API + "/docs";
+apiBase().then((base) => {
+  const link = $("api-link");
+  if (!link) return;
+  link.href = base + "/docs";
+  if (base !== HOSTS[0]) link.textContent = "the mirror instance of the production MandiIQ API";
+});
 
 refreshAll();
 refreshTimer = setInterval(() => {

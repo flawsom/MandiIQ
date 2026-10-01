@@ -1,10 +1,10 @@
 # Refresh Live Data: keep the production warehouse genuinely current.
 #
-# The API runs an in-process hourly ingest loop, but a container restart (or a
-# crash inside the loop) silently freezes the warehouse - which is exactly how
-# the live numbers went stale. This workflow triggers the pipeline from
-# outside, waits for it to finish, and fails loudly when the warehouse did not
-# advance, so staleness is caught in minutes instead of months.
+# The API runs an in-process 30-minute ingest loop, but a container restart
+# (or a crash inside the loop) silently freezes the warehouse - which is
+# exactly how the live numbers went stale. This workflow triggers the pipeline
+# from outside, waits for it to finish, and fails loudly when the warehouse did
+# not advance, so staleness is caught in minutes instead of months.
 #
 # Overlap safety: the pipeline is serialised by a run lock inside the API, so a
 # trigger that lands while another run is in flight reports "busy" instead of
@@ -13,19 +13,40 @@
 name: Refresh Live Data
 
 on:
+  # Checking often is not the same as ingesting often. Agmarknet publishes its
+  # daily file once, so the newest DATE any run can add advances at most daily;
+  # what a tight schedule buys is picking that release up within minutes of it
+  # landing, and noticing a frozen warehouse before anyone looks at it. The
+  # minimum-interval guard below is what actually limits how often a run is
+  # triggered, so the cron can stay aggressive without loading the 512 MB
+  # container more than MANDIIQ_MIN_REFRESH_GAP_MINUTES allows.
   schedule:
-    - cron: "7 * * * *"   # hourly, offset from the top of the hour
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       wait_minutes:
         description: "Minutes to wait for the pipeline to finish"
         required: false
         default: "18"
+      force:
+        description: "Trigger even if the last run is inside the minimum interval"
+        required: false
+        default: "false"
+
+# A queued run that overlaps one already in flight adds nothing: the API is
+# locked, the trigger step skips while ingestion_running is true. Dropping the
+# older queued run keeps the newest check authoritative.
+concurrency:
+  group: mandiiq-refresh-live-data
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
+  # Shortest gap allowed between two triggered pipeline runs, in minutes.
+  # The cron fires every 15; this is the real throttle.
+  MIN_REFRESH_GAP_MINUTES: "20"
   API_BASE: "https://p01--mandiiq--x4n8x4gkmzht.code.run"
 
 jobs:
@@ -35,6 +56,31 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # Two instances serve this API, and the primary has already gone dark
+      # once (2026-10-01: `503 no healthy upstream` on every route while the
+      # mirror answered /health normally). A workflow that keeps posting
+      # /refresh at a dead host stops keeping anything current, so pick the
+      # instance that answers before doing any work. The workflow-level
+      # API_BASE is only the first guess.
+      - name: Use an instance that is actually serving
+        run: |
+          set -u
+          for host in "https://p01--mandiiq--x4n8x4gkmzht.code.run" "https://p01--mandiiq--zbvjrztgjqgw.code.run"; do
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" --max-time 20 "${host}/health" || echo "000")
+            echo "${host} -> HTTP ${code}"
+            if [ "${code}" = "200" ]; then
+              # GITHUB_ENV takes precedence over workflow-level env for every
+              # later step, so one probe re-points the whole job.
+              echo "API_BASE=${host}" >> "$GITHUB_ENV"
+              if [ "${host}" != "https://p01--mandiiq--x4n8x4gkmzht.code.run" ]; then
+                echo "::warning::the primary instance is not serving; this run drives ${host} instead (it may run an older build)"
+              fi
+              exit 0
+            fi
+          done
+          echo "::error::neither instance answered /health - nothing can be triggered or verified"
+          exit 1
 
       # The two failure modes that took production down on 2026-09-30, healed
       # before this workflow tries to ingest into them:
@@ -49,8 +95,6 @@ jobs:
       # cannot be healed fails the job so a human sees it, but the common case
       # now recovers itself on the next hour instead of waiting for one.
       - name: Auto-heal a recorded index fault or an empty warehouse
-        env:
-          API_BASE: ${{ env.API_BASE }}
         run: |
           python3 - <<'PY'
           import json, os, time, urllib.request
@@ -79,6 +123,32 @@ jobs:
               # rather than gambling on the deployed build's behaviour.
               print("::warning::production was not built with safe recovery; "
                     "deploy the current master before automated healing runs")
+              raise SystemExit(0)
+
+          # The flag alone is not enough. Builds before 2.4.0 advertised
+          # safe_recovery unconditionally while doing exactly the unsafe thing
+          # the flag promises they do not - and a flag already deployed cannot
+          # be corrected by editing this file. The version cannot lie, so the
+          # version is what actually decides:
+          #
+          #   2026-10-01: a 2.3.0 container with a recorded index fault was sent
+          #   /admin/rebuild-prices, OOM-killed during the rebuild, and never
+          #   came back - every route answered `503 no healthy upstream` until
+          #   a human redeployed it. Refusing here leaves the warehouse stale
+          #   and serving, which is recoverable; a crash loop is not.
+          version = str(health.get("version") or "")
+          try:
+              build = tuple(
+                  int("".join(c for c in part if c.isdigit()) or 0)
+                  for part in version.split(".")[:3]
+              )
+          except Exception:
+              build = ()
+          if build < (2, 4, 0):
+              print(f"::warning::the deployed build ({version or 'unknown'}) predates "
+                    "the atomic, memory-capped rebuild (2.4.0); refusing automated "
+                    "recovery so the container is not OOM-killed. Data stays as it is "
+                    "and keeps serving. Redeploy master to re-enable self-healing.")
               raise SystemExit(0)
 
           problems = []
@@ -137,6 +207,32 @@ jobs:
             echo "::notice::A pipeline run is already in flight; skipping this trigger."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          # Self-throttle: the cron is every 15 minutes, but a run is only
+          # triggered when the previous one is at least MIN_REFRESH_GAP_MINUTES
+          # old. Each run is a full pipeline (prices + rainfall + NDVI + RDD +
+          # forecast) on a 512 MB instance, so this is what keeps a tight
+          # schedule from turning into a queue of overlapping full runs.
+          if [ "${{ github.event.inputs.force || 'false' }}" != "true" ] && [ -n "${BEFORE}" ]; then
+            age=$(python3 -c "
+          import datetime, sys
+          raw = sys.argv[1].replace('Z', '+00:00')
+          try:
+              when = datetime.datetime.fromisoformat(raw)
+          except ValueError:
+              print('unknown'); raise SystemExit
+          if when.tzinfo is None:
+              when = when.replace(tzinfo=datetime.timezone.utc)
+          now = datetime.datetime.now(datetime.timezone.utc)
+          print(int((now - when).total_seconds() // 60))
+          " "${BEFORE}")
+            echo "Previous run finished ${age} minute(s) ago (minimum gap ${MIN_REFRESH_GAP_MINUTES})"
+            if [ "${age}" != "unknown" ] && [ "${age}" -lt "${MIN_REFRESH_GAP_MINUTES}" ]; then
+              echo "::notice::Last run is inside the ${MIN_REFRESH_GAP_MINUTES} minute minimum interval; nothing to do."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
           code=$(curl -s -o /tmp/refresh.json -w "%{http_code}" \

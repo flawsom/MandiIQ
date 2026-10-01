@@ -44,6 +44,13 @@ Thumbs.db
 # Environment
 .env
 .envrc
+# Local overrides. The workspace loads these into every shell and preview, so
+# they hold real credentials (the CEDA token and the data.gov.in key live in
+# .env.local) - they must never be committed. Templates stay tracked.
+.env.local
+.env.*.local
+.env.*.secret
+!.env.example
 
 # Docker
 .dockerignore

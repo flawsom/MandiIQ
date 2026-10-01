@@ -327,10 +327,11 @@ def _run_ingestion_locked(
                         "reason": "MANDIIQ_CEDA_API_KEY not set",
                     }
                     logger.warning(
-                        "The data.gov.in feed is unreachable and no CEDA mirror "
-                        "token is configured, so the warehouse cannot advance. "
-                        "Set MANDIIQ_CEDA_API_KEY to fill prices from Agmarknet "
-                        "via CEDA (see NORTHFLANK_DEPLOY.md)."
+                        "The data.gov.in feed returned nothing and no CEDA "
+                        "token is configured. Note that CEDA is an ARCHIVE "
+                        "(measured: daily coverage ends around 2025-10), not a "
+                        "live feed - arming it backfills history, it does not "
+                        "make the newest date current. See NORTHFLANK_DEPLOY.md."
                     )
                 else:
                     from mandi_rdd.storage.duckdb_store import (
@@ -385,11 +386,28 @@ def _run_ingestion_locked(
                             "CEDA mirror filled %d rows (%d new)", n_ceda, n_ceda_new
                         )
             except Exception as ceda_error:
-                logger.warning(f"CEDA mirror fallback skipped: {ceda_error}")
-                summary["steps"]["prices_ceda"] = {
-                    "status": "error",
-                    "error": str(ceda_error),
-                }
+                # The mirror throttles hard (a burst earns `429` with
+                # `Retry-After` in the half-hour range), so being locked out is
+                # a normal, expected state rather than a failure to report.
+                try:
+                    from mandi_rdd.ingestion.fetch_ceda import CedaRateLimited
+                except Exception:  # pragma: no cover - import cannot fail here
+                    CedaRateLimited = ()  # type: ignore[assignment]
+                if isinstance(ceda_error, CedaRateLimited):
+                    logger.info(
+                        "CEDA mirror is rate-limited (%s); leaving it to a later tick",
+                        ceda_error,
+                    )
+                    summary["steps"]["prices_ceda"] = {
+                        "status": "rate_limited",
+                        "retry_after_s": int(getattr(ceda_error, "retry_after_s", 0)),
+                    }
+                else:
+                    logger.warning(f"CEDA mirror fallback skipped: {ceda_error}")
+                    summary["steps"]["prices_ceda"] = {
+                        "status": "error",
+                        "error": str(ceda_error),
+                    }
 
     # 2b. Supplementary variety-wise recent-price feed (resource 35985678).
     # Bounded + best-effort: never blocks the main pipeline if it fails.

@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 820" width="1400" height="820" role="img" aria-label="MandiIQ validation battery as returned by the deployed API: headline estimate versus robustness engine, bandwidth sweep, placebos, covariate balance, density test and a live capability ledger">
+  <defs>
+    <linearGradient id="a-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#060606"/><stop offset="100%" stop-color="#0a0b06"/>
+    </linearGradient>
+    <radialGradient id="a-glow" cx="50%" cy="-10%" r="65%">
+      <stop offset="0%" stop-color="#d7ff00" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#d7ff00" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="a-dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fill-opacity="0.04"/>
+    </pattern>
+  </defs>
+
+  <g font-family="Inter, Segoe UI, system-ui, sans-serif">
+    <rect x="0.5" y="0.5" width="1399" height="819" rx="20" fill="url(#a-bg)" stroke="#ffffff" stroke-opacity="0.10"/>
+    <rect x="0.5" y="0.5" width="1399" height="819" rx="20" fill="url(#a-dots)"/>
+    <rect x="0.5" y="0.5" width="1399" height="819" rx="20" fill="url(#a-glow)"/>
+
+    <text x="64" y="74" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="30" font-weight="600" fill="#ffffff">What the deployed API returned</text>
+    <text x="64" y="104" font-size="15" fill="#bababa">Measured 2026-10-01 &#183; quoted with the endpoint that produced it &#183; routes the running build cannot answer are printed as such, not omitted.</text>
+    <text x="64" y="128" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12.5" fill="#7e7e7e">GET /rdd-result/Onion &#183; GET /robustness/Onion &#183; GET /fdr &#183; GET /spec-curve/Onion</text>
+    <line x1="64" y1="150" x2="1336" y2="150" stroke="#ffffff" stroke-opacity="0.08"/>
+
+    <!-- row 1: the disagreement -->
+    <g>
+      <rect x="64" y="174" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#f39c12" stroke-opacity="0.26"/>
+      <text x="88" y="206" font-size="12" fill="#7e7e7e" letter-spacing="1.4">HEADLINE vs ROBUSTNESS ENGINE</text>
+      <text x="88" y="246" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#ffffff">+&#8377;230.22 &#183; p = 0.0258</text>
+      <text x="88" y="272" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#9a9a9a">main specification, 160 left / 218 right of cutoff</text>
+      <line x1="88" y1="288" x2="448" y2="288" stroke="#ffffff" stroke-opacity="0.08"/>
+      <text x="88" y="312" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#f39c12">+&#8377;70.69 &#183; p = 0.628</text>
+      <text x="88" y="338" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#9a9a9a">robustness engine, same commodity, same warehouse</text>
+      <text x="88" y="360" font-size="12.5" fill="#6f6f6f">Two endpoints, one build, different answers. Both printed.</text>
+    </g>
+    <g>
+      <rect x="496" y="174" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="520" y="206" font-size="12" fill="#7e7e7e" letter-spacing="1.4">BANDWIDTH SENSITIVITY &#183; 4 WINDOWS</text>
+      <text x="520" y="246" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#ffffff">null in every window</text>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" fill="#9a9a9a">
+        <text x="520" y="276">&#177;15pp  +&#8377;77.99  p = 0.625</text>
+        <text x="520" y="298">&#177;20pp  +&#8377;70.69  p = 0.628</text>
+        <text x="520" y="320">&#177;25pp  +&#8377;67.85  p = 0.630</text>
+        <text x="520" y="342">&#177;30pp  +&#8377;67.82  p = 0.623</text>
+      </g>
+      <text x="520" y="364" font-size="12.5" fill="#6f6f6f">Sign is stable, significance is not. Widening never rescues it.</text>
+    </g>
+    <g>
+      <rect x="928" y="174" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="952" y="206" font-size="12" fill="#7e7e7e" letter-spacing="1.4">PLACEBO CUTOFFS &#183; 5 FAKE THRESHOLDS</text>
+      <text x="952" y="246" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#ffffff">5 / 5 null</text>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" fill="#9a9a9a">
+        <text x="952" y="276">p = 0.410 &#183; 0.429 &#183; 0.787</text>
+        <text x="952" y="298">p = 0.683 &#183; 0.190</text>
+      </g>
+      <rect x="952" y="314" width="190" height="28" rx="14" fill="#2ecc71" fill-opacity="0.12" stroke="#2ecc71" stroke-opacity="0.30"/>
+      <text x="968" y="333" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12" fill="#2ecc71">placebos behave</text>
+      <text x="952" y="364" font-size="12.5" fill="#6f6f6f">Effects &#8722;&#8377;35.70 to &#8722;&#8377;208.46; none is a jump.</text>
+    </g>
+
+    <!-- row 2: balance, density, and the routes the build cannot answer -->
+    <g>
+      <rect x="64" y="386" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#2ecc71" stroke-opacity="0.22"/>
+      <text x="88" y="418" font-size="12" fill="#7e7e7e" letter-spacing="1.4">COVARIATE BALANCE</text>
+      <text x="88" y="458" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#ffffff">p = 0.922</text>
+      <text x="88" y="484" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#9a9a9a">log(observations) across the cutoff</text>
+      <text x="88" y="508" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#9a9a9a">observation count: p = 0.791</text>
+      <rect x="88" y="524" width="176" height="28" rx="14" fill="#2ecc71" fill-opacity="0.12" stroke="#2ecc71" stroke-opacity="0.30"/>
+      <text x="104" y="543" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12" fill="#2ecc71">balance passes here</text>
+      <text x="88" y="570" font-size="12.5" fill="#6f6f6f">Reported per build and per snapshot, never inherited.</text>
+    </g>
+    <g>
+      <rect x="496" y="386" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="520" y="418" font-size="12" fill="#7e7e7e" letter-spacing="1.4">McCRARY DENSITY TEST</text>
+      <text x="520" y="458" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#ffffff">not computed</text>
+      <text x="520" y="484" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" fill="#9a9a9a">density_jump: null &#183; 20 bins returned</text>
+      <rect x="520" y="500" width="196" height="28" rx="14" fill="#7e7e7e" fill-opacity="0.12" stroke="#7e7e7e" stroke-opacity="0.35"/>
+      <text x="536" y="519" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12" fill="#bababa">unavailable, not a pass</text>
+      <text x="520" y="546" font-size="12.5" fill="#6f6f6f">A missing test says nothing about manipulation. It says nothing.</text>
+    </g>
+    <g>
+      <rect x="928" y="386" width="408" height="196" rx="16" fill="#ffffff" fill-opacity="0.035" stroke="#e74c3c" stroke-opacity="0.22"/>
+      <text x="952" y="418" font-size="12" fill="#7e7e7e" letter-spacing="1.4">ROUTES THE RUNNING BUILD CANNOT ANSWER</text>
+      <text x="952" y="458" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="27" font-weight="600" fill="#e74c3c">404</text>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12.5" fill="#9a9a9a">
+        <text x="952" y="486">/spec-curve  /fdr  /analytics</text>
+        <text x="952" y="508">/conformal  /drift  /tail-risk</text>
+        <text x="952" y="530">/dml  /nowcast  /forecast</text>
+        <text x="952" y="552">/risk-score</text>
+      </g>
+      <rect x="1160" y="440" width="156" height="28" rx="14" fill="#e74c3c" fill-opacity="0.12" stroke="#e74c3c" stroke-opacity="0.30"/>
+      <text x="1176" y="459" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12" fill="#e74c3c">2.4.0 · not deployed</text>
+      <text x="952" y="574" font-size="12.5" fill="#6f6f6f">Absent routes are listed, so a gap is never mistaken for a zero.</text>
+    </g>
+
+    <!-- capability ledger -->
+    <line x1="64" y1="608" x2="1336" y2="608" stroke="#ffffff" stroke-opacity="0.08"/>
+    <text x="64" y="638" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="16" fill="#ffffff">Capability ledger &#183; what is measurable where</text>
+    <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12.5">
+      <rect x="64" y="656" width="300" height="104" rx="14" fill="#2ecc71" fill-opacity="0.05" stroke="#2ecc71" stroke-opacity="0.24"/>
+      <text x="84" y="682" fill="#2ecc71">ANSWERED BY THE DEPLOYED BUILD</text>
+      <text x="84" y="708" fill="#9a9a9a">/health  /freshness  /data-quality</text>
+      <text x="84" y="728" fill="#9a9a9a">/prices  /rdd-result  /rdd-plot</text>
+      <text x="84" y="748" fill="#9a9a9a">/robustness  /metrics  /admin/source-probe</text>
+      <rect x="380" y="656" width="300" height="104" rx="14" fill="#e74c3c" fill-opacity="0.05" stroke="#e74c3c" stroke-opacity="0.22"/>
+      <text x="400" y="682" fill="#e74c3c">NEEDS THE 2.4.0 DEPLOY</text>
+      <text x="400" y="708" fill="#9a9a9a">specification curve &#183; FDR control</text>
+      <text x="400" y="728" fill="#9a9a9a">conformal &#183; drift &#183; tail risk</text>
+      <text x="400" y="748" fill="#9a9a9a">DoubleML &#183; nowcast &#183; forecast &#183; risk score</text>
+      <rect x="696" y="656" width="316" height="104" rx="14" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="716" y="682" fill="#bababa">NEVER INVENTED</text>
+      <text x="716" y="708" fill="#9a9a9a">a metric without its evaluation context</text>
+      <text x="716" y="728" fill="#9a9a9a">a p-value for a test that did not run</text>
+      <text x="716" y="748" fill="#9a9a9a">a row count from a cached page</text>
+      <rect x="1028" y="656" width="308" height="104" rx="14" fill="#d7ff00" fill-opacity="0.05" stroke="#d7ff00" stroke-opacity="0.24"/>
+      <text x="1048" y="682" fill="#d7ff00">REPRODUCE ANY ROW ABOVE</text>
+      <text x="1048" y="708" fill="#9a9a9a">curl -s $API/robustness/Onion</text>
+      <text x="1048" y="728" fill="#9a9a9a">| python3 -m json.tool</text>
+      <text x="1048" y="748" fill="#9a9a9a">nothing here needs a notebook</text>
+    </g>
+
+    <text x="64" y="792" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="#555">Every figure is an HTTP response, not a hand-typed number. Values move with the warehouse; the endpoint and date are printed beside them for that reason.</text>
+  </g>
+</svg>

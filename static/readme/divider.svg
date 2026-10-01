@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 28" width="1600" height="28" role="presentation" aria-hidden="true">
+  <defs>
+    <linearGradient id="d-hair" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="18%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="50%" stop-color="#d7ff00" stop-opacity="0.55"/>
+      <stop offset="82%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="d-glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#d7ff00" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#d7ff00" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="28" fill="none"/>
+  <rect x="0" y="13" width="1600" height="1.4" fill="url(#d-hair)"/>
+  <ellipse cx="800" cy="14" rx="230" ry="12" fill="url(#d-glow)"/>
+  <circle cx="800" cy="14" r="3.1" fill="#d7ff00"/>
+  <circle cx="776" cy="14" r="1.7" fill="#d7ff00" fill-opacity="0.45"/>
+  <circle cx="824" cy="14" r="1.7" fill="#d7ff00" fill-opacity="0.45"/>
+</svg>

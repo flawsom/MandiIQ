@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 880" width="1400" height="880" role="img" aria-label="MandiIQ live console: warehouse KPIs, median price chart, discontinuity plot and freshness table">
+  <defs>
+    <linearGradient id="c-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#060606"/><stop offset="100%" stop-color="#0a0b07"/>
+    </linearGradient>
+    <radialGradient id="c-glow" cx="18%" cy="0%" r="60%">
+      <stop offset="0%" stop-color="#d7ff00" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#d7ff00" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="c-area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d7ff00" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#d7ff00" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="c-dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fill-opacity="0.045"/>
+    </pattern>
+    <clipPath id="c-chart"><rect x="96" y="404" width="800" height="208"/></clipPath>
+  </defs>
+
+  <g font-family="Inter, Segoe UI, system-ui, sans-serif">
+    <rect x="0.5" y="0.5" width="1399" height="879" rx="20" fill="url(#c-bg)" stroke="#ffffff" stroke-opacity="0.10"/>
+    <rect x="0.5" y="0.5" width="1399" height="879" rx="20" fill="url(#c-dots)"/>
+    <rect x="0.5" y="0.5" width="1399" height="879" rx="20" fill="url(#c-glow)"/>
+
+    <!-- window chrome -->
+    <rect x="0.5" y="0.5" width="1399" height="52" rx="20" fill="#ffffff" fill-opacity="0.02"/>
+    <rect x="0.5" y="32" width="1399" height="21" fill="#ffffff" fill-opacity="0.02"/>
+    <circle cx="34" cy="27" r="5.5" fill="#ffffff" fill-opacity="0.18"/>
+    <circle cx="56" cy="27" r="5.5" fill="#ffffff" fill-opacity="0.12"/>
+    <circle cx="78" cy="27" r="5.5" fill="#ffffff" fill-opacity="0.09"/>
+    <rect x="112" y="12" width="392" height="30" rx="15" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.07"/>
+    <text x="130" y="32" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13.5" fill="#bababa">mandiiq.unifies.codes/live.html</text>
+    <rect x="1215" y="12" width="150" height="30" rx="15" fill="#2ecc71" fill-opacity="0.10" stroke="#2ecc71" stroke-opacity="0.35"/>
+    <circle cx="1234" cy="27" r="4.4" fill="#2ecc71"/>
+    <text x="1248" y="32" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12.5" fill="#2ecc71">live /health poll</text>
+    <line x1="0" y1="53" x2="1400" y2="53" stroke="#ffffff" stroke-opacity="0.08"/>
+
+    <!-- nav -->
+    <rect x="96" y="70" width="16" height="16" rx="4.6" fill="#d7ff00" fill-opacity="0.16" stroke="#d7ff00" stroke-opacity="0.5"/>
+    <path d="M99 80 L103.4 74.6 L107.8 80" fill="none" stroke="#d7ff00" stroke-width="1.7" stroke-linejoin="round"/>
+    <text x="124" y="84" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="17" font-weight="600" fill="#ffffff">MandiIQ</text>
+    <text x="196" y="84" font-size="10.5" fill="#555" letter-spacing="1.6">AGRICULTURAL PRICE INTELLIGENCE</text>
+    <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" fill="#7e7e7e">
+      <text x="700" y="84">Overview</text>
+      <text x="790" y="84" fill="#d7ff00">Live console</text>
+      <text x="892" y="84">Heartbeat</text>
+      <text x="986" y="84">System design</text>
+      <text x="1108" y="84">API</text>
+    </g>
+    <line x1="96" y1="94" x2="1304" y2="94" stroke="#d7ff00" stroke-opacity="0.35"/>
+    <line x1="96" y1="94" x2="1304" y2="94" stroke="#ffffff" stroke-opacity="0.06" stroke-dasharray="6 8"/>
+
+    <!-- KPI tiles -->
+    <g font-family="IBM Plex Mono, ui-monospace, monospace">
+      <g>
+        <rect x="96" y="118" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="116" y="142" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">PRICE RECORDS</text>
+        <text x="116" y="176" font-size="27" font-weight="600" fill="#ffffff">1,994,318</text>
+        <text x="116" y="198" font-size="11.5" fill="#555">rows in the live warehouse</text>
+      </g>
+      <g>
+        <rect x="412" y="118" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="432" y="142" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">COMMODITIES</text>
+        <text x="432" y="176" font-size="27" font-weight="600" fill="#ffffff">423</text>
+        <text x="432" y="198" font-size="11.5" fill="#555">36 states &#183; 667 districts</text>
+      </g>
+      <g>
+        <rect x="728" y="118" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#f39c12" stroke-opacity="0.30"/>
+        <text x="748" y="142" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">NEWEST ARRIVAL DATE</text>
+        <text x="748" y="176" font-size="27" font-weight="600" fill="#ffffff">2026-09-25</text>
+        <text x="748" y="198" font-size="11.5" fill="#8a6a1f">6 days behind today</text>
+      </g>
+      <g>
+        <rect x="1044" y="118" width="260" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="1064" y="142" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">RAINFALL ROWS</text>
+        <text x="1064" y="176" font-size="27" font-weight="600" fill="#ffffff">2,278</text>
+        <text x="1064" y="198" font-size="11.5" fill="#555">1,056 below &#8722;19%</text>
+      </g>
+
+      <g>
+        <rect x="96" y="230" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="116" y="254" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">RDD ESTIMATES</text>
+        <text x="116" y="288" font-size="27" font-weight="600" fill="#ffffff">33</text>
+        <text x="116" y="310" font-size="11.5" fill="#555">commodities with a fit</text>
+      </g>
+      <g>
+        <rect x="412" y="230" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#2ecc71" stroke-opacity="0.28"/>
+        <text x="432" y="254" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">DATE INTEGRITY</text>
+        <text x="432" y="288" font-size="27" font-weight="600" fill="#ffffff">clean</text>
+        <text x="432" y="310" font-size="11.5" fill="#555">no impossible arrival dates</text>
+      </g>
+      <g>
+        <rect x="728" y="230" width="292" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="748" y="254" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">NDVI COVERAGE</text>
+        <text x="748" y="288" font-size="27" font-weight="600" fill="#ffffff">605</text>
+        <text x="748" y="310" font-size="11.5" fill="#555">districts with vegetation index</text>
+      </g>
+      <g>
+        <rect x="1044" y="230" width="260" height="96" rx="14" fill="#ffffff" fill-opacity="0.035" stroke="#ffffff" stroke-opacity="0.09"/>
+        <text x="1064" y="254" font-size="11.5" fill="#7e7e7e" letter-spacing="1.3">LAST PIPELINE RUN</text>
+        <text x="1064" y="284" font-size="17.5" font-weight="600" fill="#ffffff">2026-07-29 17:57Z</text>
+        <text x="1064" y="310" font-size="11.5" fill="#7e7e7e">outcome: failure</text>
+      </g>
+    </g>
+
+    <!-- price chart -->
+    <g>
+      <rect x="96" y="352" width="910" height="296" rx="14" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="118" y="382" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="15" fill="#ffffff">Median modal price per session</text>
+      <text x="118" y="402" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="#7e7e7e">GET /prices?commodity=Onion&#160;&#183;&#160;up to 5,000 observations</text>
+      <g stroke="#ffffff" stroke-opacity="0.06">
+        <line x1="96" y1="452" x2="1006" y2="452"/>
+        <line x1="96" y1="504" x2="1006" y2="504"/>
+        <line x1="96" y1="556" x2="1006" y2="556"/>
+        <line x1="96" y1="608" x2="1006" y2="608"/>
+      </g>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="10.5" fill="#555" text-anchor="end">
+        <text x="86" y="456">2,400</text>
+        <text x="86" y="508">1,900</text>
+        <text x="86" y="560">1,400</text>
+        <text x="86" y="612">900</text>
+      </g>
+      <g clip-path="url(#c-chart)">
+        <path fill="url(#c-area)" d="M96 566 L140 552 L184 560 L228 534 L272 542 L316 508 L360 516 L404 490 L448 498 L492 470 L536 486 L580 458 L624 470 L668 444 L712 452 L756 430 L800 440 L844 414 L888 424 L932 402 L976 410 L1006 396 L1006 612 L96 612 Z"/>
+        <path fill="none" stroke="#d7ff00" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" d="M96 566 L140 552 L184 560 L228 534 L272 542 L316 508 L360 516 L404 490 L448 498 L492 470 L536 486 L580 458 L624 470 L668 444 L712 452 L756 430 L800 440 L844 414 L888 424 L932 402 L976 410 L1006 396"/>
+        <circle cx="1006" cy="396" r="4.2" fill="#d7ff00"/>
+      </g>
+      <line x1="96" y1="612" x2="1006" y2="612" stroke="#ffffff" stroke-opacity="0.16"/>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="10.5" fill="#555">
+        <text x="96" y="632">22-01</text>
+        <text x="330" y="632">22-09</text>
+        <text x="560" y="632">23-05</text>
+        <text x="790" y="632">24-01</text>
+        <text x="960" y="632">24-09</text>
+      </g>
+      <text x="118" y="634" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#555" opacity="0">.</text>
+    </g>
+
+    <!-- RDD plot -->
+    <g>
+      <rect x="1026" y="352" width="278" height="296" rx="14" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="1046" y="382" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="15" fill="#ffffff">Discontinuity at the threshold</text>
+      <text x="1046" y="402" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="#7e7e7e">GET /rdd-plot/{commodity}</text>
+      <g stroke="#ffffff" stroke-opacity="0.06">
+        <line x1="1046" y1="470" x2="1284" y2="470"/>
+        <line x1="1046" y1="520" x2="1284" y2="520"/>
+        <line x1="1046" y1="570" x2="1284" y2="570"/>
+      </g>
+      <line x1="1160" y1="424" x2="1160" y2="600" stroke="#d9663b" stroke-width="1.6" stroke-dasharray="5 5"/>
+      <text x="1160" y="618" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="10.5" fill="#d9663b" text-anchor="middle">cutoff &#8722;19%</text>
+      <g fill="#d7ff00">
+        <circle cx="1076" cy="556" r="4" fill-opacity="0.85"/><circle cx="1090" cy="548" r="5" fill-opacity="0.85"/>
+        <circle cx="1104" cy="540" r="4.4" fill-opacity="0.85"/><circle cx="1118" cy="536" r="5.4" fill-opacity="0.85"/>
+        <circle cx="1132" cy="528" r="4.2" fill-opacity="0.85"/><circle cx="1146" cy="524" r="5" fill-opacity="0.85"/>
+      </g>
+      <g fill="#7bb8ff">
+        <circle cx="1174" cy="502" r="4.6" fill-opacity="0.8"/><circle cx="1188" cy="512" r="5.4" fill-opacity="0.8"/>
+        <circle cx="1202" cy="518" r="4" fill-opacity="0.8"/><circle cx="1216" cy="534" r="5" fill-opacity="0.8"/>
+        <circle cx="1230" cy="542" r="4.4" fill-opacity="0.8"/><circle cx="1244" cy="556" r="5.2" fill-opacity="0.8"/>
+      </g>
+      <path d="M1070 560 L1150 520" stroke="#d7ff00" stroke-width="2" fill="none"/>
+      <path d="M1170 500 L1252 566" stroke="#7bb8ff" stroke-width="2" fill="none"/>
+    </g>
+
+    <!-- analytics cards -->
+    <g>
+      <rect x="96" y="666" width="910" height="150" rx="14" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="118" y="694" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="15" fill="#ffffff">Analytics on the same warehouse</text>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace">
+        <g>
+          <rect x="118" y="708" width="212" height="86" rx="11" fill="#d7ff00" fill-opacity="0.05" stroke="#d7ff00" stroke-opacity="0.22"/>
+          <text x="134" y="732" font-size="10.5" fill="#7e7e7e" letter-spacing="1.1">RDD EFFECT</text>
+          <text x="134" y="758" font-size="18" fill="#ffffff">&#8377; per quintal</text>
+          <text x="134" y="780" font-size="10.5" fill="#555">p-value &#183; n left / n right</text>
+        </g>
+        <g>
+          <rect x="344" y="708" width="212" height="86" rx="11" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>
+          <text x="360" y="732" font-size="10.5" fill="#7e7e7e" letter-spacing="1.1">CONFORMAL INTERVAL</text>
+          <text x="360" y="758" font-size="18" fill="#ffffff">&#177; half-width</text>
+          <text x="360" y="780" font-size="10.5" fill="#555">split conformal coverage</text>
+        </g>
+        <g>
+          <rect x="570" y="708" width="212" height="86" rx="11" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>
+          <text x="586" y="732" font-size="10.5" fill="#7e7e7e" letter-spacing="1.1">DRIFT (PSI / KS)</text>
+          <text x="586" y="758" font-size="18" fill="#ffffff">verdict</text>
+          <text x="586" y="780" font-size="10.5" fill="#555">data-quality score /100</text>
+        </g>
+        <g>
+          <rect x="796" y="708" width="192" height="86" rx="11" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>
+          <text x="812" y="732" font-size="10.5" fill="#7e7e7e" letter-spacing="1.1">TAIL RISK (EVT)</text>
+          <text x="812" y="758" font-size="18" fill="#ffffff">VaR / CVaR</text>
+          <text x="812" y="780" font-size="10.5" fill="#555">GPD fit at 99%</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- provenance -->
+    <g>
+      <rect x="1026" y="666" width="278" height="150" rx="14" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.09"/>
+      <text x="1046" y="694" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="15" fill="#ffffff">Ingestion provenance</text>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5">
+        <rect x="1046" y="708" width="238" height="26" rx="13" fill="#2ecc71" fill-opacity="0.10" stroke="#2ecc71" stroke-opacity="0.30"/>
+        <text x="1060" y="725" fill="#2ecc71">prices served by &#8594; named</text>
+        <rect x="1046" y="742" width="238" height="26" rx="13" fill="#f39c12" fill-opacity="0.10" stroke="#f39c12" stroke-opacity="0.28"/>
+        <text x="1060" y="759" fill="#f39c12">history backfill armed</text>
+        <rect x="1046" y="776" width="238" height="26" rx="13" fill="#2ecc71" fill-opacity="0.10" stroke="#2ecc71" stroke-opacity="0.30"/>
+        <text x="1060" y="793" fill="#2ecc71">price index clean</text>
+      </g>
+    </g>
+
+    <text x="96" y="852" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="#555">Interface preview of docs/live.html &#183; figures are the measured /health payload, 2026-10-01 &#183; chart shape is illustrative</text>
+  </g>
+</svg>

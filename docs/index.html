@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MandiIQ - Agricultural Margin Intelligence & Causal RDD System</title>
+    <meta name="description" content="MandiIQ turns India's public mandi, rainfall and satellite data into causal market intelligence: a regression-discontinuity engine on the rainfall-deficiency threshold, over a live DuckDB warehouse served by FastAPI.">
+    <link rel="canonical" href="https://mandiiq.unifies.codes/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MandiIQ - Agricultural Margin Intelligence & Causal RDD System">
+    <meta property="og:description" content="Regression discontinuity on the rainfall-deficiency threshold, over a live warehouse of India's mandi prices.">
+    <meta property="og:url" content="https://mandiiq.unifies.codes/">
+    <meta property="og:image" content="https://mandiiq.unifies.codes/social-preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="./assets/site.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
     
     <!-- Fonts -->
@@ -1151,6 +1160,8 @@
 </head>
 <body>
 
+    <div data-site-nav></div>
+
     <!-- Dot Grid Overlay -->
     <div class="dot-grid" aria-hidden="true"></div>
 
@@ -1215,8 +1226,8 @@
                 <nav aria-label="Main Navigation">
                     <a class="nav-link" href="#overview" data-scramble>Overview</a>
                     <a class="nav-link" href="#causal" data-scramble>Causal RDD</a>
-                <a class="nav-link" href="#architecture" data-scramble>Architecture</a>
-                <a class="nav-link" href="./live.html" data-scramble>Live Console</a>
+                <a class="nav-link" href="#architecture" data-scramble>Architecture</a>                    <a class="nav-link" href="./live.html" data-scramble>Live Console</a>
+                <a class="nav-link" href="./heartbeat-dashboard.html" data-scramble>Heartbeat</a>
                 <a class="nav-link" href="https://github.com/flawsom/MandiIQ" target="_blank" data-scramble>GitHub</a>
                 </nav>
                 <div class="header-actions">
@@ -1288,30 +1299,37 @@
                     <span class="section-num">02 / REAL-TIME LEDGER</span>
                     <h2 class="section-title">Warehouse Scale & Coverage</h2>
                 </div>
+                <!-- These four read the same /health as every other page on this
+                     site. They were typed-in numbers (1,605,944 rows, 436
+                     commodities, a hand-measured "< 85ms") on a page whose own
+                     footer promises nothing here is hardcoded - and the real
+                     warehouse has held 1.99M rows since. A figure that cannot
+                     be measured from the API now says so instead of guessing. -->
                 <div class="kpi-grid">
                     <div class="glass-card">
                         <div class="label">Database Coverage</div>
-                        <div class="value accent">1,605,944</div>
+                        <div class="value accent" data-health="n_prices">—</div>
                         <div class="meta">Live price records</div>
                     </div>
                     <div class="glass-card">
                         <div class="label">Commodity Scope</div>
-                        <div class="value">436</div>
+                        <div class="value" data-health="n_commodities">—</div>
                         <div class="meta">Unique agricultural commodities</div>
                     </div>
                     <div class="glass-card">
                         <div class="label">Temporal Window</div>
-                        <div class="value">1994–2026</div>
-                        <div class="meta">Joined IMD weather reports</div>
+                        <div class="value" data-health-window>—</div>
+                        <div class="meta">Earliest to newest arrival date held</div>
                     </div>
                     <div class="glass-card">
-                        <div class="label">API Serving Latency</div>
-                        <div class="value">&lt; 85ms</div>
-                        <div class="meta">FastAPI dynamic endpoints</div>
+                        <div class="label">Warehouse Freshness</div>
+                        <div class="value" data-health="days_behind">—</div>
+                        <div class="meta">Days between the newest arrival date and today</div>
                     </div>
                 </div>
+                <p class="meta" data-health-audit style="font-family: var(--font-mono, monospace); font-size: .78rem;">reading /health…</p>
                 <p>
-                    Our data pipeline runs automated nightly extraction cycles. It pulls arrivals and prices from Agmarknet, validates the transaction schema, matches market records with spatial coordinate keys, and resolves weather attributes by joining spatial grid files from the Indian Meteorological Department.
+                    Our data pipeline runs a continuous extraction cycle: the serving container refreshes its own warehouse every 30 minutes, an outside workflow triggers and verifies a run every 15, and both fail loudly when the newest arrival date does not advance. Each pass pulls arrivals and prices from Agmarknet, validates the transaction schema, matches market records with spatial coordinate keys, and resolves weather attributes by joining spatial grid files from the Indian Meteorological Department.
                 </p>
             </section>
 
@@ -1730,6 +1748,67 @@ flowchart TB
     </script>
     <!-- Canvas Cursor Effect -->
     <script src="cursor-effect.js"></script>
+
+    <div data-site-footer></div>
+    <script src="./assets/site.js"></script>
+
+    <script>
+    /* Fill the ledger cards from the live /health payload, through the same
+       instance resolution the rest of the site uses. Nothing is invented: if
+       the API cannot be read, the cards say so rather than keep a number that
+       was true when this page was written. */
+    (function () {
+        var shell = window.MandiiqShell;
+        var nf = new Intl.NumberFormat("en-IN");
+
+        function fill(key, text) {
+            var nodes = document.querySelectorAll('[data-health="' + key + '"]');
+            for (var i = 0; i < nodes.length; i++) nodes[i].textContent = text;
+        }
+
+        function note(text) {
+            var el = document.querySelector("[data-health-audit]");
+            if (el) el.textContent = text;
+        }
+
+        function paint(hit) {
+            var h = (hit && hit.health) || {};
+            fill("n_prices", h.n_prices == null ? "—" : nf.format(h.n_prices));
+            fill("n_commodities", h.n_commodities == null ? "—" : nf.format(h.n_commodities));
+            var earliest = (h.data_min_date || "").slice(0, 4);
+            var newest = (h.data_max_date || "").slice(0, 4);
+            var rangeEl = document.querySelector("[data-health-window]");
+            if (rangeEl) rangeEl.textContent = (earliest && newest) ? earliest + "–" + newest
+                : (h.data_max_date || "—");
+            var behind = h.days_behind;
+            fill("days_behind", behind == null ? "—" : behind + (behind === 1 ? " day" : " days"));
+            note("Read live from the " + (hit ? hit.label : "?") + " instance (v" + (h.version || "?") +
+                ") · newest arrival date " + (h.data_max_date || "unknown") +
+                " · status " + (h.status || "unknown") + ".");
+        }
+
+        function refresh() {
+            if (!shell || !shell.resolveApi) {
+                note("The shared shell did not load, so these figures cannot be read live.");
+                return Promise.resolve();
+            }
+            return shell.resolveApi().then(paint, function () {
+                fill("n_prices", "unavailable");
+                fill("n_commodities", "unavailable");
+                fill("days_behind", "unavailable");
+                var rangeEl = document.querySelector("[data-health-window]");
+                if (rangeEl) rangeEl.textContent = "unavailable";
+                note("Neither instance of the production API answered /health, so no live figures can be shown.");
+            });
+        }
+
+        refresh();
+        setInterval(refresh, 60000);
+        document.addEventListener("visibilitychange", function () {
+            if (!document.hidden) refresh();
+        });
+    })();
+    </script>
 </body>
 </html>
 

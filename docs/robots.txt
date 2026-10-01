@@ -1,4 +1,10 @@
+# MandiIQ public surfaces.
+#
+# This file used to advertise https://flawsom.github.io/MandiIQ/seo/sitemap-index.xml,
+# which returned 404 - so the sitemap directive was worse than absent. The
+# canonical host is the Vercel deployment of docs/, and sitemap.xml sits next
+# to this file.
 User-agent: *
 Allow: /
 
-Sitemap: https://flawsom.github.io/MandiIQ/seo/sitemap-index.xml
+Sitemap: https://mandiiq.unifies.codes/sitemap.xml
