@@ -44,6 +44,8 @@ import os
 
 import sys
 
+import time
+
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -491,7 +493,7 @@ st.html(
 
 COMMODITY_COLORS = {
 
-    "Onion": "#8B6BC4", "Tomato": "{RUST}",
+    "Onion": "#8B6BC4", "Tomato": RUST,
 
     "Wheat": "#D4A94E", "Potato": "#B98354",
 
@@ -507,7 +509,17 @@ st.html(f"""
 
 .mandiq-topbar {{
 
-    position: fixed; top: 0; left: 0; right: 0;
+    /* In the flow, never position:fixed. Streamlit's own header is pinned at
+
+       top:0 at the top of its own stacking order, so a bar asking for z-index
+
+       1000 was painted underneath it (and underneath the Cloud toolbar): two
+
+       headers in one strip of pixels. That is the "duplicate header" and the
+
+       "alignment error" this bar kept producing. */
+
+    position: relative;
 
     height: 56px;
 
@@ -565,10 +577,6 @@ st.html(f"""
 
 }}
 
-.mandiq-topbar-spacer {{ height: 56px; }}
-
-
-
 /* ── Model-served indicator ── */
 
 .model-served {{
@@ -615,13 +623,17 @@ st.html(f"""
 
 /* ── Hidden Streamlit button for JS theme toggle ── */
 
-/* Target the first Streamlit button container (our hidden toggle).
+/* Hide this one widget and nothing else. Streamlit stamps a widget's key onto
 
-   Streamlit renders it before all other buttons, so :first-of-type
+   its element container as st-key-<key>, so this class is ours alone. The old
 
-   reliably selects it. */
+   :first-of-type rule also matched every OTHER button on every page (each
 
-.stButton:first-of-type {{
+   button is the first div inside its own container), which fixed-positioned
+
+   and zero-sized the entire cockpit's controls. */
+
+[data-testid="stElementContainer"].st-key-_topbar_theme_btn {{
 
     position: fixed !important;
 
@@ -1252,11 +1264,17 @@ _page_label = getattr(pg, 'title', 'Executive Overview')
 
 # ── Hidden Streamlit button for top-bar theme toggle ──
 
-# The JS in the top-bar icon finds this hidden button and clicks it.
+# The top-bar icon's JS clicks this button; its on_click flips surface_mode.
 
-# We identify it by its empty label text (no other Streamlit button
+# It is found by its key - Streamlit puts the key on the element container as
 
-# uses empty text). The on_click lambda flips the surface_mode state.
+# st-key-_topbar_theme_btn, which is also what the CSS hides. Do not go back to
+
+# "the first button in the document": the sidebar renders before the main
+
+# content, so that selector hit the sidebar's "Refresh data now" button and the
+
+# theme icon kicked off an ingest instead of switching the theme.
 
 st.button(
 
@@ -1298,7 +1316,7 @@ _TOPBAR_HTML = (
 
     '<a class="theme-toggle-btn" id="theme-toggle-topbar" href="#" title="Toggle surface mode"'
 
-    'onclick="var btn=document.querySelector(\'[data-testid=stButton] button\');if(btn)btn.click();return false">'
+    'onclick="var btn=document.querySelector(\'.st-key-_topbar_theme_btn button\');if(btn)btn.click();return false">'
 
     '<span id="theme-toggle-icon">' + (SVG_SUN if not _surface_on else SVG_MOON) + '</span>'
 
@@ -1317,8 +1335,6 @@ _TOPBAR_HTML = (
     '</div>'
 
     '</div>'
-
-    '<div class="mandiq-topbar-spacer"></div>'
 
 ) % dict(FAINT=FAINT)
 
@@ -1379,6 +1395,13 @@ def _live_snapshot() -> dict:
             status = "degraded"
         else:
             status = "stale" if int(behind) > 3 else "healthy"
+    # A build that cannot date its own data cannot know that it is fresh, so
+    # "healthy" from such a payload is not a fact - it is the absence of one.
+    # The banner and the sidebar both read this snapshot, so without this the
+    # cockpit could say "stale" in the strip and "healthy" in the sidebar at
+    # the same moment, depending on which instance happened to answer.
+    if status == "healthy" and behind is None and not live.get("data_max_date"):
+        status = "unknown"
     return {
         "status": status,
         "max_date": quality.get("max_date") or live.get("data_max_date"),
@@ -1468,10 +1491,25 @@ if _live["status"] != "healthy":
     )
 
 
+# A full rerun re-enters this tick within the same second; a timer fire
+# arrives a whole interval later. Anything inside this gap is that re-entry,
+# so the tick must not treat it as a new interval. Without the guard the rerun
+# it requests re-enters the tick immediately and loops forever: the script
+# never reaches the sidebar or the page body, and the cockpit paints nothing
+# but the freshness banner. That is what shipped in 2.4.1.
+_LIVE_TICK_REENTRY_S = 5.0
+
 if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
+    st.session_state.setdefault("_live_tick_last", time.time())
+
     @st.fragment(run_every=LIVE_REFRESH_SECONDS)
     def _live_tick():
         """Re-render the whole page on a timer so no number goes stale."""
+        gap = min(LIVE_REFRESH_SECONDS, _LIVE_TICK_REENTRY_S)
+        last = float(st.session_state.get("_live_tick_last") or 0.0)
+        if time.time() - last < gap:
+            return
+        st.session_state["_live_tick_last"] = time.time()
         _live_snapshot.clear()
         st.rerun(scope="app")
 

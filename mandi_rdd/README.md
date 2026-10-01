@@ -104,6 +104,13 @@ The dashboard uses a 3-layer styling model (spec: [`PROJECT_STATUS.md` §Visual 
 
 Palette: Ink Indigo `#0B0F1E` / Rain Slate `#2E3A55` / Paper `#F2EFE6` / **Turmeric `#E8B14D`** (accent) / commodity colors (Onion `#8B6BC4`, Tomato `#D9663B`, Wheat `#D4A94E`, Potato `#B98354`). **Accessibility guarantees:** focus outlines are never suppressed (`*:focus-visible` outline preserved), and `prefers-reduced-motion` disables all animation. A screenshot check of the Executive Overview page after any Streamlit upgrade is the recommended catch for CSS regressions (no heavy automation).
 
+**Shell invariants.** Each of these has already shipped broken and is now pinned by `tests/test_dashboard_boot.py`:
+
+- **One banner per run.** The freshness banner is emitted exactly once, by the app shell. It appeared *twice* on a page that looked settled, because the app was never finishing a run (see the tick below) and each aborted run re-painted the elements it reached.
+- **The top bar stays in the flow.** It must never be `position: fixed`. Streamlit's own header is pinned at `top: 0` at the top of its own stacking order, so a bar asking for `z-index: 1000` is painted underneath it (and underneath the Cloud toolbar) and the two headers share one 56px strip - which is both the reported "duplicate header" and the "alignment error".
+- **The hidden theme toggle is hidden by key.** `[data-testid="stElementContainer"].st-key-_topbar_theme_btn` targets that one widget. The earlier `:first-of-type` rule matched *every* button (each button is the first div inside its own element container) and fixed-positioned them all at zero size, which blanked the cockpit's controls. The toggle's JS clicks `.st-key-_topbar_theme_btn button` - "the first button in the document" is a *sidebar* button, because Streamlit renders the sidebar before the page.
+- **The live tick throttles its own rerun.** A `st.fragment(run_every=…)` whose body unconditionally calls `st.rerun(scope="app")` re-enters itself on the rerun it just requested, forever. The script then never reaches the sidebar (`app.py` builds it after the tick) or `pg.run()`, so the cockpit paints the theme, the top bar and a stack of banners and nothing else. `_LIVE_TICK_REENTRY_S` is the guard, and the boot test runs at the production interval so a regression cannot hide behind a disabled tick.
+
 ---
 
 ## 🚀 Quick Start
@@ -178,7 +185,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**222 test items passing** (204 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
+**226 test items passing** (208 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -195,7 +202,7 @@ pytest mandi_rdd/tests/ -v
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
 | `test_consumer_check.py` (11 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, plus an unrepaired index fault as a blocker |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
-| `test_dashboard_boot.py` (5 tests) | Headless Streamlit run, every page imports, route table intact, live-freshness strip wired in |
+| `test_dashboard_boot.py` (9 tests) | Headless Streamlit run at the production refresh interval (a rerun loop shows up as a run that never settles), one settled run paints the chrome + sidebar + page body with exactly one banner, the shell cannot fix-position its header or hide every button, the live tick throttles its own rerun, a build that cannot date its data is never called healthy, every page imports, route table intact |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
 

@@ -339,9 +339,11 @@ def _render_freshness_widget():
     # Count how many commodities have data in the last 7 days
     import datetime
     _seven_days_ago = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    # str() again: the DuckDB fallback returns date/Timestamp objects, and
+    # comparing those to the ISO string above raises TypeError.
     recent_count = sum(
         1 for r in freshness_data if isinstance(r, dict)
-        and r.get("latest_date", "") >= _seven_days_ago
+        and str(r.get("latest_date", "") or "")[:10] >= _seven_days_ago
     )
 
     # KPI micro-row
@@ -449,8 +451,13 @@ def _render_freshness_widget():
         if not isinstance(r, dict):
             continue
         commodity = (r.get("commodity") or "Other / Uncategorized").title()
-        latest = r.get("latest_date") or "-"
-        earliest = r.get("earliest_date") or "-"
+        # DuckDB hands back datetime.date/Timestamp here, the API hands back
+        # strings. Without normalising, the comparison below raises
+        # ">= not supported between instances of 'Timestamp' and 'str'" and the
+        # page becomes a traceback exactly when the API is unreachable - the
+        # moment the freshness table matters most.
+        latest = str(r.get("latest_date") or "-")[:10]
+        earliest = str(r.get("earliest_date") or "-")[:10]
         row_count = r.get("row_count", 0)
         n_districts = r.get("n_districts", 0)
         n_states = r.get("n_states", 0)
