@@ -538,6 +538,56 @@ def test_every_workflow_is_valid_yaml():
         assert isinstance(doc, dict), f"{path.name} is not a YAML mapping"
 
 
+def test_the_run_persists_what_the_mirror_step_did(tmp_path):
+    """An armed mirror the host refuses must not read as a working one.
+
+    /health derives ``mirror_configured`` from the environment alone, so the
+    run record is the only place a rejected token can be told from a backfill -
+    and the difference is the whole reason the warehouse stays frozen while a
+    token is set. A run that never reached the mirror step claims nothing.
+    """
+    from mandi_rdd.ingestion import scheduler
+
+    out = tmp_path / "last_ingest_status.json"
+    scheduler._write_ingest_status(
+        {
+            "status": "degraded",
+            "error": (
+                "price source unavailable: <urlopen error [Errno 111] "
+                "Connection refused>"
+            ),
+            "steps": {
+                "prices": {"fetched": 0, "new": 0},
+                "prices_ceda": {
+                    "status": "error",
+                    "error": "HTTPError: HTTP Error 401",
+                    "http_status": 401,
+                    "token_rejected": True,
+                    "fetched": 0,
+                    "new": 0,
+                },
+            },
+            "duration_seconds": 108.8,
+        },
+        status_path=out,
+    )
+    record = json.loads(out.read_text(encoding="utf-8"))
+    assert record["ceda"]["status"] == "error"
+    assert "401" in record["ceda"]["error"]
+    assert record["ceda"]["token_rejected"] is True, (
+        "the cockpit repeats a remedy from this record, so a refused token has "
+        "to survive the write"
+    )
+
+    scheduler._write_ingest_status(
+        {"status": "ok", "steps": {"prices": {"fetched": 5, "new": 2}}},
+        status_path=out,
+    )
+    assert json.loads(out.read_text(encoding="utf-8"))["ceda"] is None, (
+        "a mirror step that never ran must not be recorded as one that did"
+    )
+
+
 def test_ingest_workflow_schedule_secret_and_commit_policy():
     path = WORKFLOWS_DIR / "nightly-ingest.yml"
     text = path.read_text(encoding="utf-8")

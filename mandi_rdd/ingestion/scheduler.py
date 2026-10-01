@@ -581,6 +581,20 @@ def _run_ingestion_locked(
                     summary["steps"]["prices_ceda"].update(
                         {"fetched": n_ceda, "new": n_ceda_new}
                     )
+                    # Why a zero is a zero. The mirror answers "No data exists"
+                    # for a window its archive does not cover - which is every
+                    # live window, because its daily coverage ends around
+                    # 2025-10 - so an armed mirror that can never answer a live
+                    # request must not read as a broken one.
+                    if ceda_out.get("last_message"):
+                        summary["steps"]["prices_ceda"]["note"] = str(
+                            ceda_out["last_message"]
+                        )[:200]
+                    elif n_ceda == 0:
+                        summary["steps"]["prices_ceda"]["note"] = (
+                            "the mirror returned no rows and no message for "
+                            "this window"
+                        )
                     if ceda_out:
                         next_index = int(ceda_out.get("offset") or 0)
                         if next_index != ceda_cursor or ceda_out.get("completed_pass"):
@@ -611,10 +625,17 @@ def _run_ingestion_locked(
                     }
                 else:
                     logger.warning(f"CEDA mirror fallback skipped: {ceda_error}")
-                    summary["steps"]["prices_ceda"] = {
-                        "status": "error",
-                        "error": str(ceda_error),
-                    }
+                    step = {"status": "error", "error": str(ceda_error)}
+                    # An HTTP status is the difference between "the network is
+                    # down" and "this token is not acceptable", and only the
+                    # second one is fixed by re-issuing the key. Recorded, so
+                    # the cockpit repeats the remedy that actually applies.
+                    code = getattr(ceda_error, "code", None)
+                    if isinstance(code, int):
+                        step["http_status"] = code
+                        if code in (401, 403):
+                            step["token_rejected"] = True
+                    summary["steps"]["prices_ceda"] = step
 
     # 2b. Supplementary variety-wise recent-price feed (resource 35985678).
     # Bounded + best-effort: never blocks the main pipeline if it fails.
@@ -1030,6 +1051,21 @@ def _write_ingest_status(summary: dict, status_path: Path = None) -> None:
     # Persist the price-index check with the run. The process that hit a fatal
     # index fault is killed by it, so an in-memory record would be gone exactly
     # when /health is asked to prove the heal happened.
+    # The mirror step is persisted too, because "a token is configured" and
+    # "the mirror works" are different facts and only the second one fills
+    # rows. A run whose last_ceda says error/401 is a mirror that is armed and
+    # refused - the state this file used to hide behind outcome "degraded".
+    ceda = steps.get("prices_ceda")
+    ceda_record = None
+    if isinstance(ceda, dict):
+        ceda_record = {
+            key: ceda.get(key)
+            for key in (
+                "status", "error", "note", "fetched", "new", "retry_after_s",
+                "http_status", "token_rejected",
+            )
+            if ceda.get(key) is not None
+        }
     index = steps.get("index_health")
     index_health = None
     if isinstance(index, dict):
@@ -1056,6 +1092,7 @@ def _write_ingest_status(summary: dict, status_path: Path = None) -> None:
         "days_behind": quality.get("days_behind"),
         "n_future_dates": quality.get("n_future_dates"),
         "index_health": index_health,
+        "ceda": ceda_record,
     }
     try:
         out = status_path or (

@@ -117,6 +117,11 @@ class HealthResponse(BaseModel):
     # these two fields say so without the caller having to run a probe.
     last_price_source: Optional[str] = None
     mirror_configured: bool = False
+    # What the last run's mirror step actually did. ``mirror_configured`` says
+    # a token is set; this says whether the host accepted it - and production
+    # ran for a day with the flag true and a token the host answered 401 to,
+    # backfilling nothing while /health implied the fallback was armed.
+    last_ceda: Optional[dict] = None
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
@@ -1027,6 +1032,7 @@ async def health():
         last_run_utc = None
         last_outcome = None
         last_price_source = None
+        last_ceda = None
         try:
             status_path = (
                 Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
@@ -1037,6 +1043,8 @@ async def health():
                 last_run_utc = record.get("last_run_utc")
                 last_outcome = record.get("outcome")
                 last_price_source = record.get("price_source")
+                if isinstance(record.get("ceda"), dict):
+                    last_ceda = record["ceda"]
         except Exception:
             pass
 
@@ -1083,6 +1091,7 @@ async def health():
             safe_recovery=_recovery_is_safe(),
             last_price_source=last_price_source,
             mirror_configured=_ceda_configured(),
+            last_ceda=last_ceda,
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),
@@ -1522,6 +1531,56 @@ def _probe_enam(timeout: float = 15.0) -> dict:
         }
 
 
+def _source_probe_hint(report: dict) -> Optional[str]:
+    """The one line an operator needs when nothing here can advance the date.
+
+    Kept out of the endpoint so it can be tested without running the probes.
+    "A token is set" is not "the mirror is armed": production held a CEDA token
+    the host answered 401 to, and the hint below used to answer that state with
+    "CEDA is not armed; setting MANDIIQ_CEDA_API_KEY ..." - telling the operator
+    to set the key that was already set, on the one surface built to explain a
+    frozen warehouse.
+    """
+    if report.get("can_ingest_live_data"):
+        return None
+    ceda = report.get("ceda") or {}
+    parts = [
+        "No source measured here can advance the newest date. "
+        "api.data.gov.in is blocked from cloud networks."
+    ]
+    if ceda.get("configured") and ceda.get("reachable"):
+        parts.append(
+            "The CEDA mirror is armed and reachable, but its archive ends "
+            "around 2025-10 - it backfills history and will not close the "
+            "gap to today."
+        )
+    elif ceda.get("configured"):
+        detail = ceda.get("error") or "no reason reported"
+        if ceda.get("token_rejected"):
+            parts.append(
+                "The CEDA mirror is armed with a token the host rejected "
+                f"({detail}), so nothing backfills - re-issue it at "
+                "https://api.ceda.ashoka.edu.in/documentation/ and re-paste "
+                "MANDIIQ_CEDA_API_KEY."
+            )
+        else:
+            parts.append(
+                "The CEDA mirror is armed but did not answer from here "
+                f"({detail}) - it backfills history when it can be reached, "
+                "and cannot close the gap to today either way."
+            )
+    else:
+        parts.append(
+            "CEDA is not armed; setting MANDIIQ_CEDA_API_KEY lets it "
+            "backfill history (token from "
+            "https://api.ceda.ashoka.edu.in/documentation/)."
+        )
+    enam_verdict = (report.get("enam") or {}).get("verdict")
+    if enam_verdict:
+        parts.append(f"eNAM: {enam_verdict}.")
+    return " ".join(parts)
+
+
 @app.get("/admin/source-probe", tags=["Admin"])
 async def admin_source_probe(timeout: float = 20.0):
     """Ask every configured price source whether it can be reached from here.
@@ -1602,27 +1661,9 @@ async def admin_source_probe(timeout: float = 20.0):
         report["can_ingest_live_data"] = bool(data_gov_ok or enam_ok)
         report["can_backfill_history_only"] = bool(ceda_ok and not report["can_ingest_live_data"])
 
-        if not report["can_ingest_live_data"]:
-            parts = [
-                "No source measured here can advance the newest date. "
-                "api.data.gov.in is blocked from cloud networks."
-            ]
-            if ceda_ok:
-                parts.append(
-                    "The CEDA mirror is armed and reachable, but its archive ends "
-                    "around 2025-10 - it backfills history and will not close the "
-                    "gap to today."
-                )
-            else:
-                parts.append(
-                    "CEDA is not armed; setting MANDIIQ_CEDA_API_KEY lets it "
-                    "backfill history (token from "
-                    "https://api.ceda.ashoka.edu.in/documentation/)."
-                )
-            enam_verdict = enam.get("verdict")
-            if enam_verdict:
-                parts.append(f"eNAM: {enam_verdict}.")
-            report["hint"] = " ".join(parts)
+        hint = _source_probe_hint(report)
+        if hint:
+            report["hint"] = hint
         return report
 
     return await anyio.to_thread.run_sync(run)

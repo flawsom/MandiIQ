@@ -413,6 +413,12 @@ def iter_ceda_pages(
                 },
             )
             rows = _rows(payload)
+            message = response_message(payload)
+            if message and cursor_out is not None:
+                # CEDA's own words for an empty response: "No data exists" for a
+                # window its archive does not cover is the difference between an
+                # armed mirror doing its job and an operator hunting a bug.
+                cursor_out["last_message"] = message
         except CedaRateLimited as exc:
             # The host locked us out - usually a ~30 minute Retry-After. Every
             # remaining call in this pass would be refused too, so stop asking
@@ -534,6 +540,30 @@ def probe(timeout: float = 20.0) -> dict:
             "key_len": len(key or ""),
             "counts": out,
         }
+    except urllib.error.HTTPError as exc:
+        # A 401/403 is not "the host is unreachable": the host answered, and it
+        # answered that this token is not acceptable. The two have different
+        # fixes - a network versus a key - and while they read the same, an
+        # operator holding a stale token sees "configured: true" and concludes
+        # the mirror is armed. Nothing backfills while the host refuses it, so
+        # the probe says which one happened and what to do about it.
+        rejected = exc.code in (401, 403)
+        out = {
+            "configured": True,
+            "reachable": False,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+            "http_status": exc.code,
+            "error": f"HTTPError: HTTP Error {exc.code}",
+        }
+        if rejected:
+            out["token_rejected"] = True
+            out["hint"] = (
+                "the mirror refused the configured token - re-issue it at "
+                "https://api.ceda.ashoka.edu.in/documentation/ and re-paste "
+                "MANDIIQ_CEDA_API_KEY. A token the host rejects is not an armed "
+                "mirror: no rows arrive while it is set."
+            )
+        return out
     except Exception as exc:
         return {
             "configured": True,

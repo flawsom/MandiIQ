@@ -342,6 +342,55 @@ def test_the_index_record_survives_the_restart_it_caused(app_module, tmp_path):
     assert app_module._persisted_index_health(tmp_path / "missing.json") is None
 
 
+def test_the_source_probe_names_a_mirror_key_the_host_rejects(app_module):
+    """"A token is set" is not "the mirror works".
+
+    Production ran with ``mirror_configured: true`` and a CEDA token the host
+    answered 401 to, while the probe's hint said "CEDA is not armed; setting
+    MANDIIQ_CEDA_API_KEY ..." - the one surface built to explain a frozen
+    warehouse was pointing the operator at a key that was already set, so the
+    rejected token stayed invisible and the backfill stayed absent.
+    """
+    assert "last_ceda" in app_module.HealthResponse.model_fields, (
+        "/health must be able to say what the mirror step did, not just that a key exists"
+    )
+
+    hint = app_module._source_probe_hint(
+        {
+            "can_ingest_live_data": False,
+            "sources": [{"host": "api.data.gov.in", "ok": False}],
+            "ceda": {
+                "configured": True,
+                "reachable": False,
+                "token_rejected": True,
+                "error": "HTTPError: HTTP Error 401",
+            },
+            "enam": {},
+        }
+    )
+    assert "rejected" in hint and "401" in hint
+    assert "CEDA is not armed" not in hint, (
+        "a key that is set must never be reported as a key that is missing"
+    )
+    assert "MANDIIQ_CEDA_API_KEY" in hint, (
+        "the remedy is to re-paste the token, so the variable must be named"
+    )
+
+    unarmed = app_module._source_probe_hint(
+        {
+            "can_ingest_live_data": False,
+            "sources": [],
+            "ceda": {"configured": False},
+            "enam": {},
+        }
+    )
+    assert "CEDA is not armed" in unarmed and "MANDIIQ_CEDA_API_KEY" in unarmed
+
+    assert app_module._source_probe_hint({"can_ingest_live_data": True}) is None, (
+        "a source that can advance the date needs no remedy paragraph"
+    )
+
+
 def test_health_exposes_a_pending_fault_and_the_check(app_module, tmp_path, monkeypatch):
     """An unrepaired fault must be visible immediately, not only once someone
     notices that the numbers stopped moving."""

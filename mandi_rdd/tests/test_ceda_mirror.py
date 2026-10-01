@@ -14,6 +14,7 @@ it safe to run unattended:
 
 from __future__ import annotations
 
+import urllib.error
 from datetime import date
 
 import pytest
@@ -252,6 +253,40 @@ def test_probe_reports_a_configured_but_unreachable_mirror(monkeypatch):
     assert probe["configured"] is True
     assert probe["reachable"] is False
     assert "Connection refused" in probe["error"]
+    assert "token_rejected" not in probe, (
+        "a transport failure is not a verdict about the key"
+    )
+
+
+def test_probe_says_the_token_was_rejected_not_that_the_host_is_down(monkeypatch):
+    """A 401 is an answer, and it is answered about the key.
+
+    Production held a CEDA token the host refused while /health reported
+    ``mirror_configured: true``, so "a token is set" and "the mirror works"
+    looked identical - the warehouse was read as merely starved while nothing
+    backfilled. The probe has to tell those apart, and its remedy for a
+    rejected token is a new token, not retrying the network.
+    """
+    monkeypatch.setenv("MANDIIQ_CEDA_API_KEY", "token")
+
+    def _reject(path, body=None, timeout=20.0):
+        raise urllib.error.HTTPError(
+            "https://api.ceda.ashoka.edu.in/v1" + path,
+            401,
+            "Unauthorized",
+            {},
+            None,
+        )
+
+    monkeypatch.setattr(fetch_ceda, "_request", _reject)
+    probe = fetch_ceda.probe(timeout=0.1)
+
+    assert probe["configured"] is True and probe["reachable"] is False
+    assert probe["token_rejected"] is True
+    assert probe["http_status"] == 401
+    assert "401" in probe["error"]
+    assert "re-issue" in probe["hint"]
+    assert "MANDIIQ_CEDA_API_KEY" in probe["hint"]
 
 
 # ---------------------------------------------------------------------------

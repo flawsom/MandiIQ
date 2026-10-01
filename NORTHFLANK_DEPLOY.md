@@ -486,6 +486,17 @@
 # between the newest date in the warehouse and today. Do not describe it as
 # the live fallback in any status page - the honest report is "archive only".
 #
+# A token that is set is not a mirror that works. On 2026-10-01 production
+# held a token the host answered 401 to while /health reported
+# `mirror_configured: true`, so the only visible symptom was a warehouse that
+# never filled - the mirror read as armed and did nothing. The probe now
+# answers that state with `ceda.token_rejected` + `ceda.http_status`, and
+# /health carries `last_ceda` (status, error, http_status, token_rejected)
+# from the last run, so "armed" and "working" can be told apart without
+# waiting on a 24-second probe. When the verdict is a rejection, re-paste the
+# token with no surrounding quotes or whitespace: a refused token backfills
+# nothing, and the key being present is not evidence that it works.
+#
 # Rows land in the same `prices` table with market = district name and
 # variety/grade = "Agmarknet daily (CEDA)", so they never collide with the
 # variety-level rows the primary feed writes. The walk is bounded by
@@ -518,6 +529,8 @@
 #
 # It reports, per configured host, whether it answered (and the newest arrival
 # date it serves), whether the CEDA mirror is armed and reachable, and a
-# single verdict field `can_ingest_live_data`. /health also carries
-# `last_price_source` and `mirror_configured`, so "stale because upstream is
-# dark" and "stale because we are misconfigured" stop looking identical.
+# single verdict field `can_ingest_live_data`. /health carries
+# `last_price_source`, `mirror_configured` and `last_ceda` (what the last
+# run's mirror step did, including a rejected token), so "stale because
+# upstream is dark" and "stale because we are misconfigured" stop looking
+# identical - and an armed-but-refused mirror stops looking like an armed one.
