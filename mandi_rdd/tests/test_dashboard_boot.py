@@ -76,6 +76,11 @@ def test_one_run_paints_the_whole_cockpit_and_one_banner(monkeypatch):
     banners = [b for b in bodies if "mandiq-live-banner" in b]
     assert len(banners) == 1, f"expected one freshness banner, got {len(banners)}"
 
+    sidebar_blocks = [b for b in bodies if ">Live data</div>" in b]
+    assert len(sidebar_blocks) == 1, (
+        f"expected one sidebar freshness block, got {len(sidebar_blocks)}"
+    )
+
     hero = [str(m.value) for m in app.markdown if "page-hero" in str(m.value)]
     assert hero, "the page body never rendered - only the shell did"
 
@@ -116,12 +121,53 @@ def test_the_shell_cannot_double_its_header_or_hide_its_controls():
     assert '"{RUST}"' not in source, "an un-substituted CSS placeholder is leaking into the sidebar"
 
 
-def test_the_live_tick_throttles_its_own_rerun():
-    """The tick must never treat its own re-entry as a new interval."""
+def _function_block(source: str, name: str) -> str:
+    """The whole body of a top-level ``def <name>(`` block, by indentation."""
+    lines = source.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"def {name}("))
+    block = [lines[start]]
+    for line in lines[start + 1:]:
+        if line.strip() and not line.startswith((" ", "\t")):
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
+def test_the_freshness_surfaces_repaint_themselves_and_never_rerun_the_app():
+    """The shell must ask for no whole-app rerun at all.
+
+    A rerun requested from inside a timer fragment hands the browser a run it
+    did not ask for while the elements of the run that was interrupted are still
+    on screen, and the freshness strip - what every run paints first - is the
+    element that then ends up painted twice. Both freshness surfaces therefore
+    repaint themselves in place, each in its own fragment, which is the one
+    repaint path Streamlit clears and redraws instead of accumulating.
+    """
     source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
-    assert "_LIVE_TICK_REENTRY_S" in source
-    assert 'setdefault("_live_tick_last"' in source
-    assert 'if time.time() - last < gap:' in source, "the rerun lost its guard"
+
+    assert "st.rerun(" not in source, (
+        "the shell must not rerun the app - repaint through a fragment instead"
+    )
+    assert "_LIVE_TICK_REENTRY_S" not in source, (
+        "the re-entry guard only made sense while the tick reran the app"
+    )
+
+    for tick in ("_paint_live_strip_tick", "_paint_sidebar_live_tick"):
+        assert f"st.fragment(run_every=LIVE_REFRESH_SECONDS)({tick})" in source, (
+            f"{tick} must be the fragment that repaints it in place"
+        )
+        assert "_live_snapshot()" in _function_block(source, tick), (
+            f"{tick} must paint the shared snapshot"
+        )
+
+    # A repaint has to be a pure paint: reading inside the painter would leave
+    # the strip able to fail (or block on the API) midway through a repaint.
+    for painter in ("_paint_live_strip", "_paint_sidebar_live"):
+        body = _function_block(source, painter)
+        for forbidden in ("_live_snapshot()", "get_health(", "requests.", "_request_ingest("):
+            assert forbidden not in body, (
+                f"{painter} must paint the snapshot it is handed, not fetch one"
+            )
 
 
 def test_a_build_that_cannot_date_its_data_is_never_called_healthy():
@@ -139,23 +185,27 @@ def test_a_build_that_cannot_date_its_data_is_never_called_healthy():
 
 
 def test_live_freshness_strip_is_wired_into_the_shell():
-    """The staleness banner, the auto-refresh tick and the manual refresh
-    control all have to be present: they are what keeps every number on the
-    page current instead of a snapshot nobody remembered to reload."""
+    """The staleness strip, the auto-refresh fragments and the manual refresh
+    control all have to be present: they are what keeps every figure's age
+    honest instead of a snapshot nobody remembered to reload."""
     source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
     for needle in (
         "def _live_snapshot",
         "def _behind_wording",
         "def _request_ingest",
+        "def _paint_live_strip",
+        "def _paint_sidebar_live",
         "mandiq-live-banner",
         "run_every=LIVE_REFRESH_SECONDS",
-        'st.rerun(scope="app")',
         "MANDIIQ_UI_REFRESH_SECONDS",
     ):
         assert needle in source, f"dashboard shell is missing {needle!r}"
-    # The banner must be driven by the API's own status vocabulary, not a
+    # The strip must be driven by the API's own status vocabulary, not a
     # hard-coded "healthy".
-    assert 'if _live["status"] != "healthy"' in source
+    assert 'if live["status"] == "healthy"' in source
+    # A repaint that finds the same /health payload would otherwise look like no
+    # repaint at all, so the sidebar block dates itself.
+    assert '"checked "' in source and "time.gmtime()" in source
 
 
 def test_every_page_module_is_importable():

@@ -1349,8 +1349,8 @@ st.html(_TOPBAR_HTML)
 # ═══════════════════════════════════════════════════════════
 # Every figure on every page is served by the production API. This strip says
 # how old that warehouse actually is - in the same words the API uses - and
-# the tick below re-renders the page on a timer so nothing on screen is a
-# snapshot somebody had to remember to refresh.
+# the two fragments below repaint it, and the sidebar's copy of it, on a timer
+# so neither is a snapshot somebody had to remember to refresh.
 
 try:
     LIVE_REFRESH_SECONDS = max(0, int(os.environ.get("MANDIIQ_UI_REFRESH_SECONDS", "60")))
@@ -1436,28 +1436,34 @@ def _request_ingest() -> bool:
         return False
 
 
-_live = _live_snapshot()
-if _live["status"] != "healthy":
+def _paint_live_strip(live: dict) -> None:
+    """The strip above the page body: what the warehouse holds, and how old it is.
+
+    Reading and painting are separate so the strip can repaint itself on a
+    timer (see ``_paint_live_strip_tick``) without repainting anything else.
+    """
+    if live["status"] == "healthy":
+        return
     _blurb = {
         "stale": "The newest arrival date is more than three days old, so every figure here is behind reality.",
         "degraded": "The warehouse holds arrival dates that cannot be true, so affected commodities are unreliable.",
         "empty": "The warehouse has no price rows at all.",
         "unknown": "The API did not report how old its data is.",
-    }.get(_live["status"], "Data freshness is not what it should be.")
-    _facts = ["data through <b>%s</b>" % (_live["max_date"] or "unknown"),
-              _behind_wording(_live["behind"])]
-    if _live["n_prices"]:
-        _facts.append("{:,} rows".format(int(_live["n_prices"])))
-    if _live["future"]:
-        _facts.append("<b>%s impossible date(s)</b>" % _live["future"])
-    if _live["last_refresh_error"]:
-        _facts.append("last refresh error: %s" % str(_live["last_refresh_error"])[:180])
-    if _live["last_price_source"]:
-        _facts.append("prices last served by %s" % str(_live["last_price_source"])[:120])
-    elif _live["status"] in ("stale", "degraded"):
+    }.get(live["status"], "Data freshness is not what it should be.")
+    _facts = ["data through <b>%s</b>" % (live["max_date"] or "unknown"),
+              _behind_wording(live["behind"])]
+    if live["n_prices"]:
+        _facts.append("{:,} rows".format(int(live["n_prices"])))
+    if live["future"]:
+        _facts.append("<b>%s impossible date(s)</b>" % live["future"])
+    if live["last_refresh_error"]:
+        _facts.append("last refresh error: %s" % str(live["last_refresh_error"])[:180])
+    if live["last_price_source"]:
+        _facts.append("prices last served by %s" % str(live["last_price_source"])[:120])
+    elif live["status"] in ("stale", "degraded"):
         # "No rows arrived" and "no source answered" are different problems.
         _facts.append("no price source has answered yet")
-    if not _live["mirror_configured"] and _live["status"] in ("stale", "degraded"):
+    if not live["mirror_configured"] and live["status"] in ("stale", "degraded"):
         # The documented feed is unreachable from cloud networks, so this is
         # the one action that restores the daily update - say it in the app
         # rather than in a deploy note nobody opens.
@@ -1484,36 +1490,89 @@ if _live["status"] != "healthy":
             RUST=RUST,
             RUST_RGB="%d,%d,%d" % (int(RUST[1:3], 16), int(RUST[3:5], 16), int(RUST[5:7], 16)),
             PAPER=PAPER,
-            STATUS=_live["status"],
+            STATUS=live["status"],
             BLURB=_blurb,
             FACTS=" &middot; ".join(_facts),
         )
     )
 
 
-# A full rerun re-enters this tick within the same second; a timer fire
-# arrives a whole interval later. Anything inside this gap is that re-entry,
-# so the tick must not treat it as a new interval. Without the guard the rerun
-# it requests re-enters the tick immediately and loops forever: the script
-# never reaches the sidebar or the page body, and the cockpit paints nothing
-# but the freshness banner. That is what shipped in 2.4.1.
-_LIVE_TICK_REENTRY_S = 5.0
+def _paint_live_strip_tick() -> None:
+    """Repaint the strip in place. This is the whole auto-refresh of the shell.
 
+    It must never call ``st.rerun``. A rerun asked for from a fragment runs the
+    shell while the browser still holds the elements of the run it just
+    interrupted, and the strip - the first element every run paints - is what
+    then ends up on screen twice. Streamlit clears and redraws a fragment's own
+    elements on every fragment rerun, which is the one repaint path that cannot
+    accumulate: a fragment repaint of the strip can only ever be one strip.
+
+    2.4.1 stacked this same banner by looping the tick; the guard that stopped
+    the loop left the timer, so a settled page could still collect a second
+    banner - and a first one behind it.
+    """
+    _paint_live_strip(_live_snapshot())
+
+
+def _paint_sidebar_live(live: dict) -> None:
+    """The sidebar's copy of the strip: the same snapshot, in the same words.
+
+    Both surfaces read ``_live_snapshot``, so the two halves of the cockpit
+    cannot disagree about the warehouse behind them.
+    """
+    st.html('<div class="sidebar-section-header">Live data</div>')
+    _accent = SAGE if live["status"] == "healthy" else RUST
+    _sidebar_rows = ("%s rows" % format(int(live["n_prices"]), ",")) \
+        if live["n_prices"] else "row count unknown"
+    _lines = [
+        '<span style="color:%s;">&#9679;</span> %s' % (_accent, live["status"]),
+        'through <span style="color:%s;">%s</span>' % (PAPER, live["max_date"] or "unknown"),
+        _behind_wording(live["behind"]) + " &middot; " + _sidebar_rows,
+    ]
+    if live["future"]:
+        _lines.append("%s impossible date(s)" % live["future"])
+    if live["n_commodities"]:
+        _lines.append("%s commodities" % format(int(live["n_commodities"]), ","))
+    if live["last_run"]:
+        _lines.append("ingest %s &middot; %s" % (
+            str(live["last_run"])[:16].replace("T", " "),
+            live["last_outcome"] or "unknown",
+        ))
+    if live["refresh_runs"] is not None:
+        _lines.append("self-refresh %d/%d ok" % (
+            int(live["refresh_runs"]) - int(live["refresh_failures"] or 0),
+            int(live["refresh_runs"]),
+        ))
+    if live["last_refresh_error"]:
+        _lines.append("error: " + str(live["last_refresh_error"])[:140])
+    if live["version"]:
+        _lines.append("build " + str(live["version"]))
+    # A repaint that finds the same /health payload looks like no repaint at
+    # all, so the block dates itself. That is the difference between "the
+    # cockpit stopped refreshing" and "the warehouse has nothing new to say".
+    _lines.append("checked " + time.strftime("%H:%M", time.gmtime()) + " UTC")
+    st.html(
+        '<div style="padding:0 1rem 0.4rem;font-family:IBM Plex Mono,monospace;'
+        'font-size:0.68rem;line-height:1.7;color:' + MUTED + ';">'
+        + "<br>".join(_lines) + '</div>'
+    )
+
+
+def _paint_sidebar_live_tick() -> None:
+    """Repaint the sidebar block in place, off the strip's own snapshot."""
+    _paint_sidebar_live(_live_snapshot())
+
+
+# The auto-refresh: one fragment per freshness surface, each repainting its own
+# elements in place on the timer. Fragments are the only repaint path Streamlit
+# guarantees cannot accumulate, and this shell asks for no whole-app rerun at
+# all - see _paint_live_strip_tick for what a rerun asked from a fragment costs.
+# With "Live updates" switched off, both surfaces are painted once, statically.
 if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
-    st.session_state.setdefault("_live_tick_last", time.time())
-
-    @st.fragment(run_every=LIVE_REFRESH_SECONDS)
-    def _live_tick():
-        """Re-render the whole page on a timer so no number goes stale."""
-        gap = min(LIVE_REFRESH_SECONDS, _LIVE_TICK_REENTRY_S)
-        last = float(st.session_state.get("_live_tick_last") or 0.0)
-        if time.time() - last < gap:
-            return
-        st.session_state["_live_tick_last"] = time.time()
-        _live_snapshot.clear()
-        st.rerun(scope="app")
-
-    _live_tick()
+    _strip_tick = st.fragment(run_every=LIVE_REFRESH_SECONDS)(_paint_live_strip_tick)
+    _strip_tick()
+else:
+    _paint_live_strip_tick()
 
 
 
@@ -1597,41 +1656,15 @@ with st.sidebar:
 
     # ── Live data provenance ──
     # Every figure in this cockpit is only as good as the warehouse behind it,
-    # so its age is stated in the same words the API uses - and it updates
-    # itself on a timer rather than waiting for someone to press R.
-    st.html('<div class="sidebar-section-header">Live data</div>')
-
-    _accent = SAGE if _live["status"] == "healthy" else RUST
-    _sidebar_rows = ("%s rows" % format(int(_live["n_prices"]), ",")) \
-        if _live["n_prices"] else "row count unknown"
-    _lines = [
-        '<span style="color:%s;">&#9679;</span> %s' % (_accent, _live["status"]),
-        'through <span style="color:%s;">%s</span>' % (PAPER, _live["max_date"] or "unknown"),
-        _behind_wording(_live["behind"]) + " &middot; " + _sidebar_rows,
-    ]
-    if _live["future"]:
-        _lines.append("%s impossible date(s)" % _live["future"])
-    if _live["n_commodities"]:
-        _lines.append("%s commodities" % format(int(_live["n_commodities"]), ","))
-    if _live["last_run"]:
-        _lines.append("ingest %s &middot; %s" % (
-            str(_live["last_run"])[:16].replace("T", " "),
-            _live["last_outcome"] or "unknown",
-        ))
-    if _live["refresh_runs"] is not None:
-        _lines.append("self-refresh %d/%d ok" % (
-            int(_live["refresh_runs"]) - int(_live["refresh_failures"] or 0),
-            int(_live["refresh_runs"]),
-        ))
-    if _live["last_refresh_error"]:
-        _lines.append("error: " + str(_live["last_refresh_error"])[:140])
-    if _live["version"]:
-        _lines.append("build " + str(_live["version"]))
-    st.html(
-        '<div style="padding:0 1rem 0.4rem;font-family:IBM Plex Mono,monospace;'
-        'font-size:0.68rem;line-height:1.7;color:' + MUTED + ';">'
-        + "<br>".join(_lines) + '</div>'
-    )
+    # so its age is stated in the same words the API uses - and, like the
+    # strip, it repaints itself on a timer rather than waiting for someone to
+    # press R. The button and the toggle below stay outside the fragment: a
+    # widget owned by a timer fragment is a widget that reruns by itself.
+    if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
+        _sidebar_tick = st.fragment(run_every=LIVE_REFRESH_SECONDS)(_paint_sidebar_live_tick)
+        _sidebar_tick()
+    else:
+        _paint_sidebar_live_tick()
 
     if st.button("Refresh data now", key="_sidebar_ingest", width="stretch"):
         if _request_ingest():
@@ -1645,7 +1678,8 @@ with st.sidebar:
             "Live updates",
             value=True,
             key="live_auto_refresh",
-            help="Re-render every page every %d seconds." % LIVE_REFRESH_SECONDS,
+            help=("Repaint the freshness strip and the sidebar every %d seconds."
+                  % LIVE_REFRESH_SECONDS),
         )
 
 
