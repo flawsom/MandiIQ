@@ -198,6 +198,34 @@ def test_the_freshness_surfaces_repaint_themselves_and_never_rerun_the_app():
             )
 
 
+def test_the_page_body_ticks_on_the_same_timer_as_the_freshness_surfaces():
+    """A repainting banner above a frozen page is two clocks in one cockpit.
+
+    The strip and the sidebar repaint themselves, but the routed page body ran
+    once per visit: the banner could report a newer arrival date while the
+    tables under it still showed the old one. The page body is therefore a
+    third ticking fragment, on the same timer and under the same "Live updates"
+    toggle - which is also the one repaint path that cannot accumulate
+    elements, so the shell still asks for no whole-app rerun.
+    """
+    source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
+
+    body = _function_block(source, "_paint_current_page")
+    assert "pg.run()" in body, "the routed page must run inside the ticked fragment"
+    assert source.count("pg.run()") == 1, (
+        "the page body must be executed in exactly one place - the ticked fragment"
+    )
+    assert (
+        "st.fragment(run_every=LIVE_REFRESH_SECONDS)(_paint_current_page)" in source
+    ), "the page body must be the third surface repainting itself in place"
+    assert "st.rerun(" not in source, (
+        "the page tick repaints in place; a whole-app rerun is what doubled the banner"
+    )
+    assert source.count('st.session_state.get("live_auto_refresh", True)') >= 3, (
+        "one toggle must gate all three ticking surfaces"
+    )
+
+
 def test_an_unreachable_api_is_never_reported_as_an_empty_warehouse():
     """A missing answer is not a missing row.
 

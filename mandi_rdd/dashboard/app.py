@@ -1439,6 +1439,9 @@ def _live_snapshot() -> dict:
         # why, which is the difference between a blocker and a known outage.
         "last_price_source": live.get("last_price_source"),
         "mirror_configured": bool(live.get("mirror_configured")),
+        # What the last run's mirror step did, straight from /health. A token
+        # being set is not the mirror working.
+        "last_ceda": live.get("last_ceda") if isinstance(live.get("last_ceda"), dict) else {},
         # The address behind those figures, so the strip can name it when
         # nothing answers. A cockpit pointed at a retired service is a
         # one-line fix - once the address is on screen.
@@ -1489,14 +1492,32 @@ def _paint_live_strip(live: dict) -> None:
     elif live["status"] in ("stale", "degraded"):
         # "No rows arrived" and "no source answered" are different problems.
         _facts.append("no price source has answered yet")
-    if not live["mirror_configured"] and live["status"] in ("stale", "degraded"):
-        # The documented feed is unreachable from cloud networks, so this is
-        # the one action that restores the daily update - say it in the app
-        # rather than in a deploy note nobody opens.
-        _facts.append(
-            "api.data.gov.in is unreachable from cloud networks - set "
-            "MANDIIQ_CEDA_API_KEY (Agmarknet via CEDA) to restore the daily feed"
-        )
+    if live["status"] in ("stale", "degraded"):
+        ceda = live.get("last_ceda") or {}
+        if ceda.get("error"):
+            _facts.append(f"CEDA mirror: {str(ceda['error'])[:120]}")
+        if not live["mirror_configured"]:
+            # This used to be offered as the one action that restores the daily
+            # update. It is not: CEDA is an archive, and its recorded daily
+            # coverage ends around 2025-10 - arming it fills history and cannot
+            # make the newest date current. Offering it as the fix sent an
+            # operator to set a key that cannot move the number on screen.
+            _facts.append(
+                "api.data.gov.in is unreachable from cloud networks, and the "
+                "CEDA mirror is an archive (coverage ends ~2025-10): no source "
+                "this cockpit can reach makes the newest date current"
+            )
+        elif ceda.get("token_rejected"):
+            _facts.append(
+                "the CEDA mirror is armed but the host rejected its token - "
+                "re-issue MANDIIQ_CEDA_API_KEY; even working, the archive "
+                "cannot make the newest date current"
+            )
+        elif ceda.get("status") == "error":
+            _facts.append(
+                "the CEDA mirror is armed but failed on the last run; even "
+                "working, the archive cannot make the newest date current"
+            )
     st.html(
         '<style>'
         '.mandiq-live-banner{display:flex;gap:14px;align-items:flex-start;margin:0 0 18px;'
@@ -1706,7 +1727,8 @@ with st.sidebar:
             "Live updates",
             value=True,
             key="live_auto_refresh",
-            help=("Repaint the freshness strip and the sidebar every %d seconds."
+            help=("Repaint the freshness strip, the sidebar and the page "
+                  "every %d seconds."
                   % LIVE_REFRESH_SECONDS),
         )
 
@@ -1740,27 +1762,56 @@ with st.sidebar:
 
 # Run the current page
 
-try:
 
-    pg.run()
+def _paint_current_page() -> None:
 
-except Exception as _exc:  # surface real error instead of redacted box
+    """Run the routed page body.
 
-    import traceback as _tb
-
-    _msg = "".join(_tb.format_exception(type(_exc), _exc, _exc.__traceback__))
+    Wrapped in a timer fragment like the two freshness surfaces, so the page's
+    tables and figures re-read their data on the same clock as the banner above
+    them instead of going stale under a repaint. Everything painted outside this
+    function - the strip, the top bar, the sidebar - is another fragment or a
+    one-shot, so a page repaint can only ever clear and redraw the page body.
+    """
 
     try:
 
-        with open("/mount/src/mandiiq/app_error.log", "w", encoding="utf-8") as _f:
+        pg.run()
 
-            _f.write(_msg)
+    except Exception as _exc:  # surface real error instead of redacted box
 
-    except Exception:
+        import traceback as _tb
 
-        pass
+        _msg = "".join(_tb.format_exception(type(_exc), _exc, _exc.__traceback__))
 
-    st.exception(_exc)
+        try:
+
+            with open("/mount/src/mandiiq/app_error.log", "w", encoding="utf-8") as _f:
+
+                _f.write(_msg)
+
+        except Exception:
+
+            pass
+
+        st.exception(_exc)
+
+
+# The page body ticks on the same timer as the freshness surfaces, under the
+# same toggle. Re-running the routed page is safe from a fragment: the
+# entrypoint re-executes on a fragment rerun, and that is what re-ordains the
+# page. The shell still asks for no rerun of its own - see
+# _paint_live_strip_tick.
+
+if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
+
+    _page_tick = st.fragment(run_every=LIVE_REFRESH_SECONDS)(_paint_current_page)
+
+    _page_tick()
+
+else:
+
+    _paint_current_page()
 
 
 
