@@ -100,6 +100,13 @@
 # A 503 here (rather than a JSON body) is the platform edge reporting no
 # healthy container: it is a service-level restart/deploy problem, not a bug in
 # the pipeline, and no client-side change can fix it.
+#
+# https://mandiiq.unifies.codes/status.html is that same check as a public page.
+# It probes both instances directly, reports each one's build, staleness and
+# /health fields side by side, marks the field where two live instances really
+# disagree, and lists the measured reasons the newest arrival is not from today.
+# It takes its host list from docs/assets/site.js, so it cannot drift from the
+# rest of the site.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Keeping the service awake
@@ -232,6 +239,13 @@
 #
 # So: deploy 2.4.0 and the next scheduled run clears index_fault_pending by
 # itself. Until then the workflow skips the repair and says why.
+#
+# That deploy landed on 2026-10-01. The primary answers /health 200 with
+# version 2.4.0 and safe_recovery true, and every 2.4.0 route answers 200 -
+# /fdr and /spec-curve/Onion included. /analytics, /conformal, /drift,
+# /tail-risk, /dml, /nowcast, /forecast and /risk-score are commodity paths:
+# they answer at /analytics/Onion and 404 at /analytics, so a probe that omits
+# the commodity reports a 404 that is not a missing route.
 #
 # The refresh-live-data.yml workflow now runs both of these
 # automatically when /health says index_fault_pending, or when n_prices is 0.

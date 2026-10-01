@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MandiIQ Status - which instance is serving, and why the data is behind</title>
+<meta name="description" content="Public MandiIQ status: which API instance is answering, what build it runs, how far behind the warehouse is, and the measured reasons the newest price is not from today.">
+<link rel="canonical" href="https://mandiiq.unifies.codes/status.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MandiIQ Status - which instance is serving, and why the data is behind">
+<meta property="og:description" content="Which MandiIQ instance is answering, what build it runs, how far behind the warehouse is, and the measured reasons for it.">
+<meta property="og:url" content="https://mandiiq.unifies.codes/status.html">
+<meta property="og:image" content="https://mandiiq.unifies.codes/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/site.css">
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --glass: rgba(255, 255, 255, 0.03);
+    --hairline: rgba(255, 255, 255, 0.08);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+    --lime: #d7ff00;
+    --paper: #ffffff;
+    --text-high: #bababa;
+    --text-med: #7e7e7e;
+    --text-low: #555555;
+    --rust: #d9663b;
+    --sage: #8fae89;
+    --font-display: "Space Grotesk", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text-high); font-family: var(--font-body); }
+  a { color: var(--lime); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 72px; }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--hairline); }
+  .brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: 22px; letter-spacing: -0.02em; color: var(--paper); }
+  .brand .dot { width: 10px; height: 10px; background: var(--lime); border-radius: 50%; box-shadow: 0 0 12px rgba(215,255,0,0.7); }
+  .brand small { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text-low); text-transform: uppercase; }
+  .status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-family: var(--font-mono); font-size: 12px; }
+  .pill { border: 1px solid var(--hairline-strong); border-radius: 999px; padding: 5px 12px; color: var(--text-high); background: var(--glass); white-space: nowrap; }
+  .pill.ok { border-color: rgba(215,255,0,0.5); color: var(--lime); }
+  .pill.warn { border-color: rgba(217,102,59,0.6); color: var(--rust); }
+  .pill.down { border-color: rgba(231,76,60,0.55); color: #e74c3c; }
+  .pill .led { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-low); margin-right: 6px; vertical-align: middle; }
+  .pill.ok .led { background: var(--lime); box-shadow: 0 0 8px rgba(215,255,0,0.8); }
+  .pill.warn .led { background: var(--rust); }
+  .pill.down .led { background: #e74c3c; }
+  button { font-family: var(--font-mono); font-size: 12px; background: var(--lime); color: #000; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  button[disabled] { opacity: 0.5; cursor: default; }
+
+  .headline { font-family: var(--font-display); font-size: clamp(26px, 4vw, 42px); line-height: 1.15; letter-spacing: -0.03em; color: var(--paper); margin: 30px 0 10px; }
+  .headline .q { color: var(--lime); }
+  .lede { max-width: 78ch; font-size: 15px; line-height: 1.7; color: var(--text-high); }
+  .lede code { font-family: var(--font-mono); font-size: 12.5px; color: var(--lime); }
+
+  .instances { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 26px; }
+  .instance { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface); padding: 16px 18px; }
+  .instance.serving { border-color: rgba(215,255,0,0.4); background: linear-gradient(180deg, rgba(215,255,0,0.05) 0%, rgba(10,10,10,1) 100%); }
+  .instance h2 { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper); margin: 0 0 2px; }
+  .instance .host { font-family: var(--font-mono); font-size: 11px; color: var(--text-low); word-break: break-all; }
+  .instance .big { font-family: var(--font-display); font-size: 24px; letter-spacing: -0.02em; color: var(--paper); margin: 12px 0 2px; }
+  .instance .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-med); line-height: 1.75; }
+  .tag-inline { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #000; background: var(--lime); border-radius: 4px; padding: 2px 6px; }
+
+  .panel { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface); padding: 18px; margin-top: 18px; }
+  .panel h2 { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper); margin: 0 0 4px; }
+  .panel p.hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-low); margin: 0 0 14px; line-height: 1.7; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  th { color: var(--text-low); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+  td.k { color: var(--text-med); white-space: nowrap; }
+  td.v { color: var(--paper); }
+  td.v.diff { color: var(--rust); }
+  .muted { color: var(--text-med); }
+  .num { text-align: right; }
+
+  .reasons { list-style: none; margin: 0; padding: 0; }
+  .reasons li { border-left: 2px solid var(--hairline-strong); padding: 2px 0 2px 14px; margin-bottom: 16px; }
+  .reasons li.warn { border-left-color: var(--rust); }
+  .reasons li.info { border-left-color: var(--sage); }
+  .reasons li.ok { border-left-color: var(--lime); }
+  .reasons .rt { display: block; font-family: var(--font-display); font-size: 14.5px; color: var(--paper); margin-bottom: 3px; }
+  .reasons .rd { display: block; font-size: 13.5px; line-height: 1.68; color: var(--text-high); }
+  .reasons .rd code { font-family: var(--font-mono); font-size: 12px; color: var(--lime); }
+
+  details { border: 1px solid var(--hairline); border-radius: 10px; background: rgba(255,255,255,0.015); padding: 12px 14px; margin-top: 12px; }
+  details summary { cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-med); }
+  details summary:hover { color: var(--lime); }
+  pre { font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--text-high); background: #000; border: 1px solid var(--hairline); border-radius: 8px; padding: 12px; overflow: auto; max-height: 340px; margin: 12px 0 0; }
+  .err { color: var(--rust); font-family: var(--font-mono); font-size: 12px; }
+  .nowrap { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div data-site-nav></div>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="dot"></span>
+      <span>MandiIQ <small>Public status</small></span>
+    </div>
+    <div class="status">
+      <span class="pill" id="serving-pill"><span class="led"></span>resolving instance</span>
+      <span class="pill" id="checked-pill">not checked yet</span>
+      <button id="recheck" type="button">Check now</button>
+    </div>
+  </header>
+
+  <h1 class="headline">Which instance is answering, and<br>why the newest price is <span class="q" id="newest-price">-</span></h1>
+  <p class="lede">
+    MandiIQ runs the same image behind two hostnames, so one of them can be down while the
+    product keeps working. This page probes both directly and reports what each one says about
+    itself, then explains the gap between the newest price it holds and today. Everything here is read
+    from <code>/health</code> on the live services - nothing is cached, and no reason is listed that the
+    service did not report.
+  </p>
+
+  <div class="instances" id="instances">
+    <div class="instance"><h2>probing</h2><div class="meta">Contacting both instances...</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Instances side by side</h2>
+    <p class="hint">
+      Both columns answer the same build of the same image. A value marked in rust differs between the
+      two, which is what a half-finished rollout looks like: the mirror is not an equal peer, it can be
+      running an older build than the primary.
+    </p>
+    <div id="matrix"><p class="muted">Loading...</p></div>
+  </div>
+
+  <div class="panel">
+    <h2>Why the data is behind</h2>
+    <p class="hint">
+      Derived from the serving instance's <code>/health</code> payload, plus the two upstream findings
+      recorded in <code>NORTHFLANK_DEPLOY.md</code>.
+    </p>
+    <ul class="reasons" id="reasons"></ul>
+  </div>
+
+  <div class="panel">
+    <h2>Documented routes</h2>
+    <p class="hint">
+      The routes this build is expected to serve, probed against the instance that is answering.
+      A 404 in this table means the deployed build is older than the repository - not that the route
+      failed. Probed every five minutes, not on every refresh, because some of these are real computations.
+    </p>
+    <div id="routes"><p class="muted">Loading...</p></div>
+  </div>
+
+  <div class="panel">
+    <h2>Raw payloads</h2>
+    <p class="hint">The unedited <code>/health</code> response from each instance, so nothing above has to be taken on trust.</p>
+    <div id="raw"></div>
+  </div>
+</div>
+<div data-site-footer></div>
+
+<script src="./assets/site.js"></script>
+<script>
+/*
+ * Two separate jobs, deliberately on different clocks.
+ *
+ * /health is cheap, so it is re-read every minute and is what drives the instance cards and the
+ * reasons list. The route probe below runs real regressions on a 512 MB free-tier container and
+ * has been measured between 0.2 s and 13 s per route, so it runs once on load and then every
+ * five minutes, at most three at a time.
+ */
+(function () {
+  "use strict";
+
+  var HEALTH_INTERVAL_MS = 60000;
+  var ROUTE_INTERVAL_MS = 300000;
+  var HEALTH_TIMEOUT_MS = 9000;
+  var ROUTE_TIMEOUT_MS = 25000;
+  var STALE_AFTER_DAYS = 3;
+  var ROUTE_CONCURRENCY = 3;
+
+  // Every route the 2.4.0 build is expected to answer. /fdr is the only one with no commodity
+  // in its path, which is why the older probes that omitted /Onion reported false 404s.
+  var ROUTES = [
+    "/health", "/data-quality", "/freshness", "/fdr",
+    "/rdd-result/Onion", "/robustness/Onion", "/spec-curve/Onion", "/analytics/Onion",
+    "/conformal/Onion", "/drift/Onion", "/tail-risk/Onion", "/dml/Onion",
+    "/nowcast/Onion", "/forecast/Onion", "/risk-score/Onion"
+  ];
+
+  var shell = window.MandiiqShell;
+  var hosts = (shell && shell.hosts) || [];
+  var lastResults = [];   // [{host, state, http, ms, health, body}]
+  var routeRows = null;
+  var busy = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function num(n) {
+    return n == null || isNaN(n) ? null : Number(n).toLocaleString("en-IN");
+  }
+
+  function ago(iso) {
+    if (!iso) return null;
+    var ms = Date.now() - Date.parse(iso);
+    if (isNaN(ms)) return null;
+    var min = Math.round(ms / 60000);
+    if (min < 1) return "just now";
+    if (min < 90) return min + " min ago";
+    var h = Math.round(min / 60);
+    if (h < 48) return h + " h ago";
+    return Math.round(h / 24) + " d ago";
+  }
+
+  /* ----------------------------------------------------------------- probe --- */
+  function fetchWithTimeout(url, ms) {
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, ms) : null;
+    function clear() { if (timer) clearTimeout(timer); }
+    return fetch(url, { cache: "no-store", signal: controller ? controller.signal : undefined })
+      .then(function (res) { return res.text().then(function (body) { return { res: res, body: body }; }); })
+      .then(function (r) { clear(); return r; }, function (err) { clear(); throw err; });
+  }
+
+  function probeHealth(host) {
+    var started = Date.now();
+    return fetchWithTimeout(host.base + "/health", HEALTH_TIMEOUT_MS).then(function (r) {
+      var ms = Date.now() - started;
+      var parsed = null;
+      try { parsed = JSON.parse(r.body); } catch (e) { parsed = null; }
+      // A 503 from the platform edge is not JSON: it is the edge saying there is no healthy
+      // container behind the hostname, which is a deploy problem, not an application one.
+      return {
+        host: host, state: r.res.ok ? "ok" : "http", http: r.res.status, ms: ms,
+        health: parsed, body: r.body
+      };
+    }, function (err) {
+      return {
+        host: host, state: "net", http: null, ms: Date.now() - started,
+        health: null, body: (err && err.name === "AbortError") ? "timed out after " + (HEALTH_TIMEOUT_MS / 1000) + "s" : String(err && err.message || err)
+      };
+    });
+  }
+
+  function probeRoute(base, path) {
+    var started = Date.now();
+    return fetchWithTimeout(base + path, ROUTE_TIMEOUT_MS).then(function (r) {
+      return { path: path, http: r.res.status, ms: Date.now() - started };
+    }, function (err) {
+      return { path: path, http: null, ms: Date.now() - started, error: String(err && err.message || err) };
+    });
+  }
+
+  function runPool(items, worker, limit) {
+    var out = new Array(items.length);
+    var next = 0;
+    function step() {
+      if (next >= items.length) return Promise.resolve();
+      var i = next++;
+      return worker(items[i]).then(function (v) { out[i] = v; return step(); });
+    }
+    var runners = [];
+    for (var k = 0; k < Math.min(limit, items.length); k++) runners.push(step());
+    return Promise.all(runners).then(function () { return out; });
+  }
+
+  /* -------------------------------------------------------------- rendering --- */
+  function serving(results) {
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].state === "ok" && results[i].health) return results[i];
+    }
+    return null;
+  }
+
+  function renderInstances(results) {
+    var host = $("instances");
+    if (!results.length) {
+      host.innerHTML = '<div class="instance"><h2>shared shell missing</h2>' +
+        '<div class="meta">site.js did not load, so the instance list is unavailable. ' +
+        'Reload the page; if it stays like this, the asset itself is the problem.</div></div>';
+      return;
+    }
+    var win = serving(results);
+    host.innerHTML = results.map(function (r) {
+      var h = r.health || {};
+      var isWin = win && r.host.base === win.host.base;
+      var state = r.state === "ok" ? (h.status === "healthy" ? "ok" : "warn") : "down";
+      var label = r.state === "ok" ? (h.status || "unknown") : (r.state === "http" ? "HTTP " + r.http : "unreachable");
+      var headline = r.state === "ok"
+        ? (h.days_behind != null ? h.days_behind + " days behind" : "no data date reported")
+        : (r.state === "http" ? "not serving" : "did not answer");
+      return '<div class="instance' + (isWin ? " serving" : "") + '">' +
+        '<h2>' + esc(r.host.label) + (isWin ? ' <span class="tag-inline">serving</span>' : "") + '</h2>' +
+        '<div class="host">' + esc(r.host.base) + '</div>' +
+        '<div class="big">' + esc(headline) + '</div>' +
+        '<div class="meta">' +
+          '<span class="pill ' + state + '"><span class="led"></span>' + esc(label) + '</span> ' +
+          '<span class="muted">' + (r.http != null ? "HTTP " + r.http + " · " : "") + r.ms + " ms</span><br>" +
+          'build v' + esc(h.version || "not reported") +
+          (h.n_prices != null ? " · " + num(h.n_prices) + " price rows" : "") +
+          (h.data_max_date ? "<br>newest arrival " + esc(h.data_max_date) : "<br>no arrival date reported") +
+          (h.last_run_utc ? " · last run " + esc(ago(h.last_run_utc) || h.last_run_utc) : "") +
+        '</div>' +
+        (r.state === "ok" ? "" :
+          '<div class="meta err" style="margin-top:10px">' +
+            (r.state === "http"
+              ? esc(r.body || ("HTTP " + r.http)) + " - the platform edge has no healthy container for this hostname. Recoverable only by a rebuild."
+              : esc(r.body || "no response")) +
+          '</div>') +
+      '</div>';
+    }).join("");
+  }
+
+  // A field the running build does not publish has to read as absent, not as a value:
+  // the older build on the mirror simply does not send safe_recovery, and printing "not
+  // reported" as if it had would make an old container look like a failing one.
+  function tri(h, key) {
+    if (!(key in h)) return null;
+    return h[key] === true ? "true" : h[key] === false ? "false" : null;
+  }
+
+  function matrixRows(h) {
+    return [
+      ["status (data, not the process)", h.status],
+      ["build version", h.version],
+      ["safe_recovery", tri(h, "safe_recovery")],
+      ["days_behind", h.days_behind],
+      ["data_max_date (newest arrival)", h.data_max_date],
+      ["data_min_date (oldest arrival)", h.data_min_date],
+      ["price rows", num(h.n_prices)],
+      ["commodities / states / districts", [h.n_commodities, h.n_states, h.n_districts].every(function (v) { return v == null; }) ? null : [h.n_commodities, h.n_states, h.n_districts].join(" / ")],
+      ["rainfall observations", h.n_rainfall],
+      ["RDD results stored", h.n_rdd_results],
+      ["NDVI observations", h.n_ndvi],
+      ["tests defined in the build", h.n_tests],
+      ["last pipeline outcome", h.last_outcome],
+      ["last run finished", h.last_run_utc ? h.last_run_utc + (ago(h.last_run_utc) ? " (" + ago(h.last_run_utc) + ")" : "") : null],
+      ["self-refresh runs / failures", (h.refresh_runs == null && h.refresh_failures == null) ? null : (h.refresh_runs || 0) + " / " + (h.refresh_failures || 0)],
+      ["last refresh attempt", h.last_refresh_attempt_utc],
+      ["last refresh success", ("last_refresh_success_utc" in h) ? (h.last_refresh_success_utc || "never since this container started") : null],
+      ["last refresh error", ("last_refresh_error" in h) ? (h.last_refresh_error || "none") : null],
+      ["last price source", ("last_price_source" in h) ? (h.last_price_source || "none reported") : null],
+      ["price index fault pending", tri(h, "index_fault_pending")],
+      ["mirror configured", tri(h, "mirror_configured")]
+    ];
+  }
+
+  function renderMatrix(results) {
+    var host = $("matrix");
+    if (!results.length) { host.innerHTML = '<p class="muted">No instances to compare.</p>'; return; }
+    var cols = results.map(function (r) { return matrixRows(r.health || {}); });
+    var names = results.map(function (r) {
+      return esc(r.host.label) + (r.state === "ok" ? "" : " (no /health)");
+    });
+    host.innerHTML = "<table><thead><tr><th>field</th>" +
+      names.map(function (n) { return "<th>" + n + "</th>"; }).join("") +
+      "</tr></thead><tbody>" +
+      cols[0].map(function (row, i) {
+        var values = cols.map(function (c) {
+          var v = c[i] ? c[i][1] : null;
+          return v == null ? null : String(v);
+        });
+        // An older build simply does not report a newer field, which is not a disagreement.
+        // Rust is reserved for two instances that both report a value and differ on it.
+        var known = values.filter(function (v) { return v != null; });
+        var differs = known.length > 1 && known.some(function (v) { return v !== known[0]; });
+        return "<tr><td class=\"k\">" + esc(row[0]) + "</td>" +
+          values.map(function (v) {
+            if (v == null) return '<td class="v muted">not reported</td>';
+            return '<td class="v' + (differs ? " diff" : "") + '">' + esc(v) + "</td>";
+          }).join("") + "</tr>";
+      }).join("") +
+      "</tbody></table>";
+  }
+
+  function reasonsFor(h) {
+    var out = [];
+    var behind = h.days_behind;
+
+    if (h.status && h.status !== "healthy") {
+      out.push({
+        level: "warn",
+        title: "The service calls its own data " + h.status,
+        detail: "/health reports status <code>" + esc(h.status) + "</code> rather than healthy. That word describes the warehouse, " +
+          "not the process: the API is up and answering while the data it serves ages."
+      });
+    }
+    if (behind != null && behind > STALE_AFTER_DAYS) {
+      out.push({
+        level: "warn",
+        title: "The newest arrival is " + behind + " days old",
+        detail: "Newest price in the warehouse is <code>" + esc(h.data_max_date || "unknown") + "</code>. The site treats anything more " +
+          "than " + STALE_AFTER_DAYS + " days behind as stale and says so in the nav instead of showing a fresh-looking number."
+      });
+    }
+    if (!h.last_price_source) {
+      out.push({
+        level: "warn",
+        title: "The last price fetch did not complete",
+        detail: "No price source is recorded for the last run (<code>last_price_source</code> is null), which means the run could not " +
+          "decide where its prices came from. The warehouse keeps serving what it already holds; a failed fetch is not a wiped warehouse."
+      });
+    }
+    if (h.last_outcome && h.last_outcome !== "success") {
+      out.push({
+        level: "warn",
+        title: "The last pipeline run reported " + esc(h.last_outcome),
+        detail: "Rainfall, RDD and the forecast still refresh on a degraded run; the price step is what the upstream cut-off costs."
+      });
+    }
+    if (h.last_refresh_error) {
+      out.push({
+        level: "warn",
+        title: "The self-refresh loop last failed with an error",
+        detail: "<code>" + esc(h.last_refresh_error) + "</code>"
+      });
+    }
+    if (h.index_fault_pending) {
+      out.push({
+        level: "warn",
+        title: "A price-index repair is pending",
+        detail: "The warehouse recorded an index fault, and the repair only runs on a build that can perform it: " +
+          "<code>version &gt;= 2.4.0</code> with <code>safe_recovery: true</code>. This instance reports version " +
+          "<code>" + esc(h.version || "unknown") + "</code> and safe_recovery <code>" + esc(String(h.safe_recovery)) + "</code>. " +
+          "Recovery is refused rather than attempted on a build that would OOM part-way through - refusing leaves the warehouse " +
+          "stale but serving, and a crash loop is worse than stale."
+      });
+    }
+    if (h.mirror_configured) {
+      out.push({
+        level: "info",
+        title: "Second instance armed",
+        detail: "The mirror instance exists so this hostname is not a single point of failure. It is a failover, not an equal: " +
+          "when the primary 503s, the pages downgrade to the mirror and label themselves with the instance that answered."
+      });
+    }
+    out.push({
+      level: "info",
+      title: "The documented upstream is unreachable from cloud networks",
+      detail: "Measured 2026-10-01 from three independent networks (a CI runner, a sandbox and the production container): " +
+        "<code>api.data.gov.in</code> completes the TCP handshake and then drops every TLS handshake. " +
+        "<code>www.data.gov.in</code> answers Akamai 503 and the public relays answer 522 for the same URL. " +
+        "No retry, mirror list or worker on a cloud network restores that feed, so a growing lag is expected rather than a fault."
+    });
+    if (behind != null && behind > STALE_AFTER_DAYS) {
+      out.push({
+        level: "info",
+        title: "The reachable Agmarknet mirror is an archive",
+        detail: "CEDA (Ashoka University) is the one Agmarknet host that answers a cloud network, and it works - but its coverage ends " +
+          "around <code>2025-10</code> with empty windows afterwards. It can backfill history and repair gaps; it can never make the " +
+          "newest date current. That is why the fix has to come from the upstream feed or a new source, not from more retries."
+      });
+    }
+    return out;
+  }
+
+  function renderReasons(results) {
+    var host = $("reasons");
+    var win = serving(results);
+    if (!win) {
+      host.innerHTML = '<li class="warn"><span class="rt">Neither instance answered /health</span>' +
+        '<span class="rd">No reason can be reported because no instance described itself. The statuses above carry whatever each host ' +
+        'returned - a platform-level <code>503 no healthy upstream</code> means the edge has no healthy container, which is a deploy ' +
+        'problem and not something a page can work around.</span></li>';
+      return;
+    }
+    var items = reasonsFor(win.health);
+    host.innerHTML = items.map(function (i) {
+      return '<li class="' + i.level + '"><span class="rt">' + i.title + '</span>' +
+        '<span class="rd">' + i.detail + '</span></li>';
+    }).join("");
+    var np = $("newest-price");
+    if (np) np.textContent = win.health.data_max_date || "unknown";
+  }
+
+  function renderRoutes() {
+    var host = $("routes");
+    if (!routeRows) { host.innerHTML = '<p class="muted">Probing...</p>'; return; }
+    var bad = routeRows.filter(function (r) { return r.http !== 200; });
+    host.innerHTML =
+      (bad.length
+        ? '<p class="hint err">' + bad.length + " of " + routeRows.length + " probed routes are not answering 200 on this build.</p>"
+        : '<p class="hint">All ' + routeRows.length + " probed routes answer 200 on this build.</p>") +
+      "<table><thead><tr><th>route</th><th class=\"num\">status</th><th class=\"num\">time</th></tr></thead><tbody>" +
+      routeRows.map(function (r) {
+        var state = r.http === 200 ? "v" : "v diff";
+        return "<tr><td class=\"k\">" + esc(r.path) + '</td><td class="' + state + ' num">' +
+          esc(r.http == null ? (r.error || "no response") : r.http) + '</td><td class="v num">' +
+          (r.ms / 1000).toFixed(2) + " s</td></tr>";
+      }).join("") +
+      "</tbody></table>";
+  }
+
+  function renderRaw(results) {
+    var host = $("raw");
+    if (!results.length) { host.innerHTML = '<p class="muted">Nothing to show.</p>'; return; }
+    host.innerHTML = results.map(function (r) {
+      var body = r.body || "";
+      try { body = JSON.stringify(JSON.parse(body), null, 2); } catch (e) { /* show it raw */ }
+      return "<details><summary>" + esc(r.host.label) + " · " + esc(r.host.base) + "/health · " +
+        (r.http != null ? "HTTP " + r.http : "no response") + " · " + r.ms + " ms</summary>" +
+        "<pre>" + esc(body) + "</pre></details>";
+    }).join("");
+  }
+
+  /* ------------------------------------------------------------------ loop --- */
+  function setStatusPills(results) {
+    var win = serving(results);
+    var pill = $("serving-pill");
+    var down = results.filter(function (r) { return r.state !== "ok"; }).length;
+    if (!win) {
+      pill.className = "pill down";
+      pill.innerHTML = '<span class="led"></span>no instance answering';
+    } else {
+      var fresh = win.health.days_behind != null && win.health.days_behind <= STALE_AFTER_DAYS;
+      pill.className = "pill " + (fresh ? "ok" : "warn");
+      pill.innerHTML = '<span class="led"></span>serving: ' + esc(win.host.label) + " (v" + esc(win.health.version || "?") + ")";
+    }
+    var checked = $("checked-pill");
+    checked.className = "pill" + (down ? " warn" : "");
+    checked.textContent = "checked " + new Date().toLocaleTimeString() +
+      (down ? " · " + down + " of " + results.length + " down" : "");
+  }
+
+  function refreshHealth() {
+    if (busy || !hosts.length) return Promise.resolve();
+    busy = true;
+    return Promise.all(hosts.map(probeHealth)).then(function (results) {
+      lastResults = results;
+      renderInstances(results);
+      renderMatrix(results);
+      renderReasons(results);
+      renderRaw(results);
+      setStatusPills(results);
+      busy = false;
+      return results;
+    }, function (err) {
+      busy = false;
+      throw err;
+    });
+  }
+
+  function refreshRoutes() {
+    var win = serving(lastResults) || lastResults[0];
+    if (!win) { routeRows = null; renderRoutes(); return Promise.resolve(); }
+    return runPool(ROUTES, function (p) { return probeRoute(win.host.base, p); }, ROUTE_CONCURRENCY)
+      .then(function (rows) { routeRows = rows; renderRoutes(); });
+  }
+
+  function boot() {
+    if (!hosts.length) {
+      renderInstances([]);
+      $("matrix").innerHTML = '<p class="err">The shared shell (site.js) did not load, so the two instance URLs are unknown to this page.</p>';
+      $("reasons").innerHTML = "";
+      renderRaw([]);
+      renderRoutes();
+      var p = $("serving-pill");
+      p.className = "pill down";
+      p.innerHTML = '<span class="led"></span>shell missing';
+      return;
+    }
+    refreshHealth().then(refreshRoutes);
+    setInterval(refreshHealth, HEALTH_INTERVAL_MS);
+    setInterval(refreshRoutes, ROUTE_INTERVAL_MS);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) refreshHealth();
+    });
+    $("recheck").addEventListener("click", function () {
+      refreshHealth().then(function () { return refreshRoutes(); });
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+</body>
+</html>

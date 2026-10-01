@@ -30,8 +30,9 @@ Live services - the API badge reads the production `/health` payload directly, s
 | **FastAPI** (38 documented endpoints / 47 routes) | `/health` returns 200 and `status` describes the warehouse | `p01--mandiiq--x4n8x4gkmzht.code.run` | [Northflank](NORTHFLANK_DEPLOY.md) - Docker service + persistent volume |
 | **FastAPI (NDVI instance)** | Second Northflank service carrying the satellite rows | `p01--mandiiq--zbvjrztgjqgw.code.run` | [Northflank](NORTHFLANK_DEPLOY.md) |
 | **Streamlit Dashboard** (10 routes) | 🔒 Access-restricted on Streamlit Cloud - set *Who can view this app* to public to open it up | `mandiiq.streamlit.app` | [Streamlit Cloud](https://share.streamlit.io) - `mandi_rdd/dashboard/app.py` |
-| **Landing Page** (static HTML) | 🟢 Green when page loads | `mandiiq.unifies.codes` | Netlify - `landing/mandi-iq/` directory |
-| **Live Data Console** (static HTML) | 🟢 Green when page loads; reads the production API directly | `flawsom.github.io/MandiIQ/live.html` | [GitHub Pages](https://flawsom.github.io/MandiIQ/) - `docs/` directory |
+| **Landing page** (static HTML) | 🟢 Green when page loads; reads the production API directly | `mandiiq.unifies.codes` | Vercel → GitHub Pages, serving the `docs/` directory at the domain root |
+| **Live Data Console** (static HTML) | 🟢 Green when page loads; reads the production API directly | `mandiiq.unifies.codes/live.html` | same `docs/` directory |
+| **Status page** (static HTML) | 🟢 Green when page loads; probes both API instances directly | `mandiiq.unifies.codes/status.html` | same `docs/` directory |
 | **Hourly refresh** (ingestion) | Runs hourly: POSTs `/refresh`, waits, then verifies freshness and every consumer surface | Internal | [GitHub Actions](https://github.com/flawsom/MandiIQ/actions/workflows/refresh-live-data.yml) - `refresh-live-data.yml` |
 
 > **Where the older Render/Netlify URLs went:** earlier revisions of this README pointed at `mandi-iq-api.onrender.com`, `mandi-iq-dashboard.onrender.com` and `mandi-iq.netlify.app/mandi-iq/`. Those services no longer serve MandiIQ - the API and its NDVI mirror run on Northflank, the cockpit on Streamlit Cloud, the landing page on Netlify and the console on GitHub Pages. `render.yaml` stays in the repository as an alternative blueprint, not as the live deployment.
@@ -177,7 +178,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**182 test items passing** (169 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
+**188 test items passing** (175 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -319,7 +320,7 @@ MandiIQ is live on three free-tier hosts, and each piece runs on the one that su
 |---|---|---|
 | **API + NDVI mirror** | [Northflank](NORTHFLANK_DEPLOY.md) | `Dockerfile.northflank`, persistent volume at `/data` holding the warehouse |
 | **Streamlit cockpit** | [Streamlit Cloud](https://share.streamlit.io) | `mandi_rdd/dashboard/app.py` on `master` |
-| **Landing page + console** | Netlify (`landing/mandi-iq/`) and GitHub Pages (`docs/`) | static HTML |
+| **Landing page, console, status page** | Vercel → GitHub Pages, serving `docs/` | static HTML, one directory, no build step |
 
 The Render Blueprint (`render.yaml` at the repo root) is kept as an alternative for the API + dashboard, and the steps below cover both it and Streamlit Cloud.
 
@@ -483,7 +484,7 @@ The **Live Data Console** (`docs/live.html`, served by GitHub Pages) reads every
 const API = "https://p01--mandiiq--x4n8x4gkmzht.code.run";
 ```
 
-Change it only if you deploy your own API, then commit and push - GitHub Pages redeploys automatically. The Netlify landing page (`landing/mandi-iq/`) is static marketing copy and needs no API base.
+Change it only if you deploy your own API, then commit and push - the site is redeployed from `docs/` on push. The landing, console and status pages are static HTML too: they take their API base from `docs/assets/site.js` (which probes both instances and remembers the one that answered), so there is no build step and nothing else to re-point.
 
 ---
 

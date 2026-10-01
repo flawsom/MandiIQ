@@ -191,11 +191,16 @@ The icons are Lucide-compatible (24×24 viewBox, `stroke="currentColor"`, `strok
 
 - **5-Layer Drifter System:** A fixed-position `atmosphere` container with five independently drifting gradient blobs, each with randomized `--x`/`--y`/`--s`/`--d`/`--hue` CSS custom properties. Combined cycle times range from 25 to 45 seconds per blob, creating a calm, infinite-canvas feel.
 - **Dot Grid:** A 38px-spaced radial-gradient dot pattern at 0.04 opacity provides a subtle pixel-grid texture without distracting from content.
-- **Groovy Decorative Paths:** The `docs/index.html` hero includes three flowing SVG bezier paths at varying opacities (0.15 → 0.08) and two drifting accent dots, adding organic motion to the otherwise rigid frame-drawing aesthetic.
+- **Groovy Decorative Paths:** The landing page hero (`docs/index.html`) includes three flowing SVG bezier paths at varying opacities (0.15 → 0.08) and two drifting accent dots, adding organic motion to the otherwise rigid frame-drawing aesthetic.
 
 ### 6.6 Static Pages Design Parity Audit
 
-All three static pages (`docs/index.html`, `landing/index.html`, `landing/mandi-iq/index.html`) were audited against the dashboard.s design system and brought to full parity:
+> **Layout note (2026-10-01).** The landing page and this write-up both used to be served at the
+> site root, so two pages claimed one canonical URL. The landing page is now `docs/index.html`
+> (what `/` serves) and the write-up is `docs/overview.html`; `landing/` and its redirect stub are
+> gone. The table below keeps the file names this audit was written against.
+
+All three static pages (`docs/overview.html`, then `landing/index.html` and `landing/mandi-iq/index.html`) were audited against the dashboard.s design system and brought to full parity:
 
 | Feature | Dashboard | `docs/index.html` | `landing/index.html` | `landing/mandi-iq/index.html` |
 |---------|:---------:|:---:|:---:|:---:|

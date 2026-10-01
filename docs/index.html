@@ -3,84 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MandiIQ - Agricultural Margin Intelligence & Causal RDD System</title>
-    <meta name="description" content="MandiIQ turns India's public mandi, rainfall and satellite data into causal market intelligence: a regression-discontinuity engine on the rainfall-deficiency threshold, over a live DuckDB warehouse served by FastAPI.">
+    <title>MandiIQ - Causal Price Intelligence Platform</title>
+    <meta name="description" content="MandiIQ is causal price intelligence for India's agricultural mandis: a regression-discontinuity engine on the rainfall-deficiency threshold, over a live warehouse of daily mandi prices.">
     <link rel="canonical" href="https://mandiiq.unifies.codes/">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="MandiIQ - Agricultural Margin Intelligence & Causal RDD System">
+    <meta property="og:title" content="MandiIQ - Causal Price Intelligence Platform">
     <meta property="og:description" content="Regression discontinuity on the rainfall-deficiency threshold, over a live warehouse of India's mandi prices.">
     <meta property="og:url" content="https://mandiiq.unifies.codes/">
     <meta property="og:image" content="https://mandiiq.unifies.codes/social-preview.png">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="./assets/site.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2L6 12h6v18h8V12h6L16 2z' fill='%23d7ff00'/%3E%3C/svg%3E">
-    
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
     <style>
-        /* ==========================================================================
-           1. DESIGN SYSTEM & VARIABLE TOKENS (MandiIQ Design)
-           ========================================================================== */
+        /* ═══════════════════════════════════════════════════════════
+           1. DESIGN TOKENS - MandiIQ
+           ═══════════════════════════════════════════════════════════ */
         :root {
-            /* Backgrounds */
             --bg-base: #000000;
             --bg-surface: #0a0a0a;
-            --bg-surface-glass: rgba(255, 255, 255, 0.03);
-            --bg-surface-glass-hover: rgba(255, 255, 255, 0.07);
+            --bg-glass: rgba(255,255,255,0.03);
+            --bg-glass-hover: rgba(255,255,255,0.06);
 
-            /* Typography */
             --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
             --font-body: "IBM Plex Sans", "Inter", system-ui, sans-serif;
             --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
             --font-numeric: "Barlow", "IBM Plex Sans", sans-serif;
 
-            /* Core Colors */
-            --color-primary: #d7ff00;      /* Lime Accent */
-            --color-paper: #ffffff;        /* Stark white headings */
-            --color-text-high: #bababa;    /* High contrast body text */
-            --color-text-med: #7e7e7e;     /* Medium contrast description text */
-            --color-text-low: #555555;     /* Low contrast metadata text */
+            --color-primary: #d7ff00;
+            --color-paper: #ffffff;
+            --color-text-high: #bababa;
+            --color-text-med: #7e7e7e;
+            --color-text-low: #555555;
+            --color-rust: #D9663B;
+            --color-sage: #8FAE89;
+            --color-warm: #D4A94E;
 
-            /* Semantic / Functional Colors */
-            --color-rust: #D9663B;         /* Deficit Rust - price spike/risk */
-            --color-sage: #8FAE89;         /* Monsoon Sage - healthy NDVI */
-            
-            /* Commodity Colors */
-            --color-commodity-onion: #8B6BC4;  /* Dusty violet - onion skin */
-            --color-commodity-tomato: #D9663B; /* Tomato */
-            --color-commodity-wheat: #D4A94E;  /* Dry gold - ripened wheat */
-            --color-commodity-potato: #B98354; /* Clay - tuber/soil */
+            --hairline: rgba(255,255,255,0.07);
+            --hairline-strong: rgba(255,255,255,0.14);
 
-            /* Hairlines */
-            --hairline: rgba(255, 255, 255, 0.07);
-            --hairline-strong: rgba(255, 255, 255, 0.14);
-
-            /* Timing & Motion */
             --duration-base: 350ms;
             --duration-slow: 600ms;
             --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
             --ease-soft: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-
-            /* Spacing grid */
-            --space-xs: 0.25rem;
-            --space-sm: 0.5rem;
-            --space-md: 1rem;
-            --space-lg: 2rem;
-            --space-xl: 4rem;
         }
 
-        /* ==========================================================================
-           2. BASE STYLING
-           ========================================================================== */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         html, body {
             background-color: var(--bg-base);
@@ -94,1047 +64,460 @@
             scroll-behavior: smooth;
         }
 
-        /* Dot Grid Background */
+        /* ── Dot Grid ── */
         .dot-grid {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1.5px, transparent 2px);
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-image: radial-gradient(rgba(255,255,255,0.04) 1.5px, transparent 2px);
             background-size: 38px 38px;
-            z-index: 0;
-            pointer-events: none;
+            z-index: 0; pointer-events: none;
         }
 
-        /* Atmosphere Blobs - Multi-layer drifter system */
+        /* ── Atmosphere Blobs ── */
         .atmosphere {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            z-index: 0;
-            pointer-events: none;
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            overflow: hidden; z-index: 0; pointer-events: none;
         }
-
         .atmosphere-flash {
-            position: absolute;
-            top: -20%;
-            right: -10%;
-            width: 70vw;
-            height: 60vh;
-            background: radial-gradient(circle, rgba(215, 255, 0, 0.04) 0%, transparent 70%);
+            position: absolute; top: -20%; right: -10%;
+            width: 70vw; height: 60vh;
+            background: radial-gradient(circle, rgba(215,255,0,0.04) 0%, transparent 70%);
             filter: blur(100px);
             animation: drift-a 45s var(--ease-soft) infinite alternate;
         }
-
         .atmosphere-cloud {
-            position: absolute;
-            bottom: -20%;
-            left: -10%;
-            width: 80vw;
-            height: 70vh;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+            position: absolute; bottom: -20%; left: -10%;
+            width: 80vw; height: 70vh;
+            background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, transparent 70%);
             filter: blur(120px);
             animation: drift-b 55s var(--ease-soft) infinite alternate;
         }
-
         .atmosphere-drifter {
             position: absolute;
-            width: var(--s, 160px);
-            height: var(--s, 160px);
-            left: var(--x, 50%);
-            top: var(--y, 50%);
+            width: var(--s,160px); height: var(--s,160px);
+            left: var(--x,50%); top: var(--y,50%);
             border-radius: 50%;
-            background: radial-gradient(circle, hsla(var(--hue, 100), var(--sat, 0.8), var(--lit, 0.55), var(--op, 0.06)) 0%, transparent 70%);
+            background: radial-gradient(circle, hsla(var(--hue,100),var(--sat,0.8),var(--lit,0.55),var(--op,0.06)) 0%, transparent 70%);
             filter: blur(80px);
-            animation: drifter-float var(--d, 30s) var(--ease-soft) infinite alternate;
+            animation: drifter-float var(--d,30s) var(--ease-soft) infinite alternate;
             will-change: transform;
         }
-
         @keyframes drifter-float {
-            0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
-            25%  { transform: translate(5%, -5%) scale(1.15) rotate(8deg); }
-            50%  { transform: translate(-3%, 3%) scale(0.95) rotate(-5deg); }
-            75%  { transform: translate(4%, -2%) scale(1.08) rotate(3deg); }
-            100% { transform: translate(-5%, 5%) scale(1.05) rotate(-4deg); }
+            0%   { transform: translate(0,0) scale(1) rotate(0deg); }
+            25%  { transform: translate(5%,-5%) scale(1.15) rotate(8deg); }
+            50%  { transform: translate(-3%,3%) scale(0.95) rotate(-5deg); }
+            75%  { transform: translate(4%,-2%) scale(1.08) rotate(3deg); }
+            100% { transform: translate(-5%,5%) scale(1.05) rotate(-4deg); }
+        }
+        @keyframes drift-a { from { transform: translate(0,0) scale(1); } to { transform: translate(-8%,10%) scale(1.1); } }
+        @keyframes drift-b { from { transform: translate(0,0) scale(1.1); } to { transform: translate(10%,-8%) scale(0.95); } }
+
+        .page-wrap {
+            position: relative; z-index: 1;
+            max-width: 1200px; margin: 0 auto; padding: 0 2rem;
         }
 
-        @keyframes drift-a {
-            from { transform: translate(0, 0) scale(1); }
-            to { transform: translate(-8%, 10%) scale(1.1); }
-        }
-
-        @keyframes drift-b {
-            from { transform: translate(0, 0) scale(1.1); }
-            to { transform: translate(10%, -8%) scale(0.95); }
-        }
-
-        /* Container Structure */
-        .page-wrapper {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Vertical Scrollspy Navigation */
-        .scrollspy-nav {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 90px;
-            height: 100vh;
-            border-right: 1px solid var(--hairline);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
-        }
-
-        .scrollspy-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 2.5rem;
-            align-items: center;
-        }
-
-        .scrollspy-item a {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-decoration: none;
-            color: var(--color-text-med);
-            transition: color var(--duration-base) var(--ease-soft);
-            position: relative;
-        }
-
-        .scrollspy-item a .num {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.05em;
-        }
-
-        .scrollspy-item a .label {
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            transform: rotate(180deg);
-            font-size: 0.75rem;
-            font-weight: 400;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            margin-top: 0.5rem;
-            opacity: 0;
-            height: 0;
-            transition: opacity var(--duration-base) var(--ease-soft), height var(--duration-base) var(--ease-soft);
-        }
-
-        .scrollspy-item a:hover .label,
-        .scrollspy-item.active a .label {
-            opacity: 1;
-            height: auto;
-            margin-top: 0.8rem;
-        }
-
-        .scrollspy-item a:hover,
-        .scrollspy-item.active a {
-            color: var(--color-primary);
-        }
-
-        .scrollspy-item.active a::before {
-            content: "";
-            position: absolute;
-            left: -12px;
-            top: 5px;
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background-color: var(--color-primary);
-        }
-
-        /* Content Area */
-        .main-content {
-            margin-left: 90px;
-            flex: 1;
-            max-width: 1300px;
-            padding: 0 4rem;
-        }
-
-        /* ==========================================================================
-           3. HEADER & NAVIGATION
-           ========================================================================== */
+        /* ═══════════════════════════════════════════════════════════
+           2. HEADER
+           ═══════════════════════════════════════════════════════════ */
         header {
-            position: sticky;
-            top: 0;
-            height: 90px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 2rem 0;
             border-bottom: 1px solid var(--hairline);
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(12px);
-            z-index: 90;
-            margin-bottom: 3rem;
-            width: 100%;
         }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
+        .logo-group { display: flex; align-items: center; gap: 0.75rem; }
         .logo-icon {
-            width: 22px;
-            height: 22px;
+            width: 20px; height: 20px;
             background: var(--color-primary);
             clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%);
         }
-
         .logo-text {
             font-family: var(--font-display);
-            font-weight: 500;
-            font-size: 1.15rem;
-            letter-spacing: 0.12em;
-            color: var(--color-paper);
+            font-weight: 500; font-size: 1rem;
+            letter-spacing: 0.12em; color: var(--color-paper);
             text-transform: uppercase;
         }
-
-        nav {
-            display: flex;
-            align-items: center;
-            gap: 2.5rem;
-        }
-
+        nav { display: flex; align-items: center; gap: 2rem; }
         .nav-link {
             font-family: var(--font-mono);
-            font-size: 0.8rem;
-            color: var(--color-text-high);
-            text-decoration: none;
-            text-transform: uppercase;
+            font-size: 0.75rem; color: var(--color-text-med);
+            text-decoration: none; text-transform: uppercase;
             letter-spacing: 0.08em;
-            cursor: pointer;
             transition: color var(--duration-base) var(--ease-soft);
-        }
-
-        .nav-link:hover {
-            color: var(--color-primary);
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 2rem;
-        }
-
-        /* Heartbeat Status Indicator */
-        .pipeline-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            color: var(--color-text-med);
-            letter-spacing: 0.05em;
-        }
-
-        .pipeline-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-            height: 10px;
-        }
-
-        .pipeline-bar {
-            width: 2px;
-            background-color: var(--color-primary);
-            border-radius: 1px;
-            height: 4px;
-        }
-
-        .pipeline-bar:nth-child(1) { animation: beat 1.2s infinite alternate; }
-        .pipeline-bar:nth-child(2) { animation: beat 1s infinite alternate 0.2s; }
-        .pipeline-bar:nth-child(3) { animation: beat 1.4s infinite alternate 0.4s; }
-
-        @keyframes beat {
-            0% { height: 3px; }
-            100% { height: 10px; }
-        }
-
-        /* SlotButton Component */
-        .slot-btn {
-            position: relative;
-            display: inline-block;
-            color: var(--color-paper);
-            text-decoration: none;
-            overflow: hidden;
-            padding: 0.55rem 1.4rem;
-            border: 1px solid var(--hairline-strong);
-            border-radius: 999px;
-            background: transparent;
             cursor: pointer;
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
+        }
+        .nav-link:hover { color: var(--color-primary); }
+
+        /* ── SlotButton ── */
+        .slot-btn {
+            position: relative; display: inline-block;
+            color: var(--color-paper); text-decoration: none;
+            overflow: hidden;
+            padding: 0.45rem 1.2rem;
+            border: 1px solid var(--hairline-strong); border-radius: 999px;
+            background: transparent; cursor: pointer;
+            font-family: var(--font-mono); font-size: 0.72rem;
+            font-weight: 500; letter-spacing: 0.08em;
             transition: background-color var(--duration-base) var(--ease-soft),
                         border-color var(--duration-base) var(--ease-soft);
         }
-
-        .slot-btn:hover {
-            background-color: var(--color-primary);
-            border-color: var(--color-primary);
-        }
-
+        .slot-btn:hover { background-color: var(--color-primary); border-color: var(--color-primary); }
         .slot-text-wrapper {
-            position: relative;
-            display: block;
+            position: relative; display: block;
             transition: transform 0.45s var(--ease-bounce);
         }
-
-        .slot-text-default {
-            display: block;
-            transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
-        }
-
+        .slot-text-default { display: block; transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce); }
         .slot-text-hover {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            display: block;
-            color: var(--bg-base);
-            font-weight: 600;
-            pointer-events: none;
-            opacity: 0;
+            position: absolute; top: 100%; left: 0; width: 100%; display: block;
+            color: var(--bg-base); font-weight: 600;
+            pointer-events: none; opacity: 0;
             transform: translateY(-50%) scale(0.95);
             transition: opacity 0.3s var(--ease-soft), transform 0.45s var(--ease-bounce);
         }
-
-        .slot-btn:hover .slot-text-wrapper {
-            transform: translateY(-100%);
-        }
-
-        .slot-btn:hover .slot-text-default {
-            opacity: 0;
-            transform: scale(0.9);
-        }
-
-        .slot-btn:hover .slot-text-hover {
-            opacity: 1;
-            transform: translateY(-50%) scale(1);
-        }
-
-        /* Slot-Button underline accent on hover */
+        .slot-btn:hover .slot-text-wrapper { transform: translateY(-100%); }
+        .slot-btn:hover .slot-text-default { opacity: 0; transform: scale(0.9); }
+        .slot-btn:hover .slot-text-hover { opacity: 1; transform: translateY(-50%) scale(1); }
         .slot-btn::after {
-            content: "";
-            position: absolute;
-            bottom: -1px;
-            left: 50%;
-            width: 0;
-            height: 1px;
+            content: ""; position: absolute; bottom: -1px; left: 50%;
+            width: 0; height: 1px;
             background: var(--color-primary);
             transition: width 0.4s var(--ease-bounce), left 0.4s var(--ease-bounce);
             pointer-events: none;
         }
+        .slot-btn:hover::after { width: 80%; left: 10%; }
 
-        .slot-btn:hover::after {
-            width: 80%;
-            left: 10%;
+        /* ═══════════════════════════════════════════════════════════
+           3. HERO
+           ═══════════════════════════════════════════════════════════ */
+        .hero {
+            padding: 5rem 0 3rem;
+            min-height: 80vh;
+            display: flex; flex-direction: column; justify-content: center;
         }
-
-        /* ==========================================================================
-           4. HERO SECTION
-           ========================================================================== */
-        section {
-            padding: 5rem 0;
-            border-bottom: 1px solid var(--hairline);
-            scroll-margin-top: 110px;
-        }
-
-        .hero-section {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: calc(85vh - 90px);
-            padding: 2rem 0 5rem;
-            border-bottom: 1px solid var(--hairline);
-            position: relative;
-        }
-
-        .hero-frame-container {
-            position: relative;
-            padding: 3rem;
-            margin-bottom: 2.5rem;
-        }
-
-        /* Animated Stellla Frame Drawing */
-        .hero-frame-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            overflow: visible;
-        }
-
-        .hero-frame-svg rect {
-            fill: none;
-            stroke: var(--hairline-strong);
-            stroke-width: 1px;
-            stroke-dasharray: 2000;
-            stroke-dashoffset: 2000;
-            animation: drawFrame 2.8s var(--ease-bounce) forwards 0.2s;
-        }
-
-        .hero-frame-svg line {
-            stroke: var(--color-primary);
-            stroke-width: 1.5px;
-            stroke-dasharray: 100;
-            stroke-dashoffset: 100;
-            animation: drawLine 1.8s var(--ease-bounce) forwards 0.8s;
-        }
-
-        @keyframes drawFrame {
-            to { stroke-dashoffset: 0; }
-        }
-
-        @keyframes drawLine {
-            to { stroke-dashoffset: 0; }
-        }
-
-        /* Groovy decorative paths - Flowing lines */
-        .hero-groovy-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            overflow: visible;
-            z-index: 1;
-        }
-
-        .groovy-path {
-            stroke-linecap: round;
-            transform-origin: center;
-            animation: groovy-flow 12s ease-in-out infinite alternate;
-        }
-
-        .gp-1 { animation-delay: 0s; }
-        .gp-2 { animation-delay: -4s; opacity: 0.1; }
-        .gp-3 { animation-delay: -8s; opacity: 0.08; }
-
-        @keyframes groovy-flow {
-            0%   { transform: translateX(0) translateY(0); }
-            50%  { transform: translateX(-15px) translateY(-8px); }
-            100% { transform: translateX(0) translateY(0); }
-        }
-
-        .groovy-dot {
-            animation: groovy-dot-float 8s var(--ease-soft) infinite alternate;
-        }
-
-        .gd-1 { animation-delay: 0s; }
-        .gd-2 { animation-delay: -3s; }
-
-        @keyframes groovy-dot-float {
-            0%   { transform: translate(0, 0); opacity: 0.3; }
-            50%  { transform: translate(10px, -15px); opacity: 0.6; }
-            100% { transform: translate(-5px, 8px); opacity: 0.2; }
-        }
-
-        .hero-tagline {
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            color: var(--color-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            margin-bottom: 1.2rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .hero-tagline::before {
-            content: "";
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            background-color: var(--color-primary);
-            border-radius: 1px;
-        }
-
-        .hero-title {
-            font-family: var(--font-display);
-            font-weight: 300;
-            font-size: clamp(2.4rem, 5.5vw, 4.8rem);
-            line-height: 1.1;
-            color: var(--color-paper);
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
+        .hero-frame {
+            position: relative; padding: 2.5rem;
             margin-bottom: 2rem;
         }
-
-        .hero-title span {
-            font-weight: 600;
+        .hero-frame-svg {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; pointer-events: none; overflow: visible;
         }
+        .hero-frame-svg rect {
+            fill: none; stroke: var(--hairline-strong);
+            stroke-width: 1px; stroke-dasharray: 2000; stroke-dashoffset: 2000;
+            animation: drawFrame 2.8s var(--ease-bounce) forwards 0.2s;
+        }
+        .hero-frame-svg line {
+            stroke: var(--color-primary); stroke-width: 1.5px;
+            stroke-dasharray: 100; stroke-dashoffset: 100;
+            animation: drawLine 1.8s var(--ease-bounce) forwards 0.8s;
+        }
+        @keyframes drawFrame { to { stroke-dashoffset: 0; } }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
 
+        .hero-tagline {
+            font-family: var(--font-mono); font-size: 0.8rem;
+            color: var(--color-primary); text-transform: uppercase;
+            letter-spacing: 0.18em; margin-bottom: 1rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+        .hero-tagline::before {
+            content: ""; display: inline-block;
+            width: 5px; height: 5px; background: var(--color-primary);
+        }
+        .hero h1 {
+            font-family: var(--font-display); font-weight: 300;
+            font-size: clamp(2rem, 5vw, 4.2rem); line-height: 1.1;
+            color: var(--color-paper); letter-spacing: 0.03em;
+            text-transform: uppercase; margin-bottom: 1.5rem;
+        }
+        .hero h1 .hl { color: var(--color-primary); font-weight: 600; }
+        .hero h1 .hl-loss { color: var(--color-rust); font-weight: 600; }
         .hero-desc {
-            font-size: 1.12rem;
-            color: var(--color-text-high);
-            max-width: 740px;
-            line-height: 1.68;
-            margin-bottom: 2.8rem;
+            font-size: 1.05rem; color: var(--color-text-high);
+            max-width: 700px; line-height: 1.7; margin-bottom: 2.5rem;
         }
-
-        .hero-actions {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
+        .hero-desc code {
+            font-family: var(--font-mono); font-size: 0.85rem;
+            color: var(--color-primary);
+            background: rgba(215,255,0,0.06);
+            padding: 0.05rem 0.35rem; border-radius: 3px;
         }
+        .hero-desc a {
+            color: var(--color-primary);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .hero-actions { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
 
-        /* Secondary Ghost Button */
         .btn-outline {
             display: inline-block;
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
+            font-family: var(--font-mono); font-size: 0.75rem;
+            text-transform: uppercase; letter-spacing: 0.08em;
             text-decoration: none;
             color: var(--color-text-high);
-            padding: 0.6rem 1.6rem;
-            border: 1px solid var(--hairline);
-            border-radius: 999px;
+            padding: 0.55rem 1.4rem;
+            border: 1px solid var(--hairline); border-radius: 999px;
             transition: all var(--duration-base) var(--ease-soft);
         }
+        .btn-outline:hover { color: var(--color-paper); border-color: var(--color-paper); }
 
-        .btn-outline:hover {
-            color: var(--color-paper);
-            border-color: var(--color-paper);
+        .tech-pills {
+            display: flex; flex-wrap: wrap; gap: 0.5rem;
+            margin-top: 2.5rem;
         }
-
-        /* ==========================================================================
-           5. SYSTEM STATS & GLASS KPI CARDS
-           ========================================================================== */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 4rem;
-        }
-
-        .glass-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
-            border: 1px solid var(--hairline);
-            border-radius: 8px;
-            padding: 1.8rem;
-            transition: transform 0.35s var(--ease-bounce),
-                        box-shadow 0.35s ease,
-                        border-color 0.35s ease;
-            position: relative;
-        }
-
-        .glass-card:hover {
-            border-color: rgba(215, 255, 0, 0.15);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Crosshair corner markers - Frame-drawing pattern */
-        .glass-card::before {
-            content: "";
-            position: absolute;
-            top: -1px;
-            left: -1px;
-            width: 12px;
-            height: 12px;
-            border-top: 2px solid var(--color-primary);
-            border-left: 2px solid var(--color-primary);
-            opacity: 0;
-            transition: opacity var(--duration-base) ease;
-            pointer-events: none;
-        }
-
-        .glass-card::after {
-            content: "";
-            position: absolute;
-            bottom: -1px;
-            right: -1px;
-            width: 12px;
-            height: 12px;
-            border-bottom: 2px solid var(--color-primary);
-            border-right: 2px solid var(--color-primary);
-            opacity: 0;
-            transition: opacity var(--duration-base) ease, transform 0.5s var(--ease-bounce);
-            pointer-events: none;
-        }
-
-        .glass-card:hover::before,
-        .glass-card:hover::after {
-            opacity: 1;
-        }
-
-        .glass-card:hover::after {
-            transform: scale(1);
-        }
-
-        /* Secondary corner pair for full frame embrace */
-        .glass-card .corner-tl,
-        .glass-card .corner-br {
-            display: none;
-        }
-
-        .glass-card .label {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            color: var(--color-text-med);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 0.75rem;
-        }
-
-        .glass-card .value {
-            font-family: var(--font-mono);
-            font-size: 2.2rem;
-            font-weight: 500;
-            color: var(--color-paper);
-            line-height: 1.1;
-            margin-bottom: 0.5rem;
-        }
-
-        .glass-card .value.accent {
-            color: var(--color-primary);
-        }
-
-        .glass-card .meta {
-            font-size: 0.8rem;
-            color: var(--color-text-med);
-        }
-
-        /* ==========================================================================
-           6. COMPONENT STYLING (Ledger, Badges, Tech Pills)
-           ========================================================================== */
-        .section-header {
-            margin-bottom: 3.5rem;
-        }
-
-        .section-num {
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            color: var(--color-primary);
-            letter-spacing: 0.1em;
-            margin-bottom: 0.8rem;
-            display: block;
-        }
-
-        .section-title {
-            font-family: var(--font-display);
-            font-weight: 400;
-            font-size: 1.8rem;
-            color: var(--color-paper);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        /* Tech Pills */
-        .tech-pill-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.6rem;
-            margin-top: 1.5rem;
-        }
-
         .tech-pill {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            padding: 0.3rem 0.8rem;
+            font-family: var(--font-mono); font-size: 0.7rem;
+            padding: 0.25rem 0.7rem;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--hairline);
-            color: var(--color-text-high);
-            text-transform: uppercase;
-        }
-
-        .tech-pill:hover {
-            border-color: rgba(215, 255, 0, 0.3);
-            color: var(--color-paper);
-            background: rgba(215, 255, 0, 0.04);
-            box-shadow: 0 0 20px rgba(215, 255, 0, 0.03);
-        }
-
-        /* Findings Ledger Table - Crosshair frame */
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto;
-            margin: 2rem 0;
-            border: 1px solid var(--hairline);
-            background: rgba(10, 10, 10, 0.4);
-            border-radius: 4px;
-        }
-
-        .table-responsive::before {
-            content: "";
-            position: absolute;
-            top: -1px;
-            left: -1px;
-            width: 10px;
-            height: 10px;
-            border-top: 1.5px solid rgba(215, 255, 0, 0.15);
-            border-left: 1.5px solid rgba(215, 255, 0, 0.15);
-            opacity: 1;
-            transition: opacity 0.5s var(--ease-soft);
-            pointer-events: none;
-        }
-
-        .ledger-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: var(--font-body);
-            font-size: 0.88rem;
-            text-align: left;
-        }
-
-        .ledger-table th {
-            padding: 1rem 1.4rem;
-            color: var(--color-paper);
-            border-bottom: 1px solid var(--hairline-strong);
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-weight: 500;
-            background: rgba(0, 0, 0, 0.3);
-        }
-
-        .ledger-table td {
-            padding: 1rem 1.4rem;
-            color: var(--color-text-high);
-            border-bottom: 1px solid var(--hairline);
-        }
-
-        .ledger-table tbody tr:hover td {
-            background: rgba(255, 255, 255, 0.015);
-            color: var(--color-paper);
-        }
-
-        .commodity-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            text-transform: uppercase;
-        }
-
-        .commodity-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 1px;
-        }
-
-        .commodity-dot.onion  { background-color: var(--color-commodity-onion); }
-        .commodity-dot.tomato { background-color: var(--color-commodity-tomato); }
-        .commodity-dot.wheat  { background-color: var(--color-commodity-wheat); }
-        .commodity-dot.potato { background-color: var(--color-commodity-potato); }
-        .commodity-dot.grapes { background-color: #7C9A5A; }
-
-        .stat-badge {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            padding: 0.15rem 0.5rem;
-            border-radius: 2px;
-            font-weight: 500;
-        }
-
-        .stat-badge.significant {
-            background: rgba(143, 174, 137, 0.12);
-            color: var(--color-sage);
-            border: 1px solid rgba(143, 174, 137, 0.25);
-        }
-
-        .stat-badge.insignificant {
-            background: rgba(255, 255, 255, 0.04);
             color: var(--color-text-med);
-            border: 1px solid var(--hairline);
+            text-transform: uppercase;
+            transition: all var(--duration-base) var(--ease-soft);
+        }
+        .tech-pill:hover {
+            border-color: rgba(215,255,0,0.3);
+            color: var(--color-paper);
+            background: rgba(215,255,0,0.04);
         }
 
-        .stat-badge.risk {
-            background: rgba(217, 102, 59, 0.12);
-            color: var(--color-rust);
-            border: 1px solid rgba(217, 102, 59, 0.25);
+        /* ═══════════════════════════════════════════════════════════
+           4. SECTIONS
+           ═══════════════════════════════════════════════════════════ */
+        section { padding: 4rem 0; border-bottom: 1px solid var(--hairline); }
+        .section-label {
+            font-family: var(--font-mono); font-size: 0.75rem;
+            color: var(--color-primary); letter-spacing: 0.1em;
+            margin-bottom: 0.8rem; display: block;
+        }
+        .section-title {
+            font-family: var(--font-display); font-weight: 400;
+            font-size: 1.6rem; color: var(--color-paper);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 1.5rem;
+        }
+        .section-sub {
+            color: var(--color-text-med);
+            margin-bottom: 1.5rem; max-width: 700px;
         }
 
-        /* ==========================================================================
-           7. DOCUMENTATION LAYOUT (Detailed text blocks)
-           ========================================================================== */
-        .doc-layout {
-            display: grid;
-            grid-template-columns: 3fr 2fr;
-            gap: 3.5rem;
+        /* ── Chart Card ── */
+        .chart-card {
+            background: rgba(10,10,10,0.4);
+            border: 1px solid var(--hairline); border-radius: 8px;
+            padding: 1.5rem; position: relative;
         }
+        .chart-card svg { width: 100%; height: auto; display: block; }
 
-        @media (max-width: 992px) {
-            .doc-layout {
-                grid-template-columns: 1fr;
-                gap: 2.5rem;
+        /* ── RDD Scatter Point Reveal Animation ──
+           Each point fades in sequentially after the frame-drawing completes.
+           sp-0 through sp-10 with 100ms stagger. Points start invisible.
+           ============================================================ */
+        @keyframes pointReveal {
+            0%   { opacity: 0; transform: scale(0); }
+            60%  { opacity: 0.9; transform: scale(1.15); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .rdd-point {
+            opacity: 0;
+            animation: pointReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+        .sp-0  { animation-delay: 2.8s; }
+        .sp-1  { animation-delay: 2.9s; }
+        .sp-2  { animation-delay: 3.0s; }
+        .sp-3  { animation-delay: 3.1s; }
+        .sp-4  { animation-delay: 3.2s; }
+        .sp-5  { animation-delay: 3.3s; }
+        .sp-6  { animation-delay: 3.4s; }
+        .sp-7  { animation-delay: 3.5s; }
+        .sp-8  { animation-delay: 3.6s; }
+        .sp-9  { animation-delay: 3.7s; }
+        .sp-10 { animation-delay: 3.8s; }
+
+        /* Error bars follow their corresponding point */
+        .rdd-ebar {
+            opacity: 0;
+            animation: ebarReveal 0.35s ease-out forwards;
+        }
+        @keyframes ebarReveal {
+            0%   { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        .eb-0  { animation-delay: 2.85s; }
+        .eb-1  { animation-delay: 3.05s; }
+        .eb-2  { animation-delay: 3.25s; }
+        .eb-3  { animation-delay: 3.45s; }
+        .eb-4  { animation-delay: 3.65s; }
+        .eb-5  { animation-delay: 3.85s; }
+
+        /* Regression lines animate after points */
+        @keyframes lineDraw {
+            0%   { stroke-dashoffset: 1000; opacity: 0; }
+            50%  { opacity: 0.5; }
+            100% { stroke-dashoffset: 0; opacity: 1; }
+        }
+        .rdd-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            opacity: 0;
+            animation: lineDraw 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .l-0 { animation-delay: 3.5s; }
+        .l-1 { animation-delay: 3.8s; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rdd-point, .rdd-ebar, .rdd-line {
+                opacity: 1;
+                animation: none !important;
             }
         }
 
-        .doc-text h3 {
-            font-family: var(--font-display);
-            font-weight: 400;
-            font-size: 1.25rem;
-            color: var(--color-paper);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin: 2.2rem 0 1rem;
-        }
-
-        .doc-text h3:first-child {
-            margin-top: 0;
-        }
-
-        .doc-text p {
-            margin-bottom: 1.2rem;
-            color: var(--color-text-high);
-            font-size: 0.95rem;
-            line-height: 1.65;
-        }
-
-        .doc-text ul, .doc-text ol {
-            margin-bottom: 1.5rem;
-            margin-left: 1.5rem;
-            color: var(--color-text-high);
-            font-size: 0.95rem;
-        }
-
-        .doc-text li {
-            margin-bottom: 0.5rem;
-        }
-
-        .doc-text code {
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-            background: rgba(255, 255, 255, 0.04);
+        /* ── Ledger Table ── */
+        .table-responsive {
+            width: 100%; overflow-x: auto;
             border: 1px solid var(--hairline);
-            padding: 0.1rem 0.35rem;
-            border-radius: 3px;
-            color: var(--color-primary);
+            background: rgba(10,10,10,0.4); border-radius: 4px;
         }
-
-        .doc-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
+        .ledger { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .ledger th {
+            padding: 0.85rem 1.2rem; color: var(--color-paper);
+            border-bottom: 1px solid var(--hairline-strong);
+            font-family: var(--font-mono); font-size: 0.68rem;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            font-weight: 500; background: rgba(0,0,0,0.3);
+            text-align: left;
         }
+        .ledger th:last-child { text-align: right; }
+        .ledger td {
+            padding: 0.85rem 1.2rem; color: var(--color-text-high);
+            border-bottom: 1px solid var(--hairline);
+        }
+        .ledger td:last-child { text-align: right; font-family: var(--font-mono); font-weight: 500; }
+        .ledger tr:last-child td { border-bottom: none; }
+        .ledger tbody tr:hover td { background: rgba(255,255,255,0.015); color: var(--color-paper); }
+        .loss { color: var(--color-rust); }
+        .profit { color: var(--color-primary); }
+        .muted { color: var(--color-text-low); }
+        .warm { color: var(--color-warm); }
 
-        .doc-widget {
-            border: 1px solid var(--hairline);
-            background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-radius: 8px;
-            padding: 1.8rem;
-            transition: transform 0.35s var(--ease-bounce),
-                        border-color 0.35s ease,
-                        box-shadow 0.35s ease;
+        /* ── Robustness Grid ── */
+        .robustness-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .robo-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%);
+            border: 1px solid var(--hairline); border-radius: 8px;
+            padding: 1.5rem;
+            transition: border-color 0.35s ease, transform 0.35s var(--ease-bounce);
             position: relative;
         }
-
-        .doc-widget:hover {
-            border-color: rgba(215, 255, 0, 0.15);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Doc-widget crosshair corners */
-        .doc-widget::before {
-            content: "";
-            position: absolute;
-            top: -1px;
-            right: -1px;
-            width: 10px;
-            height: 10px;
-            border-top: 1.5px solid rgba(215, 255, 0, 0.2);
-            border-right: 1.5px solid rgba(215, 255, 0, 0.2);
-            opacity: 0;
-            transition: opacity 0.5s var(--ease-soft);
+        .robo-card::before {
+            content: ""; position: absolute;
+            top: -1px; right: -1px;
+            width: 8px; height: 8px;
+            border-top: 1.5px solid rgba(215,255,0,0.2);
+            border-right: 1.5px solid rgba(215,255,0,0.2);
+            opacity: 0; transition: opacity 0.4s ease;
             pointer-events: none;
         }
-
-        .doc-widget::after {
-            content: "";
-            position: absolute;
-            bottom: -1px;
-            left: -1px;
-            width: 10px;
-            height: 10px;
-            border-bottom: 1.5px solid rgba(215, 255, 0, 0.2);
-            border-left: 1.5px solid rgba(215, 255, 0, 0.2);
-            opacity: 0;
-            transition: opacity 0.5s var(--ease-soft);
-            pointer-events: none;
+        .robo-card:hover::before { opacity: 1; }
+        .robo-card:hover { border-color: rgba(215,255,0,0.12); transform: translateY(-2px); }
+        .robo-title {
+            font-family: var(--font-mono); font-size: 0.72rem;
+            color: var(--color-text-med); text-transform: uppercase;
+            letter-spacing: 0.06em; margin-bottom: 0.3rem;
         }
+        .robo-status { font-size: 0.9rem; font-weight: 500; }
+        .robo-desc { font-size: 0.78rem; color: var(--color-text-med); margin-top: 0.3rem; }
 
-        .doc-widget:hover::before,
-        .doc-widget:hover::after {
-            opacity: 1;
+        /* ── Architecture Flow ── */
+        .arch-flow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 0.4rem; flex-wrap: wrap;
+            padding: 1.5rem;
+            background: rgba(10,10,10,0.3);
+            border: 1px solid var(--hairline); border-radius: 8px;
         }
-
-        .doc-widget-title {
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            color: var(--color-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .arch-node {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--hairline); border-radius: 6px;
+            padding: 0.5rem 0.9rem;
+            font-size: 0.7rem; font-family: var(--font-mono);
+            color: var(--color-text-med); text-align: center;
         }
-
-        .doc-widget-title::before {
-            content: "";
-            width: 5px;
-            height: 5px;
-            background: var(--color-primary);
-        }
+        .arch-node .node-icon { font-size: 0.9rem; display: block; margin-bottom: 0.15rem; }
+        .arch-node.highlight { border-color: var(--color-primary); color: var(--color-primary); }
+        .arch-arrow { color: var(--color-text-low); font-size: 1rem; font-family: var(--font-mono); }
 
         /* Mermaid diagram wrapper */
         .mermaid-wrapper {
-            background: rgba(0, 0, 0, 0.4);
-            padding: 1.5rem 1rem;
-            border-radius: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
             border: 1px solid var(--hairline);
             overflow-x: auto;
-            margin: 1.2rem 0;
         }
         .mermaid-wrapper .mermaid {
-            max-width: 100%;
+            font-family: "Space Grotesk", "Inter", sans-serif;
         }
 
-        .alert-box {
-            background: rgba(217, 102, 59, 0.04);
-            border-left: 2px solid var(--color-rust);
-            padding: 1.2rem;
-            border-radius: 0 4px 4px 0;
-            margin: 1.5rem 0;
+        /* ── AI Chat Code Block ── */
+        .code-block {
+            font-family: var(--font-mono); font-size: 0.78rem;
+            line-height: 1.7; overflow-x: auto;
         }
 
-        .alert-box-title {
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            color: var(--color-rust);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.5rem;
-        }
-
-        .alert-box-desc {
-            font-size: 0.85rem;
-            color: var(--color-text-high);
-            margin: 0 !important;
-        }
-
-        /* ==========================================================================
-           8. FOOTER
-           ========================================================================== */
+        /* ═══════════════════════════════════════════════════════════
+           5. FOOTER
+           ═══════════════════════════════════════════════════════════ */
         footer {
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-top: 1px solid var(--hairline);
-            margin-top: 6rem;
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            color: var(--color-text-low);
-            letter-spacing: 0.05em;
+            padding: 2.5rem 0;
+            font-family: var(--font-mono); font-size: 0.7rem;
+            color: var(--color-text-low); letter-spacing: 0.05em;
         }
-
-        .footer-links {
-            display: flex;
-            gap: 2rem;
-        }
-
+        .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
         .footer-link {
-            color: var(--color-text-med);
-            text-decoration: none;
+            color: var(--color-text-med); text-decoration: none;
             text-transform: uppercase;
             transition: color var(--duration-base) var(--ease-soft);
         }
+        .footer-link:hover { color: var(--color-primary); }
 
-        .footer-link:hover {
-            color: var(--color-primary);
-        }
-
-        /* Scroll Reveal base style */
+        /* ═══════════════════════════════════════════════════════════
+           6. SCROLL REVEAL
+           ═══════════════════════════════════════════════════════════ */
         .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-            will-change: opacity, transform;
+            opacity: 0; transform: translateY(30px);
+            transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1),
+                        transform 0.8s cubic-bezier(0.16,1,0.3,1);
         }
+        .reveal.is-visible { opacity: 1; transform: translateY(0); }
 
-        .reveal.is-visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* ==========================================================================
-           9. RESPONSIVE DESIGN
-           ========================================================================== */
-        @media (max-width: 768px) {
-            .scrollspy-nav {
-                display: none;
-            }
-            .main-content {
-                margin-left: 0;
-                padding: 0 1.5rem;
-            }
-            header {
-                height: auto;
-                padding: 1.5rem 0;
-                flex-direction: column;
-                gap: 1.2rem;
-            }
-            .header-actions {
-                width: 100%;
-                justify-content: space-between;
-            }
-            section {
-                padding: 3rem 0;
-            }
-            .hero-section {
-                min-height: auto;
-                padding: 2rem 0;
-            }
-            .hero-frame-container {
-                padding: 1.5rem;
-            }
-            .hero-title {
-                font-size: 2.2rem;
-            }
-            footer {
-                flex-direction: column;
-                gap: 1rem;
-                justify-content: center;
-                height: auto;
-                padding: 2rem 0;
-            }
+        /* ═══════════════════════════════════════════════════════════
+           7. RESPONSIVE
+           ═══════════════════════════════════════════════════════════ */
+        @media (max-width: 600px) {
+            .page-wrap { padding: 0 1.2rem; }
+            header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+            nav { width: 100%; gap: 1rem; flex-wrap: wrap; }
+            .hero { padding: 3rem 0 2rem; min-height: auto; }
+            .hero-frame { padding: 1.2rem; }
+            .hero h1 { font-size: 1.6rem; }
+            .robustness-grid { grid-template-columns: 1fr; }
+            .arch-flow { flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); }
+            .ledger th, .ledger td { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
         }
     </style>
-    <!-- Mermaid.js for diagrams -->
+    <!-- Mermaid.js for architecture diagrams -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
         mermaid.initialize({
@@ -1160,517 +543,309 @@
 </head>
 <body>
 
-    <div data-site-nav></div>
-
-    <!-- Dot Grid Overlay -->
+    <!-- Atmosphere Layer -->
     <div class="dot-grid" aria-hidden="true"></div>
-
-    <!-- Atmosphere Drifting Glows - Extended -->
     <div class="atmosphere" aria-hidden="true">
         <div class="atmosphere-flash"></div>
         <div class="atmosphere-cloud"></div>
-        <div class="atmosphere-drifter" style="--x:15%;--y:20%;--s:180px;--d:25s;--hue:100;--op:0.06"></div>
-        <div class="atmosphere-drifter" style="--x:75%;--y:30%;--s:140px;--d:35s;--hue:80;--op:0.05"></div>
-        <div class="atmosphere-drifter" style="--x:50%;--y:70%;--s:200px;--d:40s;--hue:60;--sat:0.9;--lit:0.6;--op:0.04"></div>
-        <div class="atmosphere-drifter" style="--x:8%;--y:65%;--s:100px;--d:30s;--op:0.03"></div>
-        <div class="atmosphere-drifter" style="--x:88%;--y:12%;--s:130px;--d:45s;--hue:120;--op:0.035"></div>
+        <div class="atmosphere-drifter" style="--x:15%;--y:25%;--s:170px;--d:26s;--op:0.05"></div>
+        <div class="atmosphere-drifter" style="--x:80%;--y:15%;--s:110px;--d:36s;--hue:80;--op:0.045"></div>
+        <div class="atmosphere-drifter" style="--x:45%;--y:80%;--s:190px;--d:44s;--op:0.03"></div>
     </div>
 
-    <div class="page-wrapper">
-        
-        <!-- Left Side Scrollspy Navigation -->
-        <nav class="scrollspy-nav" aria-label="Vertical Section Navigation">
-            <ul class="scrollspy-list">
-                <li class="scrollspy-item active" data-target="overview">
-                    <a href="#overview">
-                        <span class="num">01</span>
-                        <span class="label">Overview</span>
-                    </a>
-                </li>
-                <li class="scrollspy-item" data-target="metrics">
-                    <a href="#metrics">
-                        <span class="num">02</span>
-                        <span class="label">Live Metrics</span>
-                    </a>
-                </li>
-                <li class="scrollspy-item" data-target="causal">
-                    <a href="#causal">
-                        <span class="num">03</span>
-                        <span class="label">Causal RDD</span>
-                    </a>
-                </li>
-                <li class="scrollspy-item" data-target="architecture">
-                    <a href="#architecture">
-                        <span class="num">04</span>
-                        <span class="label">System Design</span>
-                    </a>
-                </li>
-                <li class="scrollspy-item" data-target="failure">
-                    <a href="#failure">
-                        <span class="num">05</span>
-                        <span class="label">Failure Modes</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
+    <div class="page-wrap">
 
-        <!-- Main Content Column -->
-        <main class="main-content">
-            
-            <!-- Sticky Top Header -->
-            <header>
-                <div class="logo-container">
-                    <div class="logo-icon"></div>
-                    <div class="logo-text">MandiIQ</div>
-                </div>
-                <nav aria-label="Main Navigation">
-                    <a class="nav-link" href="#overview" data-scramble>Overview</a>
-                    <a class="nav-link" href="#causal" data-scramble>Causal RDD</a>
-                <a class="nav-link" href="#architecture" data-scramble>Architecture</a>                    <a class="nav-link" href="./live.html" data-scramble>Live Console</a>
+        <!-- ── Header ── -->
+        <header>
+            <div class="logo-group">
+                <div class="logo-icon"></div>
+                <span class="logo-text">MandiIQ</span>
+            </div>
+            <nav>
+                <a class="nav-link" href="#findings" data-scramble>Findings</a>
+                <a class="nav-link" href="#rdd" data-scramble>Causal RDD</a>
+                <a class="nav-link" href="./overview.html" data-scramble>Overview</a>
+                <a class="nav-link" href="./live.html" data-scramble>Live console</a>
+                <a class="nav-link" href="./status.html" data-scramble>Status</a>
                 <a class="nav-link" href="./heartbeat-dashboard.html" data-scramble>Heartbeat</a>
                 <a class="nav-link" href="https://github.com/flawsom/MandiIQ" target="_blank" data-scramble>GitHub</a>
-                </nav>
-                <div class="header-actions">
-                    <div class="pipeline-status">
-                        <span>PIPE RUNNING</span>
-                        <div class="pipeline-bars" aria-hidden="true">
-                            <div class="pipeline-bar"></div>
-                            <div class="pipeline-bar"></div>
-                            <div class="pipeline-bar"></div>
-                        </div>
-                    </div>
-                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn">
+                <span class="site-nav__status" data-shell-status="" data-state=""
+                      style="margin-left:6px"
+                      title="Fetching live status from the production API">
+                    <span class="led" aria-hidden="true"></span>connecting
+                </span>
+                <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn">
+                    <span class="slot-text-wrapper">
+                        <span class="slot-text-default">Dashboard</span>
+                        <span class="slot-text-hover">Open App →</span>
+                    </span>
+                </a>
+            </nav>
+        </header>
+
+        <!-- ── Hero ── -->
+        <section class="hero" id="overview">
+            <div class="hero-frame">
+                <svg class="hero-frame-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <rect x="0" y="0" width="100" height="100" />
+                    <line x1="0" y1="50" x2="5" y2="50" />
+                    <line x1="95" y1="50" x2="100" y2="50" />
+                    <line x1="50" y1="0" x2="50" y2="5" />
+                    <line x1="50" y1="95" x2="50" y2="100" />
+                </svg>
+                <div class="hero-tagline">MandiIQ - Mandi Price Intelligence System v1.0</div>
+                <h1>Rainfall crosses <span class="hl-loss">−19%</span> →<br>onion prices <span class="hl" data-live="rdd-headline">show no jump (p = 0.28)</span></h1>
+                <p class="hero-desc">
+                    Automated causal inference + predictive ML + prescriptive recommendations + AI orchestration
+                    on Indian mandi prices. Data sourced daily from <code>data.gov.in</code>
+                    and IMD rainfall records. RDD cutoff at <strong>−19% rainfall deficiency</strong>
+                    (official IMD classification) returns <strong><span data-live="rdd-effect">+₹101</span>, <span data-live="rdd-p">p = 0.28</span></strong> on the current
+                    warehouse - <span data-live="rdd-verdict">no statistically significant discontinuity</span>, and the 30-specification
+                    curve <span data-live="spec-verdict">agrees (0/30 significant, verdict <em>fragile</em>)</span>. Fully automated, nightly, zero manual intervention.
+                    Powered by <strong>OpenRouter</strong> free-tier multi-model AI routing.
+                    <a href="#ask">Ask MandiIQ →</a>
+                </p>
+                <div class="hero-actions">
+                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="slot-btn" style="padding:0.7rem 1.8rem;font-size:0.85rem;">
                         <span class="slot-text-wrapper">
-                            <span class="slot-text-default">LAUNCH APP</span>
-                            <span class="slot-text-hover">LIVE DASHBOARD</span>
+                            <span class="slot-text-default">Open Interactive Dashboard</span>
+                            <span class="slot-text-hover">Launch MandiIQ →</span>
                         </span>
                     </a>
+                    <a href="#rdd" class="btn-outline">Explore RDD Findings</a>
                 </div>
-            </header>
-
-            <!-- Hero Section -->
-            <section class="hero-section" id="overview">
-                <div class="hero-frame-container">
-                    <svg class="hero-frame-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <rect x="0" y="0" width="100" height="100" />
-                        <line x1="0" y1="50" x2="6" y2="50" />
-                        <line x1="94" y1="50" x2="100" y2="50" />
-                        <line x1="50" y1="0" x2="50" y2="6" />
-                        <line x1="50" y1="94" x2="50" y2="100" />
-                    </svg>
-                    <!-- Decorative groovy paths -->
-                    <svg class="hero-groovy-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <path class="groovy-path gp-1" d="M -50 350 Q 100 200 250 320 T 550 280 T 850 350" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" opacity="0.15" />
-                        <path class="groovy-path gp-2" d="M -50 400 Q 150 250 300 370 T 600 330 T 850 400" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.3" opacity="0.1" />
-                        <path class="groovy-path gp-3" d="M -50 300 Q 200 450 350 280 T 500 350 T 850 280" fill="none" stroke="var(--color-primary)" stroke-width="0.4" opacity="0.08" />
-                        <circle class="groovy-dot gd-1" cx="250" cy="320" r="2" fill="var(--color-primary)" opacity="0.3" />
-                        <circle class="groovy-dot gd-2" cx="550" cy="280" r="1.5" fill="var(--color-primary)" opacity="0.2" />
-                    </svg>
-                    <div class="hero-tagline">Causal Agricultural Intelligence</div>
-                    <h1 class="hero-title">Testing Policy Thresholds<br>On <span>Mandi Margins</span></h1>
-                    <p class="hero-desc">
-                        MandiIQ is an open-source analytical warehouse and dashboard that applies Causal Regression Discontinuity Designs (RDD) to test whether Indian Meteorological Department (IMD) rainfall-deficit thresholds drive structural margins in national commodity markets.
-                    </p>
-                    <div class="hero-actions">
-                        <a href="./live.html" class="slot-btn" style="padding: 0.75rem 2rem; font-size: 0.85rem;">
-                            <span class="slot-text-wrapper">
-                                <span class="slot-text-default">OPEN LIVE DATA CONSOLE</span>
-                                <span class="slot-text-hover">LIVE DATA ➔</span>
-                            </span>
-                        </a>
-                        <a href="#causal" class="btn-outline">EXPLORE FINDINGS</a>
-                        <a href="https://mandiiq.streamlit.app/" target="_blank" rel="noopener" class="btn-outline">FULL COCKPIT (STREAMLIT SIGN-IN)</a>
-                    </div>
-                </div>
-
-                <div class="tech-pill-container">
+                <div class="tech-pills">
                     <span class="tech-pill">Regression Discontinuity</span>
                     <span class="tech-pill">Causal Inference</span>
-                    <span class="tech-pill">DuckDB Analytical Store</span>
-                    <span class="tech-pill">FastAPI inference</span>
-                    <span class="tech-pill">Streamlit Front</span>
-                    <span class="tech-pill">MLflow Models</span>
+                    <span class="tech-pill">DuckDB</span>
+                    <span class="tech-pill">FastAPI</span>
+                    <span class="tech-pill">XGBoost</span>
+                    <span class="tech-pill">Prophet</span>
+                    <span class="tech-pill">OpenRouter</span>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- Section 02: Live Metrics -->
-            <section id="metrics" class="reveal">
-                <div class="section-header">
-                    <span class="section-num">02 / REAL-TIME LEDGER</span>
-                    <h2 class="section-title">Warehouse Scale & Coverage</h2>
-                </div>
-                <!-- These four read the same /health as every other page on this
-                     site. They were typed-in numbers (1,605,944 rows, 436
-                     commodities, a hand-measured "< 85ms") on a page whose own
-                     footer promises nothing here is hardcoded - and the real
-                     warehouse has held 1.99M rows since. A figure that cannot
-                     be measured from the API now says so instead of guessing. -->
-                <div class="kpi-grid">
-                    <div class="glass-card">
-                        <div class="label">Database Coverage</div>
-                        <div class="value accent" data-health="n_prices">—</div>
-                        <div class="meta">Live price records</div>
-                    </div>
-                    <div class="glass-card">
-                        <div class="label">Commodity Scope</div>
-                        <div class="value" data-health="n_commodities">—</div>
-                        <div class="meta">Unique agricultural commodities</div>
-                    </div>
-                    <div class="glass-card">
-                        <div class="label">Temporal Window</div>
-                        <div class="value" data-health-window>—</div>
-                        <div class="meta">Earliest to newest arrival date held</div>
-                    </div>
-                    <div class="glass-card">
-                        <div class="label">Warehouse Freshness</div>
-                        <div class="value" data-health="days_behind">—</div>
-                        <div class="meta">Days between the newest arrival date and today</div>
-                    </div>
-                </div>
-                <p class="meta" data-health-audit style="font-family: var(--font-mono, monospace); font-size: .78rem;">reading /health…</p>
-                <p>
-                    Our data pipeline runs a continuous extraction cycle: the serving container refreshes its own warehouse every 30 minutes, an outside workflow triggers and verifies a run every 15, and both fail loudly when the newest arrival date does not advance. Each pass pulls arrivals and prices from Agmarknet, validates the transaction schema, matches market records with spatial coordinate keys, and resolves weather attributes by joining spatial grid files from the Indian Meteorological Department.
+        <!-- ── RDD Discontinuity Plot ── -->
+        <section id="rdd" class="reveal">
+            <span class="section-label">01 / Causal Discontinuity</span>
+            <h2 class="section-title">The Rainfall-Deficiency Cliff</h2>
+            <p class="section-sub">
+                Average onion modal price (₹/quintal) by rainfall departure from normal.
+                The <strong>−19% threshold</strong> is IMD's official classification for
+                "deficient" rainfall - and on the current warehouse the live estimate
+                there is <strong><span data-live="rdd-effect">+₹101</span> with <em>p</em> = <span data-live="rdd-p-bare">0.28</span></strong>: <span data-live="rdd-verdict">no statistically
+                significant jump</span>, with <span data-live="spec-count">0 of 30 specifications significant</span>.
+            </p>
+            <p class="section-sub" id="engine-note" style="font-family:var(--font-mono,monospace);font-size:0.78rem;"></p>
+            <div class="chart-card">
+                <svg viewBox="0 0 700 280" role="img" aria-label="RDD discontinuity plot">
+                    <line x1="65" y1="30" x2="65" y2="225" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <line x1="65" y1="225" x2="640" y2="225" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <line x1="65" y1="65" x2="640" y2="65" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="105" x2="640" y2="105" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="145" x2="640" y2="145" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="65" y1="185" x2="640" y2="185" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" stroke-dasharray="4,4"/>
+                    <line x1="305" y1="30" x2="305" y2="240" stroke="#d7ff00" stroke-width="2" stroke-dasharray="6,4"/>
+                    <line x1="65" y1="105" x2="640" y2="105" stroke="rgba(255,255,255,0.14)" stroke-width="0.8" stroke-dasharray="2,4"/>
+                    <circle class="rdd-point sp-0" cx="105" cy="162" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-1" cx="145" cy="148" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-2" cx="185" cy="155" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-3" cx="225" cy="140" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-4" cx="265" cy="145" r="4.5" fill="rgba(143,174,137,0.7)" stroke="#8FAE89" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-5" cx="345" cy="92" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-6" cx="385" cy="88" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-7" cx="425" cy="78" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-8" cx="465" cy="72" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-9" cx="505" cy="65" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <circle class="rdd-point sp-10" cx="545" cy="62" r="4.5" fill="rgba(217,102,59,0.7)" stroke="#D9663B" stroke-width="0.5"/>
+                    <line class="rdd-ebar eb-0" x1="105" y1="155" x2="105" y2="169" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-1" x1="185" y1="148" x2="185" y2="162" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-2" x1="265" y1="138" x2="265" y2="152" stroke="rgba(143,174,137,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-3" x1="385" y1="80" x2="385" y2="96" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-4" x1="465" y1="64" x2="465" y2="80" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-ebar eb-5" x1="545" y1="54" x2="545" y2="70" stroke="rgba(217,102,59,0.4)" stroke-width="1"/>
+                    <line class="rdd-line l-0" x1="85" y1="148" x2="305" y2="142" stroke="#8FAE89" stroke-width="2.5" stroke-linecap="round"/>
+                    <line class="rdd-line l-1" x1="305" y1="95" x2="600" y2="52" stroke="#D9663B" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="290" y1="142" x2="290" y2="95" stroke="#d7ff00" stroke-width="2" stroke-dasharray="3,3"/>
+                    <text x="165" y="112" fill="#d7ff00" font-size="11" font-family="IBM Plex Mono, monospace" font-weight="600" data-live="svg-rdd">⚠ No sig. jump: ₹101</text>
+                    <text x="275" y="250" fill="#d7ff00" font-size="10" font-family="IBM Plex Mono, monospace" font-weight="500">Cutoff: −19%</text>
+                    <text x="55" y="68" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹2,000</text>
+                    <text x="55" y="108" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹1,600</text>
+                    <text x="55" y="148" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹1,200</text>
+                    <text x="55" y="188" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">₹800</text>
+                    <text x="105" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−40%</text>
+                    <text x="185" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−30%</text>
+                    <text x="385" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">−10%</text>
+                    <text x="465" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">0%</text>
+                    <text x="545" y="242" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">+10%</text>
+                    <text x="10" y="130" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle" transform="rotate(-90,10,130)">Avg Modal Price (₹/qtl)</text>
+                    <text x="350" y="262" fill="#555555" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">Rainfall Departure from Normal (%)</text>
+                    <text x="610" y="68" fill="#8FAE89" font-size="9" font-family="IBM Plex Mono, monospace" font-weight="500" text-anchor="end">p = 0.277</text>
+                    <text x="610" y="82" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace" text-anchor="end">not significant</text>
+                    <rect x="460" y="8" width="12" height="3" rx="1.5" fill="#8FAE89"/>
+                    <text x="478" y="13" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace">Normal rainfall</text>
+                    <rect x="565" y="8" width="12" height="3" rx="1.5" fill="#D9663B"/>
+                    <text x="583" y="13" fill="#7e7e7e" font-size="7" font-family="IBM Plex Mono, monospace">Deficient</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- ── Findings Ledger ── -->
+        <section id="findings" class="reveal">
+            <span class="section-label">02 / Empirical Results</span>
+            <h2 class="section-title">Headline Findings</h2>
+            <div class="table-responsive">
+                <table class="ledger">
+                    <thead>
+                        <tr>
+                            <th>Finding</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>RDD discontinuity effect (Onion at −19% cutoff)</td><td class="warm" data-live="row-rdd">+₹101 (p = 0.28) - not significant</td></tr>
+                        <tr><td>Specification curve (30 combos)</td><td class="warm" data-live="row-spec">0 / 30 significant - verdict: fragile</td></tr>
+                        <tr><td>BH-FDR across commodity fits</td><td class="warm" data-live="row-fdr">0 survivors after correction</td></tr>
+                        <tr><td>Bandwidth sensitivity (15–30%)</td><td class="muted" data-live="row-bandwidth">+₹81…+₹101, p = 0.42…0.27 - null in every window</td></tr>
+                        <tr><td>Placebo tests (fake cutoffs)</td><td class="muted" data-live="row-placebo">3 of 4 null; one spurious jump at −37%</td></tr>
+                        <tr><td>McCrary density test</td><td class="muted" data-live="row-density">Not available on the current warehouse</td></tr>
+                        <tr><td>Covariate balance</td><td class="muted" data-live="row-balance">log(observations) p = 0.04 - not clean</td></tr>
+                        <tr><td>Forecast MAPE (Prophet winner)</td><td class="muted" data-live="row-mape">served by 2.4.0</td></tr>
+                        <tr><td>Classifier ROC-AUC</td><td class="muted" data-live="row-auc">served by 2.4.0</td></tr>
+                        <tr><td>Data sources</td><td class="muted">data.gov.in + IMD rainfall</td></tr>
+                        <tr><td>AI Orchestrator</td><td class="warm">OpenRouter free-tier routing</td></tr>
+                        <tr><td>Pipeline freshness</td><td class="profit">Continuous - container every 30 min, externally verified every 15</td></tr>
+                    </tbody>
+                </table>
+                <p class="section-sub" id="live-provenance" style="font-family:var(--font-mono,monospace);font-size:0.74rem;margin-top:0.75rem;">
+                    Reading the findings from the API...
                 </p>
-            </section>
+            </div>
+        </section>
 
-            <!-- Section 03: Causal RDD Findings -->
-            <section id="causal" class="reveal">
-                <div class="section-header">
-                    <span class="section-num">03 / EMPIRICAL FRAMEWORK</span>
-                    <h2 class="section-title">Regression Discontinuity Design</h2>
+        <!-- ── Robustness Checks ── -->
+        <section class="reveal">
+            <span class="section-label">03 / Validation Suite</span>
+            <h2 class="section-title">Statistical Robustness Checks</h2>
+            <p class="section-sub">
+                Every RDD estimate is tested against the full battery before it reaches
+                the dashboard. These are the live results, including the ones that cut
+                against the finding.
+            </p>
+            <div class="robustness-grid">
+                <div class="robo-card">
+                    <div class="robo-title">Bandwidth Sensitivity</div>
+                    <div class="robo-status warm" data-live="robo-bw-status">⚠ Null at 15 / 20 / 25 / 30</div>
+                    <div class="robo-desc" data-live="robo-bw-desc">Point estimate stays positive (+₹81 … +₹101) but p ranges 0.42 … 0.27 - not significant in any window.</div>
                 </div>
-                
-                <div class="doc-layout">
-                    <div class="doc-text">
-                        <p>
-                            Does the IMD declaring a region as "rain-deficient" drive agricultural market behavior, or is price movement merely a continuous function of physical precipitation?
-                        </p>
-                        <p>
-                            We test this by placing rain departure on the horizontal axis and modeling the discontinuity at the official <strong>−19% deficit cutoff</strong>. If the policy declaration drives market sentiment, we should observe a sharp discontinuous jump (discontinuity) in prices at the boundary, holding all physical parameters constant.
-                        </p>
-                        <h3>Causal RDD Specification</h3>
-                        <p>
-                            We estimate local linear regressions on both sides of the −19% threshold:
-                        </p>
-                        <code style="display: block; padding: 1rem; margin-bottom: 1.5rem; text-align: center; font-size: 0.95rem;">
-                            Y<sub>it</sub> = α + β D<sub>it</sub> + γ<sub>1</sub> (X<sub>it</sub> - c) + γ<sub>2</sub> D<sub>it</sub>(X<sub>it</sub> - c) + ε<sub>it</sub>
-                        </code>
-                        <p>
-                            Where <code>Y<sub>it</sub></code> is the log market price, <code>X<sub>it</sub></code> is the actual rainfall departure percentage, <code>c = −19%</code> is the threshold, and <code>D<sub>it</sub></code> is the indicator binary equal to 1 if rainfall departure is below −19% (deficit territory).
-                        </p>
-                        <p>
-                            Our findings suggest that while physical rainfall levels strongly affect yields and continuous pricing, the administrative −19% declaration itself produces statistically insignificant jumps in every crop we can fit. Onion, the traditional headline candidate, returns <strong>+₹101 (p = 0.28)</strong>; a 30-combination specification curve finds <strong>0 of 30 significant</strong>; and Benjamini–Hochberg correction across 21 commodity fits leaves <strong>zero survivors</strong>. The threshold story is a null result on this warehouse, and the repository reports it as one.
-                        </p>
+                <div class="robo-card">
+                    <div class="robo-title">Placebo / Falsification</div>
+                    <div class="robo-status warm" data-live="robo-placebo-status">⚠ 1 of 4 spurious at −37%</div>
+                    <div class="robo-desc" data-live="robo-placebo-desc">Three fake cutoffs are null, but the −37% placebo returns a significant +₹297 (p = 0.006) - single-cutoff evidence is thin.</div>
+                </div>
+                <div class="robo-card">
+                    <div class="robo-title">Specification Curve</div>
+                    <div class="robo-status warm" data-live="robo-spec-status">⚠ Fragile (0 / 30)</div>
+                    <div class="robo-desc" data-live="robo-spec-desc">Across bandwidth × kernel × polynomial combinations, 0 of 30 estimates are significant; median +₹50, sign not stable. Verdict: fragile.</div>
+                </div>
+                <div class="robo-card">
+                    <div class="robo-title">Covariate Balance</div>
+                    <div class="robo-status warm" data-live="robo-balance-status">⚠ Not clean</div>
+                    <div class="robo-desc">log(observations) jumps at the cutoff (p = 0.04), so a clean pre-treatment balance cannot be claimed.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── AI Chat / Ask ── -->
+        <section id="ask" class="reveal">
+            <span class="section-label">04 / AI Procurement Chat</span>
+            <h2 class="section-title">Ask MandiIQ</h2>
+            <p class="section-sub">
+                Ask free-text procurement questions in plain English. The AI orchestrator routes
+                across <strong>multiple free-tier OpenRouter models</strong> with automatic
+                circuit-breaker fallback - if one model is rate-limited, the next in the chain
+                serves the request. Answers are grounded in live tool-call results (never fabricated).
+            </p>
+            <div class="chart-card">
+                <div class="code-block">
+                    <div style="margin-bottom:0.8rem;color:var(--color-text-high);font-weight:500;">
+                        <span style="color:var(--color-primary);">$</span> curl -X POST https://your-api.onrender.com/ask <span style="color:var(--color-text-low);">\</span><br>
+                        <span style="color:var(--color-primary);">$</span>   -H 'Content-Type: application/json' <span style="color:var(--color-text-low);">\</span><br>
+                        <span style="color:var(--color-primary);">$</span>   -d '{<span style="color:var(--color-warm);">"query"</span>: <span style="color:var(--color-primary);">"Should I lock in onion procurement in Nashik next month?"</span>, <span style="color:var(--color-warm);">"commodity"</span>: <span style="color:var(--color-primary);">"Onion"</span>, <span style="color:var(--color-warm);">"district"</span>: <span style="color:var(--color-primary);">"Nashik"</span>}'
                     </div>
-
-                    <div class="doc-sidebar">
-                        <div class="doc-widget">
-                            <div class="doc-widget-title">Empirical Results</div>
-                            <div class="table-responsive" style="margin: 0; border: none;">
-                                <table class="ledger-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Crop</th>
-                                            <th>Discontinuity</th>
-                                            <th>P-Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>
-                                                <div class="commodity-chip">
-                                                    <span class="commodity-dot onion"></span>
-                                                    <span>Onion</span>
-                                                </div>
-                                            </td>
-                                            <td style="font-family: var(--font-mono);">+₹101.41</td>
-                                            <td><span class="stat-badge insignificant">p = 0.277</span></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="commodity-chip">
-                                                    <span class="commodity-dot tomato"></span>
-                                                    <span>Tomato</span>
-                                                </div>
-                                            </td>
-                                            <td style="font-family: var(--font-mono);">+₹39.62</td>
-                                            <td><span class="stat-badge insignificant">p = 0.170</span></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="commodity-chip">
-                                                    <span class="commodity-dot grapes"></span>
-                                                    <span>Grapes</span>
-                                                </div>
-                                            </td>
-                                            <td style="font-family: var(--font-mono);">+₹126.04</td>
-                                            <td><span class="stat-badge insignificant">p = 0.162</span></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="commodity-chip">
-                                                    <span class="commodity-dot potato"></span>
-                                                    <span>Potato</span>
-                                                </div>
-                                            </td>
-                                            <td style="font-family: var(--font-mono);">+₹12.18</td>
-                                            <td><span class="stat-badge insignificant">p = 0.353</span></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="doc-widget">
-                            <div class="doc-widget-title">McCrary Density Check</div>
-                            <p style="font-size: 0.8rem; color: var(--color-text-med); margin: 0;">
-                                We run a McCrary Density Test to examine manipulation of the running variable. The test verifies that rainfall measurements are not artificially sorted or modified around the −19% cutoff boundary. On the current warehouse the density statistic returns <code>null</code>, so this page does not claim a pass.
-                            </p>
-                        </div>
+                    <div style="border-top:1px solid var(--hairline);padding-top:0.8rem;color:var(--color-text-med);">
+                        <span style="color:var(--color-text-low);">// Response (grounded, never fabricated):</span><br>
+                        {<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"answer"</span>: <span style="color:var(--color-primary);">"MODERATE RISK (32%): <span data-live="ask-verdict">The rainfall-threshold discontinuity is not significant on the current warehouse (+₹101, p = 0.28).</span> Spike risk comes from the forecast and volatility stack; consider staggering procurement."</span>,<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"model_used"</span>: <span style="color:var(--color-primary);">"google/gemini-2.0-flash-exp:free"</span>,<br>
+                        &nbsp;&nbsp;<span style="color:var(--color-warm);">"endpoints_used"</span>: [<span style="color:var(--color-primary);">"get_rdd_result"</span>, <span style="color:var(--color-primary);">"get_forecast"</span>, <span style="color:var(--color-primary);">"get_risk_score"</span>]<br>
+                        }<br>
+                        <span style="color:var(--color-text-low);font-size:0.65rem;">⚡ Model auto-selected by circuit breaker · Tool-grounded</span>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- Section 04: System Architecture -->
-            <section id="architecture" class="reveal">
-                <div class="section-header">
-                    <span class="section-num">04 / SYSTEM ARCHITECTURE</span>
-                    <h2 class="section-title">Decoupled Processing & Serving</h2>
-                </div>
-
-                <div class="doc-layout">
-                    <div class="doc-text">
-                        <p>
-                            MandiIQ decouples the heavy analytical warehouse from the customer-facing dashboard. The system runs an automated ELT pipeline using DuckDB, fits locally weighted regressions, tracks models in MLflow, and exposes predictions through FastAPI.
-                        </p>
-                        
-                        <div class="mermaid-wrapper">
+        <!-- ── Architecture ── -->
+        <section class="reveal">
+            <span class="section-label">05 / System Design</span>
+            <h2 class="section-title">Architecture Flow</h2>
+            <p style="color:var(--color-text-low);margin-bottom:1rem;font-size:0.85rem;max-width:640px;">
+                An automated ELT pipeline ingests live mandi prices and rainfall data, runs causal RDD analysis + ML forecasts, serves results through a FastAPI gateway, and renders them in an interactive Streamlit dashboard.
+            </p>
+            <div class="mermaid-wrapper">
 <pre class="mermaid" style="text-align: center;">
 %%{init: {"theme": "dark", "themeVariables": { "primaryColor": "#1a1a2e", "primaryTextColor": "#fff", "lineColor": "#d7ff00", "secondaryColor": "#16213e", "tertiaryColor": "#0f3460"}}}%%
-flowchart TB
-    subgraph Sources["Data Sources"]
-        A1["Agmarknet API<br/>Daily Mandi Prices"]
-        A6["Ashoka CEDA<br/>Historical Price CSV"]
-        A2["IMD Weather Grids<br/>Rainfall Departure"]
-    end
-    subgraph Ingestion["Ingestion Pipeline"]
-        B1["fetch_prices.py<br/>Pagination + Retry"]
-        B5["fetch_prices.py<br/>Variety-Wise Archive"]
-        B6["ingest_historical_csv.py<br/>CSV Backfill"]
-        B2["fetch_rainfall.py<br/>Sub-division Parser"]
-        B3["http_client.py<br/>Shared Retry + SSL"]
-        B4["scheduler.py<br/>Orchestration"]
-    end
-    subgraph Storage["Analytical Store"]
-        C1["DuckDB<br/>mandi_iq.duckdb"]
-        C2["🔍 data_lineage<br/>Batch Provenance · Fingerprint<br/>Source Type · Commodity List"]
-        C3["📊 freshness_by_commodity<br/>Per-Commodity: Latest Date<br/>Row Count · District Coverage"]
-    end
-    subgraph Analysis["Analysis Engine"]
-        D1["Causal RDD<br/>Local-linear + FE"]
-        D2["Forecast<br/>Prophet vs LSTM"]
-        D3["Classifier<br/>XGBoost + SHAP"]
-        D4["Prescriptive<br/>Procurement Advice"]
-    end
-    subgraph AI["AI Orchestrator"]
-        E1["Router<br/>Multi-model + Circuit Breaker"]
-        E2["Nightly Narratives<br/>Commodity Reports"]
-    end
-    subgraph Serving["Serving Layer"]
-        F1["FastAPI Gateway<br/>Endpoints: /health /prices<br/>/rdd-result /forecast<br/>/freshness /lineage"]
-        F2["Streamlit Dashboard<br/>mandiiq.streamlit.app<br/>Data Freshness Widget"]
-    end
-    A1 --> B1
-    A6 --> B6
-    A2 --> B2
-    B1 --> B3
-    B5 --> B3
-    B2 --> B3
-    B4 --> B1
-    B4 --> B5
-    B4 --> B6
-    B4 --> B2
-    B1 --> C1
-    B5 --> C1
-    B6 --> C1
-    B2 --> C1
-    C1 --> C2
-    C2 --> C3
-    C1 --> D1
-    C1 --> D2
-    C1 --> D3
-    D1 --> D4
-    D2 --> D4
-    D3 --> D4
-    D4 --> F1
-    D1 --> F1
-    D2 --> F1
-    D3 --> F1
-    F1 --> E1
-    E1 --> E2
-    F1 --> F2
-    %% Source-labeled edges to data_lineage
-    B1 -.->|API<br/>9ef84268| C2
-    B5 -.->|Variety<br/>35985678| C2
-    B6 -.->|CSV| C2
-    B2 -.->|Rainfall| C2
-    C3 -.->|Dashboard Feed| F2
+flowchart LR
+    A["data.gov.in<br/>Mandi Prices"]
+    B["IMD Rainfall<br/>Monthly Grids"]
+    C["Ingestion<br/>Pagination + Retry"]
+    D["DuckDB<br/>Analytical Store"]
+    E["RDD Engine<br/>Causal Inference"]
+    F["ML Pipeline<br/>XGBoost + Prophet"]
+    G["Prescriptive<br/>Procurement Advice"]
+    H["FastAPI Gateway<br/>10 Endpoints"]
+    I["Streamlit Dashboard<br/>5 Interactive Pages"]
+    J["AI Orchestrator<br/>Multi-model Router"]
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> G
+    G --> H
+    H --> I
+    H --> J
+    J --> I
 </pre>
-</div>
+            </div>
+        </section>
 
-                        <h3>Scaling to 10 Million Orders per Day</h3>
-                        <p>
-                            To transition MandiIQ to support massive transactional data volumes (e.g. 10M transactions per day), the infrastructure expands along several dimensions:
-                        </p>
-                        <ul>
-                            <li><strong>Ingestion:</strong> Replace batch CSV loads with a streaming broker (Apache Kafka or AWS Kinesis) feeding analytical tables in real-time.</li>
-                            <li><strong>Analytical Storage:</strong> Migrate the single-node local DuckDB file to a highly parallel serverless cloud warehouse such as <strong>Google BigQuery</strong> or Snowflake, maintaining similar SQL aggregation syntax but scaling horizontally.</li>
-                            <li><strong>Feature Store:</strong> Introduce <code>Feast</code> or <code>Tecton</code> to serve model features with sub-50ms latency and prevent training-serving skew.</li>
-                            <li><strong>Serving Layer:</strong> Run the FastAPI service inside containerized Kubernetes pods with horizontal autoscaling (HPA) and a Redis caching layer for active market queries.</li>
-                        </ul>
-                    </div>
-
-                    <div class="doc-sidebar">
-                        <div class="doc-widget">
-                            <div class="doc-widget-title">Technology Blueprint</div>
-                            <div class="table-responsive" style="margin: 0; border: none;">
-                                <table class="ledger-table" style="font-size: 0.8rem;">
-                                    <thead>
-                                        <tr>
-                                            <th>Component</th>
-                                            <th>Prototype</th>
-                                            <th>10M Scale Target</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Warehouse</td>
-                                            <td>DuckDB</td>
-                                            <td>Google BigQuery</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Ingestion</td>
-                                            <td>Cron Batch</td>
-                                            <td>Apache Kafka</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Features</td>
-                                            <td>Pandas Engine</td>
-                                            <td>Feast Store</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Deployment</td>
-                                            <td>Docker Compose</td>
-                                            <td>AWS EKS / K8s</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Section 05: Failure Modes & Degradation -->
-            <section id="failure" class="reveal">
-                <div class="section-header">
-                    <span class="section-num">05 / RISK ENGINEERING</span>
-                    <h2 class="section-title">Failure Modes & Mitigations</h2>
-                </div>
-
-                <div class="doc-layout">
-                    <div class="doc-text">
-                        <p>
-                            A robust intelligence platform must anticipate failure. MandiIQ implements built-in fallback states and active telemetry checks across the following failure boundaries:
-                        </p>
-                        
-                        <h3>1. Model Registry Outages</h3>
-                        <p>
-                            If the active MLflow registry is unreachable at API startup, the FastAPI endpoints fall back to reading a locally serialized model pickle (<code>models/loss_classifier_fallback.pkl</code>). The service generates an active alert while continuing to serve inferences.
-                        </p>
-
-                        <h3>2. Data Drift & Anomalous Weather Jumps</h3>
-                        <p>
-                            Climate variables are highly volatile. When the pipeline detects feature distribution shift exceeding 3σ (e.g. during an unprecedented extreme monsoon departure), it automatically:
-                        </p>
-                        <ol>
-                            <li>Sends telemetry warnings to monitoring dashboards.</li>
-                            <li>Triggers an automated retraining run on the latest 90-day window.</li>
-                            <li>Switches the prediction endpoint to a robust, simple baseline estimator until the new model passes champion verification tests.</li>
-                        </ol>
-
-                        <div class="alert-box">
-                            <div class="alert-box-title">Active Fail-Safe Status</div>
-                            <p class="alert-box-desc">
-                                All forecasting endpoints fallback gracefully. If an API call fails or encounters an invalid parameter, the Streamlit front-end automatically swaps the chart with a historical moving-average baseline, preserving dashboard availability.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="doc-sidebar">
-                        <div class="doc-widget">
-                            <div class="doc-widget-title">Recovery Plan</div>
-                            <ul style="font-size: 0.8rem; color: var(--color-text-med); margin: 0; padding-left: 1.1rem;">
-                                <li style="margin-bottom: 0.8rem;"><strong>Prefect Retries:</strong> Exponential backoffs are configured on the ETL task block.</li>
-                                <li style="margin-bottom: 0.8rem;"><strong>FastAPI Rates:</strong> Inbound prediction traffic is capped using token bucket rate limiters.</li>
-                                <li><strong>Telemetry Checks:</strong> Daily z-score evaluations monitor feature boundaries for outlier values.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Footer -->
-            <footer>
-                <div>&copy; 2026 MandiIQ Project. Creative-studio layout.</div>
-                <div class="footer-links">
-                    <a href="https://github.com/flawsom/MandiIQ" target="_blank" class="footer-link" data-scramble>GitHub Source</a>
-                    <a href="https://mandiiq.streamlit.app/" target="_blank" class="footer-link" data-scramble>Streamlit App</a>
-                </div>
-            
-            <!-- Heartbeat Monitor Link -->
-            <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;text-align:center;">
-                <a href="heartbeat-dashboard.html" style="color:var(--color-primary);text-decoration:none;font-family:var(--font-mono);font-size:0.85rem;">♥ Heartbeat &amp; Dashboard Monitor &rarr;</a>
-                <p style="color:var(--color-text-low);font-size:0.75rem;margin-top:4px;">Live dashboard cache status, md5_hash stability, and workflow run history</p>
+        <!-- ── Footer ── -->
+        <footer>
+            <div>
+                Data: <a href="https://data.gov.in/" target="_blank" rel="noopener" class="footer-link" data-scramble>data.gov.in</a> ·
+                <a href="https://github.com/flawsom/MandiIQ" target="_blank" rel="noopener" class="footer-link" data-scramble>GitHub</a> ·
+                <a href="./live.html" class="footer-link" data-scramble>Live console</a> ·
+                <a href="./status.html" class="footer-link" data-scramble>Status</a> ·
+                <a href="./overview.html" class="footer-link" data-scramble>Overview</a> ·
+                <a href="https://p01--mandiiq--x4n8x4gkmzht.code.run/docs" target="_blank" rel="noopener" class="footer-link" data-scramble>API</a>
+            </div>
+            <div class="footer-links">
+                <span>Local-linear RDD · Triangular kernel · HC2 sandwich SE</span>
+                <span>OpenRouter multi-model with circuit-breaker</span>
+                <span>© 2026 · MandiIQ</span>
             </div>
         </footer>
 
-        </main>
     </div>
 
-    <!-- Interactive Scripts -->
+    <!-- ── Scripts ── -->
     <script>
-        // ── Scrollspy Indicator Logic ──
-        document.addEventListener('DOMContentLoaded', () => {
-            const spyItems = document.querySelectorAll('.scrollspy-item');
-            const sections = document.querySelectorAll('section');
-
-            const observerOptions = {
-                root: null,
-                rootMargin: '-10% 0px -60% 0px',
-                threshold: 0
-            };
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const activeId = entry.target.getAttribute('id');
-                        spyItems.forEach(item => {
-                            if (item.getAttribute('data-target') === activeId) {
-                                item.classList.add('active');
-                            } else {
-                                item.classList.remove('active');
-                            }
-                        });
-                    }
-                });
-            }, observerOptions);
-
-            sections.forEach(section => observer.observe(section));
-        });
-
-        // ── Text Scramble Animation Class ──
-        class TextScrambler {
+        /* Text Scramble */
+        class Scrambler {
             constructor(el) {
                 this.el = el;
                 this.chars = '!<>-_\\/[]{}-=+*^?#________';
@@ -1678,135 +853,247 @@ flowchart TB
             }
             setText(newText) {
                 const oldText = this.el.innerText;
-                const length = Math.max(oldText.length, newText.length);
-                const promise = new Promise((resolve) => this.resolve = resolve);
+                const len = Math.max(oldText.length, newText.length);
                 this.queue = [];
-                for (let i = 0; i < length; i++) {
+                for (let i = 0; i < len; i++) {
                     const from = oldText[i] || '';
                     const to = newText[i] || '';
-                    const start = Math.floor(Math.random() * 38);
-                    const end = start + Math.floor(Math.random() * 38);
-                    this.queue.push({ from, to, start, end });
+                    this.queue.push({
+                        from, to,
+                        start: Math.floor(Math.random() * 38),
+                        end: Math.floor(Math.random() * 38) + 10,
+                    });
                 }
                 cancelAnimationFrame(this.frameId);
                 this.frame = 0;
                 this.update();
-                return promise;
             }
             update() {
-                let output = '';
-                let complete = 0;
-                for (let i = 0, n = this.queue.length; i < n; i++) {
-                    let { from, to, start, end, char } = this.queue[i];
-                    if (this.frame >= end) {
-                        complete++;
-                        output += to;
-                    } else if (this.frame >= start) {
-                        if (!char || Math.random() < 0.28) {
-                            char = this.randomChar();
-                            this.queue[i].char = char;
-                        }
-                        output += `<span style="color:var(--color-primary)">${char}</span>`;
-                    } else {
-                        output += from;
-                    }
+                let out = '', complete = 0;
+                for (const item of this.queue) {
+                    if (this.frame >= item.end) { complete++; out += item.to; }
+                    else if (this.frame >= item.start) {
+                        out += `<span style="color:var(--color-primary)">${this.chars[Math.floor(Math.random() * this.chars.length)]}</span>`;
+                    } else { out += item.from; }
                 }
-                this.el.innerHTML = output;
-                if (complete === this.queue.length) {
-                    this.resolve();
-                } else {
-                    this.frameId = requestAnimationFrame(this.update);
-                    this.frame++;
-                }
-            }
-            randomChar() {
-                return this.chars[Math.floor(Math.random() * this.chars.length)];
+                this.el.innerHTML = out;
+                if (complete === this.queue.length) return;
+                this.frameId = requestAnimationFrame(this.update);
+                this.frame++;
             }
         }
-
-        // Apply Scramble effect on elements with [data-scramble]
         document.querySelectorAll('[data-scramble]').forEach(el => {
-            const originalText = el.innerText;
-            const scrambler = new TextScrambler(el);
-            el.addEventListener('mouseenter', () => {
-                scrambler.setText(originalText);
-            });
+            const orig = el.innerText;
+            const s = new Scrambler(el);
+            el.addEventListener('mouseenter', () => s.setText(orig));
         });
 
-        // ── Scroll Reveal Trigger ──
-        const revealElements = document.querySelectorAll('.reveal');
-        const revealObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('is-visible');
-                    revealObserver.unobserve(entry.target);
+        /* Scroll Reveal */
+        const revealObserver = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('is-visible');
+                    revealObserver.unobserve(e.target);
                 }
             });
         }, { threshold: 0.1 });
-        
-        revealElements.forEach(el => revealObserver.observe(el));
+        document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
     </script>
-    <!-- Canvas Cursor Effect -->
-    <script src="cursor-effect.js"></script>
 
-    <div data-site-footer></div>
+    <!-- Shared shell: drives the live status pill in the nav from /health. -->
     <script src="./assets/site.js"></script>
 
     <script>
-    /* Fill the ledger cards from the live /health payload, through the same
-       instance resolution the rest of the site uses. Nothing is invented: if
-       the API cannot be read, the cards say so rather than keep a number that
-       was true when this page was written. */
+    /*
+     * Every finding on this page is read from the API, not typed in.
+     *
+     * The section above used to carry a snapshot table (+₹101, p = 0.28, a
+     * 30-combination specification curve) that was accurate when it was written
+     * and wrong a warehouse later: the running build now answers +₹230.22,
+     * p = 0.0258 for the headline fit and +₹70.69, p = 0.628 from the robustness
+     * engine on the same commodity. A published snapshot is not a measurement,
+     * so the text below is a fallback: when the API answers, it is replaced, and
+     * when a route does not exist on the deployed build that is printed instead
+     * of leaving an old number standing.
+     */
     (function () {
+        "use strict";
+
         var shell = window.MandiiqShell;
-        var nf = new Intl.NumberFormat("en-IN");
+        var MONTHS = null;
 
         function fill(key, text) {
-            var nodes = document.querySelectorAll('[data-health="' + key + '"]');
+            var nodes = document.querySelectorAll('[data-live="' + key + '"]');
             for (var i = 0; i < nodes.length; i++) nodes[i].textContent = text;
         }
 
-        function note(text) {
-            var el = document.querySelector("[data-health-audit]");
+        function rupees(v) {
+            var n = Math.abs(Math.round(v));
+            return (v < 0 ? "\u2212\u20b9" : "+\u20b9") + n.toLocaleString("en-IN");
+        }
+
+        function pval(p) {
+            if (p == null) return "p = n/a";
+            return "p " + (p < 0.001 ? "< 0.001" : "= " + p.toFixed(4).replace(/0+$/, "").replace(/\.$/, ""));
+        }
+
+        function getJSON(base, path) {
+            var controller = typeof AbortController === "function" ? new AbortController() : null;
+            var timer = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
+            return fetch(base + path, { cache: "no-store", signal: controller ? controller.signal : undefined })
+                .then(function (res) {
+                    if (timer) clearTimeout(timer);
+                    if (!res.ok) { var e = new Error("HTTP " + res.status); e.status = res.status; throw e; }
+                    return res.json();
+                }, function (err) { if (timer) clearTimeout(timer); throw err; });
+        }
+
+        var MISSING = "not served by this build \u2014 arrives with 2.4.0";
+
+        function paintRdd(rdd, robust) {
+            var effect = rdd && rdd.effect;
+            var p = rdd && rdd.p_value;
+            var significant = p != null && p < 0.05;
+
+            if (effect != null && p != null) {
+                var verdict = significant
+                    ? "shows a jump that clears p < 0.05 at this specification"
+                    : "show no statistically significant jump";
+                fill("rdd-headline", significant ? "show a jump (p = " + p.toFixed(3) + ")" : "show no jump (p = " + p.toFixed(2) + ")");
+                fill("rdd-effect", rupees(effect));
+                fill("rdd-p", pval(p));
+                fill("rdd-p-bare", p.toFixed(3));
+                fill("rdd-verdict", verdict);
+                fill("svg-rdd", (significant ? "\u26a0 Significant: " : "\u26a0 No sig. jump: ") + Math.round(Math.abs(effect)));
+                fill("row-rdd", rupees(effect) + " (" + pval(p) + ") \u2013 " + (significant ? "significant" : "not significant"));
+                fill("ask-verdict", significant
+                    ? "The rainfall-threshold discontinuity is positive and significant on the current warehouse (" + rupees(effect) + ", " + pval(p) + "), but the bandwidth sweep is null in every window \u2014 treat it as fragile."
+                    : "The rainfall-threshold discontinuity is not significant on the current warehouse (" + rupees(effect) + ", " + pval(p) + ").");
+                var row = document.querySelector('[data-live="row-rdd"]');
+                if (row) row.className = significant ? "profit" : "warm";
+            }
+
+            if (robust && robust.bandwidth_sensitivity && robust.bandwidth_sensitivity.length) {
+                var rows = robust.bandwidth_sensitivity.filter(function (r) { return r.p_value != null; });
+                var sig = rows.filter(function (r) { return r.p_value < 0.05; });
+                var lo = rows[rows.length - 1], hi = rows[0];
+                var ps = rows.map(function (r) { return r.p_value; });
+                var statuses = rows.map(function (r) { return r.bandwidth; }).join(" / ");
+                fill("robo-bw-status", (sig.length ? "\u26a0 " + sig.length + " of " + rows.length + " significant" : "\u26a0 Null at " + statuses));
+                fill("robo-bw-desc", "Point estimate runs " + rupees(hi.effect) + " \u2026 " + rupees(lo.effect) +
+                    " but p ranges " + Math.min.apply(null, ps).toFixed(3) + " \u2026 " + Math.max.apply(null, ps).toFixed(3) +
+                    " \u2013 " + (sig.length ? sig.length + " window(s) clear 0.05." : "not significant in any window."));
+                fill("row-bandwidth", rupees(hi.effect) + "\u2026" + rupees(lo.effect) + ", p " + Math.min.apply(null, ps).toFixed(3) +
+                    "\u2026" + Math.max.apply(null, ps).toFixed(3) + " - " + (sig.length ? sig.length + " of " + rows.length + " significant" : "null in every window"));
+                var bRow = document.querySelector('[data-live="row-bandwidth"]');
+                if (bRow) bRow.className = sig.length ? "profit" : "muted";
+            }
+
+            if (robust && robust.placebo_tests && robust.placebo_tests.length) {
+                var pr = robust.placebo_tests.filter(function (r) { return r.p_value != null; });
+                var fired = pr.filter(function (r) { return r.p_value < 0.05; });
+                fill("robo-placebo-status", fired.length ? "\u26a0 " + fired.length + " of " + pr.length + " spurious" : "\u2713 " + pr.length + " of " + pr.length + " null");
+                fill("robo-placebo-desc", fired.length
+                    ? "Fake cutoffs mostly behave, but " + fired.length + " returns a significant effect (p " + Math.min.apply(null, fired.map(function (r) { return r.p_value; })).toFixed(3) + ") \u2013 single-cutoff evidence is thin."
+                    : "All " + pr.length + " fake cutoffs are null (p " + Math.min.apply(null, pr.map(function (r) { return r.p_value; })).toFixed(3) + " \u2026 " + Math.max.apply(null, pr.map(function (r) { return r.p_value; })).toFixed(3) + ") \u2014 the real cutoff is not an artefact of the placebo set.");
+                fill("row-placebo", fired.length ? fired.length + " of " + pr.length + " significant" : pr.length + " of " + pr.length + " null");
+                var pRow = document.querySelector('[data-live="row-placebo"]');
+                if (pRow) pRow.className = fired.length ? "warm" : "profit";
+                var ps2 = document.querySelector('[data-live="robo-placebo-status"]');
+                if (ps2) ps2.className = "robo-status " + (fired.length ? "warm" : "profit");
+            }
+
+            var bal = robust && robust.covariate_balance;
+            if (bal) {
+                var logs = bal.log_n_obs || bal.n_observations;
+                if (logs && logs.p_value != null) {
+                    fill("robo-balance-status", logs.p_value < 0.05 ? "\u26a0 Not clean (p = " + logs.p_value.toFixed(2) + ")" : "\u2713 Balanced (p = " + logs.p_value.toFixed(2) + ")");
+                    fill("row-balance", "log(observations) p = " + logs.p_value.toFixed(3) + " - " + (logs.p_value < 0.05 ? "not clean" : "clean"));
+                    var bs = document.querySelector('[data-live="robo-balance-status"]');
+                    if (bs) bs.className = "robo-status " + (logs.p_value < 0.05 ? "warm" : "profit");
+                    var bR = document.querySelector('[data-live="row-balance"]');
+                    if (bR) bR.className = logs.p_value < 0.05 ? "warm" : "profit";
+                }
+            }
+
+            var density = robust && robust.density_test;
+            if (density) {
+                fill("row-density", density.density_p_value == null
+                    ? "Not available on the current warehouse (reported as unavailable, not as a pass)"
+                    : "density jump p = " + Number(density.density_p_value).toFixed(3));
+            }
+
+            var engine = robust && robust.main_effect;
+            if (engine != null) {
+                var engineNote = document.getElementById("engine-note");
+                if (engineNote) {
+                    engineNote.textContent = "Same warehouse, different specification: the robustness engine reports " +
+                        rupees(engine) + " (" + pval(robust.p_value) + ") for the same commodity. Both are shown on purpose.";
+                }
+            }
+        }
+
+        function markMissing() {
+            ["row-spec", "row-fdr", "row-mape", "row-auc", "robo-spec-status", "robo-spec-desc", "spec-count"].forEach(function (key) {
+                document.querySelectorAll('[data-live="' + key + '"]').forEach(function (el) { el.textContent = MISSING; });
+            });
+            fill("spec-verdict", "is " + MISSING);
+        }
+
+        function provenance(text) {
+            var el = document.getElementById("live-provenance");
             if (el) el.textContent = text;
         }
 
-        function paint(hit) {
-            var h = (hit && hit.health) || {};
-            fill("n_prices", h.n_prices == null ? "—" : nf.format(h.n_prices));
-            fill("n_commodities", h.n_commodities == null ? "—" : nf.format(h.n_commodities));
-            var earliest = (h.data_min_date || "").slice(0, 4);
-            var newest = (h.data_max_date || "").slice(0, 4);
-            var rangeEl = document.querySelector("[data-health-window]");
-            if (rangeEl) rangeEl.textContent = (earliest && newest) ? earliest + "–" + newest
-                : (h.data_max_date || "—");
-            var behind = h.days_behind;
-            fill("days_behind", behind == null ? "—" : behind + (behind === 1 ? " day" : " days"));
-            note("Read live from the " + (hit ? hit.label : "?") + " instance (v" + (h.version || "?") +
-                ") · newest arrival date " + (h.data_max_date || "unknown") +
-                " · status " + (h.status || "unknown") + ".");
-        }
-
-        function refresh() {
+        function boot() {
             if (!shell || !shell.resolveApi) {
-                note("The shared shell did not load, so these figures cannot be read live.");
-                return Promise.resolve();
+                provenance("The shared shell did not load, so these figures are the published snapshot.");
+                return;
             }
-            return shell.resolveApi().then(paint, function () {
-                fill("n_prices", "unavailable");
-                fill("n_commodities", "unavailable");
-                fill("days_behind", "unavailable");
-                var rangeEl = document.querySelector("[data-health-window]");
-                if (rangeEl) rangeEl.textContent = "unavailable";
-                note("Neither instance of the production API answered /health, so no live figures can be shown.");
+            shell.resolveApi().then(function (hit) {
+                var base = hit.base;
+                var when = new Date().toLocaleString();
+                return Promise.all([
+                    getJSON(base, "/rdd-result/Onion").catch(function () { return null; }),
+                    getJSON(base, "/robustness/Onion").catch(function () { return null; }),
+                ]).then(function (res) {
+                    if (!res[0] && !res[1]) {
+                        provenance("The API did not answer /rdd-result or /robustness, so the figures below are the published snapshot, not live values.");
+                        return;
+                    }
+                    paintRdd(res[0], res[1]);
+                    // Clear the snapshot for every figure the deployed build cannot
+                    // answer BEFORE trying: a 404 must never leave an old number
+                    // standing as if it were current. /forecast and /risk-score are
+                    // not fetched at all - guessing a payload shape this build has
+                    // never served is the exact invention this page is fixing.
+                    markMissing();
+                    Promise.all([
+                        getJSON(base, "/spec-curve/Onion").then(function (d) { return d; }, function (e) { return e; }),
+                        getJSON(base, "/fdr").then(function (d) { return d; }, function (e) { return e; }),
+                    ]).then(function (extra) {
+                        var spec = extra[0], fdr = extra[1];
+                        if (spec && !spec.status && spec.summary) {
+                            fill("spec-count", spec.summary.n_significant + " of " + spec.summary.n_estimated + " specifications significant");
+                            fill("spec-verdict", "agrees (" + spec.summary.n_significant + "/" + spec.summary.n_estimated + " significant, verdict " + spec.summary.verdict + ")");
+                            fill("robo-spec-status", "\u26a0 " + String(spec.summary.verdict || "fragile").replace(/^./, function (c) { return c.toUpperCase(); }) + " (" + spec.summary.n_significant + " / " + spec.summary.n_estimated + ")");
+                            fill("robo-spec-desc", "Across bandwidth \u00d7 kernel \u00d7 polynomial combinations, " + spec.summary.n_significant + " of " + spec.summary.n_estimated + " estimates are significant; median " + rupees(spec.summary.median_effect) + ".");
+                            fill("row-spec", spec.summary.n_significant + " / " + spec.summary.n_estimated + " significant - verdict: " + spec.summary.verdict);
+                        }
+                        if (fdr && !fdr.status && fdr.n_hypotheses != null) {
+                            fill("row-fdr", fdr.n_significant_fdr + " survivors of " + fdr.n_hypotheses + " fits after correction (" + fdr.n_significant_raw + " raw at alpha " + fdr.alpha + ")");
+                        }
+                        provenance("Findings read live from the " + hit.label + " instance (" + base + ") at " + when +
+                            ". Figures move with the warehouse; stale text is replaced, and missing routes are named.");
+                    });
+                });
+            }, function () {
+                provenance("Neither API instance answered, so the figures below are the published snapshot from an earlier warehouse \u2014 treat them as history, not as current values.");
             });
         }
 
-        refresh();
-        setInterval(refresh, 60000);
-        document.addEventListener("visibilitychange", function () {
-            if (!document.hidden) refresh();
-        });
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+        else boot();
     })();
     </script>
 </body>

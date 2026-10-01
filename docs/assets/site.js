@@ -37,8 +37,10 @@
      appears everywhere instead of drifting page by page.
      ----------------------------------------------------------------------- */
   var PAGES = [
-    { href: "./index.html", label: "Overview" },
+    { href: "./index.html", label: "Home" },
+    { href: "./overview.html", label: "Overview" },
     { href: "./live.html", label: "Live console" },
+    { href: "./status.html", label: "Status" },
     { href: "./heartbeat-dashboard.html", label: "Heartbeat" },
     { href: "./system_design.md", label: "System design" },
     { href: API + "/docs", label: "API", external: true }

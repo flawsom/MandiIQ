@@ -5,6 +5,10 @@
   while robots.txt advertised a sitemap that did not exist
   (/seo/sitemap-index.xml returned 404), so none of these pages were
   discoverable. Both are now on the canonical domain.
+
+  / is the landing page and /overview.html is the technical write-up it used
+  to compete with: the landing page wearing the write-up's URL and canonical
+  tag was two pages claiming one canonical address.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -16,6 +20,16 @@
     <loc>https://mandiiq.unifies.codes/live.html</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://mandiiq.unifies.codes/status.html</loc>
+    <changefreq>hourly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mandiiq.unifies.codes/overview.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://mandiiq.unifies.codes/heartbeat-dashboard.html</loc>
