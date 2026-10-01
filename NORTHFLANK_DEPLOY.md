@@ -113,6 +113,18 @@
 # disagree, and lists the measured reasons the newest arrival is not from today.
 # It takes its host list from docs/assets/site.js, so it cannot drift from the
 # rest of the site.
+#
+# It also keeps a short downtime timeline of its own: one entry per transition
+# between answering /health and not answering it, with the status text the
+# instance or the platform edge returned, the build it came back on, and - when
+# the container that returns reports a refresh run killed mid-flight - the step
+# that run died in. That list lives in the visitor's browser (localStorage),
+# is capped to the last few outages per instance, and the page says outright
+# that it is not a monitor: an outage that began and ended between two visits
+# was never observed, an outage already running at the first check is labelled
+# as such rather than dated to that check, and a browser that blocks storage is
+# told apart from one that has simply seen nothing. A pill in the header carries
+# the one-line version (running / recorded / none, browser-local, so titled).
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Keeping the service awake

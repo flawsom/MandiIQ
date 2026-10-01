@@ -133,6 +133,40 @@ def test_the_status_page_reads_its_hosts_from_the_shell() -> None:
         assert hook in page, f"the status page is missing the shared {hook} mount"
 
 
+def test_the_status_page_keeps_a_short_downtime_timeline_in_the_browser() -> None:
+    """The status page records its own outages, and says how little that means.
+
+    Nothing server-side stores downtime, so the timeline lives in the visitor's
+    browser and has to stay a short list: one entry per transition between
+    answering ``/health`` and not answering it, capped per instance, and never
+    an outage back-dated to a check that did not observe it begin. The page is
+    checked here for all four properties - stored, bounded, recorded, rendered -
+    so a later edit cannot quietly turn a browser-side note into a fake log.
+    """
+    page = (DOCS / "status.html").read_text(encoding="utf-8")
+
+    key = re.search(r'TIMELINE_KEY\s*=\s*"([^"]+)"', page)
+    assert key, "the downtime timeline no longer names the storage key it uses"
+    assert "localStorage" in page, "the timeline must be kept client-side, not implied to be server-side"
+
+    cap = re.search(r"TIMELINE_MAX\s*=\s*(\d+)", page)
+    assert cap, "the timeline no longer declares a cap"
+    assert 0 < int(cap.group(1)) <= 25, "a browser is not a monitor: the timeline has to stay short"
+
+    for fn in ("recordTimeline", "renderTimeline"):
+        assert fn in page, f"the status page no longer has {fn}"
+    assert 'id="timeline"' in page, "the timeline panel has no mount point"
+    assert 'id="downtime-pill"' in page, "the header has no downtime summary to fill"
+    assert "setDowntimePill" in page, "the header pill is never updated from the recorded timeline"
+
+    # An outage already running at the first check must be labelled as such,
+    # not dated to the check that happened to find it.
+    assert "first_check" in page, "an outage seen in progress is not distinguished from one seen start"
+
+    # And the copy has to admit the shape of the record it is showing.
+    assert "not a monitor" in page, "the timeline does not state that it only sees what a visit sees"
+
+
 def test_the_landing_page_and_the_write_up_claim_different_urls() -> None:
     """Two pages sharing one canonical URL is how a site de-indexes itself."""
     landing = (DOCS / "index.html").read_text(encoding="utf-8")

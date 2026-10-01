@@ -178,7 +178,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**218 test items passing** (200 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
+**219 test items passing** (201 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|

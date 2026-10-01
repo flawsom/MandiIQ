@@ -94,6 +94,19 @@
   .reasons .rd { display: block; font-size: 13.5px; line-height: 1.68; color: var(--text-high); }
   .reasons .rd code { font-family: var(--font-mono); font-size: 12px; color: var(--lime); }
 
+  .tl-instance { border-top: 1px solid var(--hairline); padding-top: 14px; margin-top: 14px; }
+  .tl-instance:first-of-type { border-top: 0; padding-top: 0; margin-top: 2px; }
+  .tl-instance h3 { font-family: var(--font-display); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper); margin: 0 0 10px; }
+  .tl-instance h3 .muted { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .tl-list { list-style: none; margin: 0; padding: 0; }
+  .tl-item { border-left: 2px solid var(--hairline-strong); padding: 3px 0 3px 14px; margin-bottom: 14px; }
+  .tl-item.live { border-left-color: var(--rust); }
+  .tl-head { display: block; font-family: var(--font-display); font-size: 14px; color: var(--paper); }
+  .tl-tail { display: block; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-med); margin: 2px 0 5px; }
+  .tl-reason { display: block; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; color: var(--text-high); word-break: break-word; }
+  .tl-note { display: block; font-size: 12.5px; line-height: 1.62; color: var(--sage); margin-top: 5px; }
+  .tl-empty { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--text-low); margin: 0; }
+
   details { border: 1px solid var(--hairline); border-radius: 10px; background: rgba(255,255,255,0.015); padding: 12px 14px; margin-top: 12px; }
   details summary { cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-med); }
   details summary:hover { color: var(--lime); }
@@ -112,6 +125,7 @@
     </div>
     <div class="status">
       <span class="pill" id="serving-pill"><span class="led"></span>resolving instance</span>
+      <span class="pill" id="downtime-pill" title="Recorded by this page in this browser only">no checks yet</span>
       <span class="pill" id="checked-pill">not checked yet</span>
       <button id="recheck" type="button">Check now</button>
     </div>
@@ -128,6 +142,19 @@
 
   <div class="instances" id="instances">
     <div class="instance"><h2>probing</h2><div class="meta">Contacting both instances...</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Downtime timeline</h2>
+    <p class="hint">
+      One entry per transition between answering <code>/health</code> and not answering it, written by the
+      checks above. This is a page, not a monitor: an outage that begins and ends while no tab is open is
+      invisible, an entry can never be more precise than the 60-second check, and the reason shown is the
+      text the instance or the platform edge returned - never a guess about it. Entries are kept in this
+      browser only, capped to the last few outages per instance, and clearing site data erases them. The
+      pill in the header is the one-line form of this list.
+    </p>
+    <div id="timeline"><p class="muted">No checks recorded yet.</p></div>
   </div>
 
   <div class="panel">
@@ -276,6 +303,256 @@
     var runners = [];
     for (var k = 0; k < Math.min(limit, items.length); k++) runners.push(step());
     return Promise.all(runners).then(function () { return out; });
+  }
+
+  /* ------------------------------------------------------------- timeline --- */
+  /*
+   * The page's own record of when each instance stopped answering, and what the
+   * instance or the platform edge said at the time. It is written by the
+   * 60-second check above and kept in this browser, and it is deliberately
+   * modest about what it can claim: an outage that starts and ends while no tab
+   * is open is invisible, an entry can never be finer than one check, and the
+   * reason shown is the returned text - never an inference about why.
+   *
+   * No hostname appears here. Entries are keyed by the base URL the shared shell
+   * hands over, so the instance list still lives in exactly one file.
+   */
+  var TIMELINE_KEY = "mandiiq.status.timeline.v1";
+  var TIMELINE_MAX = 8;            // closed outages kept per instance
+  var TIMELINE_REASON_MAX = 200;   // characters of returned text kept per entry
+  var timeline = null;
+
+  function store() {
+    try { return window.localStorage || null; } catch (e) { return null; }
+  }
+
+  function loadTimeline() {
+    if (timeline) return timeline;
+    var s = store();
+    var readable = !!s;
+    var parsed = null;
+    if (s) {
+      try { parsed = JSON.parse(s.getItem(TIMELINE_KEY) || "null"); }
+      catch (e) { readable = false; parsed = null; }
+    }
+    timeline = { persisted: readable, states: {}, episodes: [] };
+    if (parsed && typeof parsed === "object") {
+      if (parsed.states && typeof parsed.states === "object") timeline.states = parsed.states;
+      if (parsed.episodes && parsed.episodes.length) timeline.episodes = parsed.episodes;
+    }
+    return timeline;
+  }
+
+  function saveTimeline() {
+    var s = store();
+    if (!timeline) return;
+    if (!s) { timeline.persisted = false; return; }
+    try {
+      s.setItem(TIMELINE_KEY, JSON.stringify({
+        v: 1, states: timeline.states, episodes: timeline.episodes
+      }));
+      timeline.persisted = true;
+    } catch (e) {
+      // Private mode, a full quota, storage blocked mid-session: keep the
+      // entries for this visit and stop claiming they will survive it.
+      timeline.persisted = false;
+    }
+  }
+
+  function oneLine(text) {
+    var s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    return s.length > TIMELINE_REASON_MAX ? s.slice(0, TIMELINE_REASON_MAX - 3) + "..." : s;
+  }
+
+  // Why an instance is not serving, in its own words wherever it has any - and
+  // with the one client-side cause named separately, because a browser that is
+  // itself offline fails both instances at once and would otherwise look like
+  // two simultaneous outages.
+  function downReason(r) {
+    if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
+      return "No response from this browser while it reports itself offline" +
+        (r.body ? ": " + oneLine(r.body) : "");
+    }
+    if (r.state === "http") return "HTTP " + r.http + (r.body ? " - " + oneLine(r.body) : "");
+    return "No response" + (r.body ? ": " + oneLine(r.body) : " at all");
+  }
+
+  function closeEpisode(t, base, at, r) {
+    var h = r.health || {};
+    for (var i = t.episodes.length - 1; i >= 0; i--) {
+      var ep = t.episodes[i];
+      if (ep.base !== base || ep.end) continue;
+      ep.end = at;
+      // The container that came back can say more about the gap than the edge
+      // could: a run marker left on the volume is the one honest evidence that
+      // the work was what killed the process.
+      var died = h.last_unclean_refresh || {};
+      var booted = died.detected_utc ? Date.parse(died.detected_utc) : NaN;
+      var during = !isNaN(booted) && booted >= Date.parse(ep.start) && booted <= Date.parse(at);
+      if (ep.unclean != null && h.unclean_refresh_runs != null && h.unclean_refresh_runs > ep.unclean) {
+        ep.note = "The container that came back reports " +
+          (h.unclean_refresh_runs - ep.unclean) + " refresh run(s) killed mid-flight" +
+          (during && died.step ? ", the last one during " + died.step : "") +
+          ". A container restarted while a run was working looks exactly like this.";
+      }
+      if (ep.version && h.version && h.version !== ep.version) {
+        ep.note = (ep.note ? ep.note + " " : "") + "It answered again on build v" + h.version +
+          " (it was v" + ep.version + " before), so a redeploy is at least part of this gap.";
+      }
+      return;
+    }
+  }
+
+  function capEpisodes(list) {
+    var counts = {}, kept = [], i, ep, n;
+    // A running outage is never dropped whatever the cap says; closed ones are
+    // kept newest-first up to TIMELINE_MAX.
+    for (i = list.length - 1; i >= 0; i--) {
+      ep = list[i];
+      if (!ep.end) { kept.push(ep); counts[ep.base] = (counts[ep.base] || 0) + 1; }
+    }
+    for (i = list.length - 1; i >= 0; i--) {
+      ep = list[i];
+      if (!ep.end) continue;
+      n = counts[ep.base] || 0;
+      if (n >= TIMELINE_MAX) continue;
+      kept.push(ep);
+      counts[ep.base] = n + 1;
+    }
+    return kept.sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); });
+  }
+
+  function recordTimeline(results) {
+    var t = loadTimeline();
+    var now = new Date().toISOString();
+    var known = {};
+    results.forEach(function (r) {
+      var base = r.host.base;
+      var prev = t.states[base] || null;
+      var h = r.health || {};
+      var down = r.state !== "ok";
+      var counts = h.unclean_refresh_runs == null ? null : h.unclean_refresh_runs;
+      // An instance that is not answering cannot report its own counters, so the
+      // baseline for "what changed during the outage" comes from the last check
+      // that did answer.
+      var baseline = counts != null ? counts : (prev && prev.unclean != null ? prev.unclean : null);
+      var build = h.version || (prev && prev.version) || null;
+
+      known[base] = true;
+      if (down && (!prev || prev.state !== "down")) {
+        t.episodes.push({
+          base: base, label: r.host.label, start: now, end: null,
+          // Separates "it was already down when this browser first looked" from
+          // "it went down while this browser was watching": a page must not
+          // back-date an outage it never saw begin.
+          first_check: !prev,
+          reason: downReason(r), http: r.http,
+          unclean: baseline, version: build
+        });
+      }
+      if (!down && prev && prev.state === "down") closeEpisode(t, base, now, r);
+
+      t.states[base] = {
+        state: down ? "down" : "up",
+        at: (!prev || prev.state !== (down ? "down" : "up")) ? now : prev.at,
+        first_at: prev && prev.first_at ? prev.first_at : now,
+        label: r.host.label,
+        version: h.version || null,
+        unclean: counts,
+        reason: down ? downReason(r) : null
+      };
+    });
+    // An instance the shell no longer lists is neither shown nor kept: the
+    // timeline describes the current pair, not hosts that have been renamed away.
+    t.episodes = capEpisodes(t.episodes.filter(function (ep) { return known[ep.base]; }));
+    saveTimeline();
+  }
+
+  function humanDuration(ms) {
+    if (isNaN(ms) || ms < 0) return "unknown";
+    var s = Math.round(ms / 1000);
+    if (s < 90) return s + " s";
+    var min = Math.round(s / 60);
+    if (min < 90) return min + " min";
+    var hours = Math.floor(min / 60), rest = min % 60;
+    if (hours < 48) return hours + " h" + (rest ? " " + rest + " min" : "");
+    return Math.round(hours / 24) + " d";
+  }
+
+  function clock(iso) {
+    var ms = Date.parse(iso);
+    if (isNaN(ms)) return iso || "an unknown time";
+    return new Date(ms).toLocaleString();
+  }
+
+  // The header pill is the one-line form of the panel below it: how many
+  // outages this browser has recorded, and whether one of them is running now.
+  function setDowntimePill(t) {
+    var pill = $("downtime-pill");
+    if (!pill) return;
+    pill.setAttribute("title", "Recorded by this page in this browser only - " +
+      "the downtime timeline below says what a browser-side record cannot see.");
+    if (!t) {
+      pill.className = "pill";
+      pill.innerHTML = "downtime unknown";
+      return;
+    }
+    var running = 0, recorded = 0;
+    t.episodes.forEach(function (ep) { if (ep.end) recorded++; else running++; });
+    if (running) {
+      pill.className = "pill down";
+      pill.innerHTML = '<span class="led"></span>' + running + " outage" +
+        (running === 1 ? "" : "s") + " running";
+    } else if (recorded) {
+      pill.className = "pill";
+      pill.innerHTML = recorded + " outage" + (recorded === 1 ? "" : "s") + " recorded";
+    } else {
+      pill.className = "pill ok";
+      pill.innerHTML = '<span class="led"></span>no downtime seen';
+    }
+  }
+
+  function renderTimeline() {
+    var host = $("timeline");
+    if (!host) return;
+    var t = loadTimeline();
+    if (!hosts.length) {
+      host.innerHTML = '<p class="err">The shared shell (site.js) did not load, so this page does not ' +
+        'know which instances to keep a timeline for.</p>';
+      setDowntimePill(null);
+      return;
+    }
+    var banner = t.persisted ? "" :
+      '<p class="err">This browser refuses to store anything, so the entries below describe this visit ' +
+      'only - the page will not pretend to remember more than it can.</p>';
+    host.innerHTML = banner + hosts.map(function (h) {
+      var episodes = t.episodes.filter(function (ep) { return ep.base === h.base; });
+      var state = t.states[h.base] || {};
+      var body;
+      if (!episodes.length) {
+        body = '<p class="tl-empty">No outage recorded' + (state.first_at
+          ? ": this browser has been checking it since " + clock(state.first_at) + "."
+          : ".") + "</p>";
+      } else {
+        body = '<ol class="tl-list">' + episodes.slice().reverse().map(function (ep) {
+          var head = (ep.first_check ? "Already down at the first check" : "Stopped answering") +
+            " - " + clock(ep.start);
+          var tail = ep.end
+            ? "Answered again " + clock(ep.end) + ", down for " +
+              humanDuration(Date.parse(ep.end) - Date.parse(ep.start))
+            : "Still down, for " + humanDuration(Date.now() - Date.parse(ep.start));
+          return '<li class="tl-item' + (ep.end ? "" : " live") + '">' +
+            '<span class="tl-head">' + esc(head) + "</span>" +
+            '<span class="tl-tail">' + esc(tail) + "</span>" +
+            '<span class="tl-reason">' + esc(ep.reason || "no reason was returned") + "</span>" +
+            (ep.note ? '<span class="tl-note">' + esc(ep.note) + "</span>" : "") +
+            "</li>";
+        }).join("") + "</ol>";
+      }
+      return '<div class="tl-instance"><h3>' + esc(h.label) + ' <span class="muted">' +
+        esc(h.base) + "</span></h3>" + body + "</div>";
+    }).join("");
+    setDowntimePill(t);
   }
 
   /* -------------------------------------------------------------- rendering --- */
@@ -578,6 +855,8 @@
       renderReasons(results);
       renderRaw(results);
       setStatusPills(results);
+      recordTimeline(results);
+      renderTimeline();
       busy = false;
       return results;
     }, function (err) {
@@ -600,6 +879,7 @@
       $("reasons").innerHTML = "";
       renderRaw([]);
       renderRoutes();
+      renderTimeline();
       var p = $("serving-pill");
       p.className = "pill down";
       p.innerHTML = '<span class="led"></span>shell missing';
