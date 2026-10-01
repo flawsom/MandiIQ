@@ -322,3 +322,48 @@ body { margin: 0; }
   color: var(--color-text-low);
 }
 .provenance strong { color: var(--color-text-high); font-weight: 500; }
+
+/* --------------------------------------------------------------------------
+   Shared downtime record. site.js renders it into [data-downtime-summary] and
+   [data-downtime-pill] on any page that mounts those hooks, so one record is
+   worded once and read the same way wherever it appears. The status page shows
+   the long form of the same entries; this is the short one.
+   -------------------------------------------------------------------------- */
+.downtime {
+  margin: 14px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-text-med);
+}
+.downtime__counts {
+  margin: 0 0 12px;
+  color: var(--color-text-high);
+  line-height: 1.7;
+}
+.downtime__list { list-style: none; margin: 0; padding: 0; }
+.downtime__item {
+  border-left: 2px solid var(--hairline-strong);
+  padding: 3px 0 3px 13px;
+  margin-bottom: 13px;
+}
+.downtime__item.is-live { border-left-color: var(--color-danger); }
+.downtime__host {
+  display: inline-block;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-low);
+  margin-bottom: 3px;
+}
+.downtime__when { display: block; color: var(--color-paper); font-family: var(--font-body); font-size: 13px; }
+.downtime__tail { display: block; margin-top: 2px; }
+.downtime__why { display: block; margin-top: 4px; color: var(--color-text-high); line-height: 1.6; word-break: break-word; }
+.downtime__note { display: block; margin-top: 5px; color: var(--color-sage); line-height: 1.6; }
+.downtime__none { margin: 0; line-height: 1.7; color: var(--color-text-low); }
+.downtime__limits {
+  margin: 12px 0 0;
+  color: var(--color-text-low);
+  line-height: 1.75;
+  max-width: 92ch;
+}
+.downtime__limits a { color: var(--color-primary); }

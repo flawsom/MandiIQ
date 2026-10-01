@@ -125,7 +125,8 @@
     </div>
     <div class="status">
       <span class="pill" id="serving-pill"><span class="led"></span>resolving instance</span>
-      <span class="pill" id="downtime-pill" title="Recorded by this page in this browser only">no checks yet</span>
+      <span class="pill" id="build-pill">builds unchecked</span>
+      <span class="pill" id="downtime-pill" data-downtime-pill title="Recorded by this page in this browser only">no checks yet</span>
       <span class="pill" id="checked-pill">not checked yet</span>
       <button id="recheck" type="button">Check now</button>
     </div>
@@ -148,21 +149,32 @@
     <h2>Downtime timeline</h2>
     <p class="hint">
       One entry per transition between answering <code>/health</code> and not answering it, written by the
-      checks above. This is a page, not a monitor: an outage that begins and ends while no tab is open is
-      invisible, an entry can never be more precise than the 60-second check, and the reason shown is the
-      text the instance or the platform edge returned - never a guess about it. Entries are kept in this
-      browser only, capped to the last few outages per instance, and clearing site data erases them. The
-      pill in the header is the one-line form of this list.
+      60-second check the shared page shell (site.js) runs on every page. This is the long form of the
+      record the other pages show in short: this is a page, not a monitor, an outage that begins and ends
+      while no tab is open is invisible, an entry can never be more precise than the 60-second check, and
+      the reason shown is the text the instance or the platform edge returned - never a guess about it.
+      Entries are kept in this browser only, capped to the last few outages per instance, and clearing
+      site data erases them. The pill in the header is the one-line form of this list.
     </p>
     <div id="timeline"><p class="muted">No checks recorded yet.</p></div>
   </div>
 
   <div class="panel">
+    <h2>Build skew</h2>
+    <p class="hint">
+      What each instance says about its own build, taken only from the fields its <code>/health</code>
+      payload actually publishes. A field an image does not send is absent - not zero, not false, and not a
+      failure - so an older build is named as one here instead of being read as a broken one below.
+    </p>
+    <div id="build-skew"><p class="muted">Comparing published payloads...</p></div>
+  </div>
+
+  <div class="panel">
     <h2>Instances side by side</h2>
     <p class="hint">
-      Both columns answer the same build of the same image. A value marked in rust differs between the
-      two, which is what a half-finished rollout looks like: the mirror is not an equal peer, it can be
-      running an older build than the primary.
+      Both columns answer the same image behind two hostnames, and a value marked in rust differs between
+      the two. A row reading <code>not reported</code> is a field that build does not publish at all; the
+      panel above says which build that is.
     </p>
     <div id="matrix"><p class="muted">Loading...</p></div>
   </div>
@@ -199,17 +211,17 @@
 /*
  * Two separate jobs, deliberately on different clocks.
  *
- * /health is cheap, so it is re-read every minute and is what drives the instance cards and the
- * reasons list. The route probe below runs real regressions on a 512 MB free-tier container and
- * has been measured between 0.2 s and 13 s per route, so it runs once on load and then every
- * five minutes, at most three at a time.
+ * /health is cheap and is read every minute - but not from here. The shared shell (site.js) probes
+ * every instance once a minute on every page, and this page renders what it reports, so the LED in
+ * the nav, the cards below and the downtime record all come from one reading instead of three. The
+ * route probe stays here because it is specific to this page: it runs real regressions on a 512 MB
+ * free-tier container and has been measured between 0.2 s and 13 s per route, so it runs once on
+ * load and then every five minutes, at most three at a time.
  */
 (function () {
   "use strict";
 
-  var HEALTH_INTERVAL_MS = 60000;
   var ROUTE_INTERVAL_MS = 300000;
-  var HEALTH_TIMEOUT_MS = 9000;
   var ROUTE_TIMEOUT_MS = 25000;
   var STALE_AFTER_DAYS = 3;
   var ROUTE_CONCURRENCY = 3;
@@ -225,9 +237,9 @@
 
   var shell = window.MandiiqShell;
   var hosts = (shell && shell.hosts) || [];
-  var lastResults = [];   // [{host, state, http, ms, health, body}]
+  var downtime = (shell && shell.downtime) || null;   // the one record, kept by site.js
+  var lastResults = [];   // [{host, state, http, ms, health, body}] - one reading for the whole page
   var routeRows = null;
-  var busy = false;
 
   function $(id) { return document.getElementById(id); }
 
@@ -263,25 +275,13 @@
       .then(function (r) { clear(); return r; }, function (err) { clear(); throw err; });
   }
 
-  function probeHealth(host) {
-    var started = Date.now();
-    return fetchWithTimeout(host.base + "/health", HEALTH_TIMEOUT_MS).then(function (r) {
-      var ms = Date.now() - started;
-      var parsed = null;
-      try { parsed = JSON.parse(r.body); } catch (e) { parsed = null; }
-      // A 503 from the platform edge is not JSON: it is the edge saying there is no healthy
-      // container behind the hostname, which is a deploy problem, not an application one.
-      return {
-        host: host, state: r.res.ok ? "ok" : "http", http: r.res.status, ms: ms,
-        health: parsed, body: r.body
-      };
-    }, function (err) {
-      return {
-        host: host, state: "net", http: null, ms: Date.now() - started,
-        health: null, body: (err && err.name === "AbortError") ? "timed out after " + (HEALTH_TIMEOUT_MS / 1000) + "s" : String(err && err.message || err)
-      };
-    });
-  }
+  /*
+   * The /health probe is not here any more. It lives in the shared shell, which runs it for every
+   * page on one clock and hands the same results to whoever asks, so this page's cards, its
+   * downtime record and the LED in the nav cannot disagree about what an instance said. What comes
+   * back is the shape this page used to build itself: the HTTP status, the parsed payload and the
+   * returned text - because when an instance is down, that text is the only account of why.
+   */
 
   function probeRoute(base, path) {
     var started = Date.now();
@@ -307,221 +307,27 @@
 
   /* ------------------------------------------------------------- timeline --- */
   /*
-   * The page's own record of when each instance stopped answering, and what the
-   * instance or the platform edge said at the time. It is written by the
-   * 60-second check above and kept in this browser, and it is deliberately
-   * modest about what it can claim: an outage that starts and ends while no tab
-   * is open is invisible, an entry can never be finer than one check, and the
-   * reason shown is the returned text - never an inference about why.
-   *
-   * No hostname appears here. Entries are keyed by the base URL the shared shell
-   * hands over, so the instance list still lives in exactly one file.
+   * The record is kept by the shared shell (site.js), not here. It is a fact
+   * about the pair of instances rather than about this page, so every page
+   * probes the same hosts on the same clock and reads the same entries back.
+   * What this page owns is the long form of the list: per entry, the reason the
+   * instance or the platform edge returned, and the note the container left when
+   * it came back. The shell owns the storage, the wording and the header pill.
    */
-  var TIMELINE_KEY = "mandiiq.status.timeline.v1";
-  var TIMELINE_MAX = 8;            // closed outages kept per instance
-  var TIMELINE_REASON_MAX = 200;   // characters of returned text kept per entry
-  var timeline = null;
-
-  function store() {
-    try { return window.localStorage || null; } catch (e) { return null; }
-  }
-
-  function loadTimeline() {
-    if (timeline) return timeline;
-    var s = store();
-    var readable = !!s;
-    var parsed = null;
-    if (s) {
-      try { parsed = JSON.parse(s.getItem(TIMELINE_KEY) || "null"); }
-      catch (e) { readable = false; parsed = null; }
-    }
-    timeline = { persisted: readable, states: {}, episodes: [] };
-    if (parsed && typeof parsed === "object") {
-      if (parsed.states && typeof parsed.states === "object") timeline.states = parsed.states;
-      if (parsed.episodes && parsed.episodes.length) timeline.episodes = parsed.episodes;
-    }
-    return timeline;
-  }
-
-  function saveTimeline() {
-    var s = store();
-    if (!timeline) return;
-    if (!s) { timeline.persisted = false; return; }
-    try {
-      s.setItem(TIMELINE_KEY, JSON.stringify({
-        v: 1, states: timeline.states, episodes: timeline.episodes
-      }));
-      timeline.persisted = true;
-    } catch (e) {
-      // Private mode, a full quota, storage blocked mid-session: keep the
-      // entries for this visit and stop claiming they will survive it.
-      timeline.persisted = false;
-    }
-  }
-
-  function oneLine(text) {
-    var s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
-    return s.length > TIMELINE_REASON_MAX ? s.slice(0, TIMELINE_REASON_MAX - 3) + "..." : s;
-  }
-
-  // Why an instance is not serving, in its own words wherever it has any - and
-  // with the one client-side cause named separately, because a browser that is
-  // itself offline fails both instances at once and would otherwise look like
-  // two simultaneous outages.
-  function downReason(r) {
-    if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
-      return "No response from this browser while it reports itself offline" +
-        (r.body ? ": " + oneLine(r.body) : "");
-    }
-    if (r.state === "http") return "HTTP " + r.http + (r.body ? " - " + oneLine(r.body) : "");
-    return "No response" + (r.body ? ": " + oneLine(r.body) : " at all");
-  }
-
-  function closeEpisode(t, base, at, r) {
-    var h = r.health || {};
-    for (var i = t.episodes.length - 1; i >= 0; i--) {
-      var ep = t.episodes[i];
-      if (ep.base !== base || ep.end) continue;
-      ep.end = at;
-      // The container that came back can say more about the gap than the edge
-      // could: a run marker left on the volume is the one honest evidence that
-      // the work was what killed the process.
-      var died = h.last_unclean_refresh || {};
-      var booted = died.detected_utc ? Date.parse(died.detected_utc) : NaN;
-      var during = !isNaN(booted) && booted >= Date.parse(ep.start) && booted <= Date.parse(at);
-      if (ep.unclean != null && h.unclean_refresh_runs != null && h.unclean_refresh_runs > ep.unclean) {
-        ep.note = "The container that came back reports " +
-          (h.unclean_refresh_runs - ep.unclean) + " refresh run(s) killed mid-flight" +
-          (during && died.step ? ", the last one during " + died.step : "") +
-          ". A container restarted while a run was working looks exactly like this.";
-      }
-      if (ep.version && h.version && h.version !== ep.version) {
-        ep.note = (ep.note ? ep.note + " " : "") + "It answered again on build v" + h.version +
-          " (it was v" + ep.version + " before), so a redeploy is at least part of this gap.";
-      }
-      return;
-    }
-  }
-
-  function capEpisodes(list) {
-    var counts = {}, kept = [], i, ep, n;
-    // A running outage is never dropped whatever the cap says; closed ones are
-    // kept newest-first up to TIMELINE_MAX.
-    for (i = list.length - 1; i >= 0; i--) {
-      ep = list[i];
-      if (!ep.end) { kept.push(ep); counts[ep.base] = (counts[ep.base] || 0) + 1; }
-    }
-    for (i = list.length - 1; i >= 0; i--) {
-      ep = list[i];
-      if (!ep.end) continue;
-      n = counts[ep.base] || 0;
-      if (n >= TIMELINE_MAX) continue;
-      kept.push(ep);
-      counts[ep.base] = n + 1;
-    }
-    return kept.sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); });
-  }
-
-  function recordTimeline(results) {
-    var t = loadTimeline();
-    var now = new Date().toISOString();
-    var known = {};
-    results.forEach(function (r) {
-      var base = r.host.base;
-      var prev = t.states[base] || null;
-      var h = r.health || {};
-      var down = r.state !== "ok";
-      var counts = h.unclean_refresh_runs == null ? null : h.unclean_refresh_runs;
-      // An instance that is not answering cannot report its own counters, so the
-      // baseline for "what changed during the outage" comes from the last check
-      // that did answer.
-      var baseline = counts != null ? counts : (prev && prev.unclean != null ? prev.unclean : null);
-      var build = h.version || (prev && prev.version) || null;
-
-      known[base] = true;
-      if (down && (!prev || prev.state !== "down")) {
-        t.episodes.push({
-          base: base, label: r.host.label, start: now, end: null,
-          // Separates "it was already down when this browser first looked" from
-          // "it went down while this browser was watching": a page must not
-          // back-date an outage it never saw begin.
-          first_check: !prev,
-          reason: downReason(r), http: r.http,
-          unclean: baseline, version: build
-        });
-      }
-      if (!down && prev && prev.state === "down") closeEpisode(t, base, now, r);
-
-      t.states[base] = {
-        state: down ? "down" : "up",
-        at: (!prev || prev.state !== (down ? "down" : "up")) ? now : prev.at,
-        first_at: prev && prev.first_at ? prev.first_at : now,
-        label: r.host.label,
-        version: h.version || null,
-        unclean: counts,
-        reason: down ? downReason(r) : null
-      };
-    });
-    // An instance the shell no longer lists is neither shown nor kept: the
-    // timeline describes the current pair, not hosts that have been renamed away.
-    t.episodes = capEpisodes(t.episodes.filter(function (ep) { return known[ep.base]; }));
-    saveTimeline();
-  }
-
-  function humanDuration(ms) {
-    if (isNaN(ms) || ms < 0) return "unknown";
-    var s = Math.round(ms / 1000);
-    if (s < 90) return s + " s";
-    var min = Math.round(s / 60);
-    if (min < 90) return min + " min";
-    var hours = Math.floor(min / 60), rest = min % 60;
-    if (hours < 48) return hours + " h" + (rest ? " " + rest + " min" : "");
-    return Math.round(hours / 24) + " d";
-  }
-
-  function clock(iso) {
-    var ms = Date.parse(iso);
-    if (isNaN(ms)) return iso || "an unknown time";
-    return new Date(ms).toLocaleString();
-  }
-
-  // The header pill is the one-line form of the panel below it: how many
-  // outages this browser has recorded, and whether one of them is running now.
-  function setDowntimePill(t) {
-    var pill = $("downtime-pill");
-    if (!pill) return;
-    pill.setAttribute("title", "Recorded by this page in this browser only - " +
-      "the downtime timeline below says what a browser-side record cannot see.");
-    if (!t) {
-      pill.className = "pill";
-      pill.innerHTML = "downtime unknown";
-      return;
-    }
-    var running = 0, recorded = 0;
-    t.episodes.forEach(function (ep) { if (ep.end) recorded++; else running++; });
-    if (running) {
-      pill.className = "pill down";
-      pill.innerHTML = '<span class="led"></span>' + running + " outage" +
-        (running === 1 ? "" : "s") + " running";
-    } else if (recorded) {
-      pill.className = "pill";
-      pill.innerHTML = recorded + " outage" + (recorded === 1 ? "" : "s") + " recorded";
-    } else {
-      pill.className = "pill ok";
-      pill.innerHTML = '<span class="led"></span>no downtime seen';
-    }
-  }
-
   function renderTimeline() {
     var host = $("timeline");
     if (!host) return;
-    var t = loadTimeline();
-    if (!hosts.length) {
-      host.innerHTML = '<p class="err">The shared shell (site.js) did not load, so this page does not ' +
-        'know which instances to keep a timeline for.</p>';
-      setDowntimePill(null);
+    if (!downtime) {
+      host.innerHTML = '<p class="err">The shared shell (site.js) did not load, so the downtime record ' +
+        "it keeps could not be read.</p>";
       return;
     }
+    if (!hosts.length) {
+      host.innerHTML = '<p class="err">The shared shell (site.js) lists no instances, so there is nothing ' +
+        "to keep a record of.</p>";
+      return;
+    }
+    var t = downtime.summary();
     var banner = t.persisted ? "" :
       '<p class="err">This browser refuses to store anything, so the entries below describe this visit ' +
       'only - the page will not pretend to remember more than it can.</p>';
@@ -531,28 +337,22 @@
       var body;
       if (!episodes.length) {
         body = '<p class="tl-empty">No outage recorded' + (state.first_at
-          ? ": this browser has been checking it since " + clock(state.first_at) + "."
+          ? ": this browser has been checking it since " + esc(downtime.clock(state.first_at)) + "."
           : ".") + "</p>";
       } else {
         body = '<ol class="tl-list">' + episodes.slice().reverse().map(function (ep) {
-          var head = (ep.first_check ? "Already down at the first check" : "Stopped answering") +
-            " - " + clock(ep.start);
-          var tail = ep.end
-            ? "Answered again " + clock(ep.end) + ", down for " +
-              humanDuration(Date.parse(ep.end) - Date.parse(ep.start))
-            : "Still down, for " + humanDuration(Date.now() - Date.parse(ep.start));
-          return '<li class="tl-item' + (ep.end ? "" : " live") + '">' +
-            '<span class="tl-head">' + esc(head) + "</span>" +
-            '<span class="tl-tail">' + esc(tail) + "</span>" +
-            '<span class="tl-reason">' + esc(ep.reason || "no reason was returned") + "</span>" +
-            (ep.note ? '<span class="tl-note">' + esc(ep.note) + "</span>" : "") +
+          var d = downtime.describe(ep);
+          return '<li class="tl-item' + (d.live ? " live" : "") + '">' +
+            '<span class="tl-head">' + esc(d.head) + "</span>" +
+            '<span class="tl-tail">' + esc(d.tail) + "</span>" +
+            '<span class="tl-reason">' + esc(d.reason) + "</span>" +
+            (d.note ? '<span class="tl-note">' + esc(d.note) + "</span>" : "") +
             "</li>";
         }).join("") + "</ol>";
       }
       return '<div class="tl-instance"><h3>' + esc(h.label) + ' <span class="muted">' +
         esc(h.base) + "</span></h3>" + body + "</div>";
     }).join("");
-    setDowntimePill(t);
   }
 
   /* -------------------------------------------------------------- rendering --- */
@@ -587,7 +387,8 @@
         '<div class="meta">' +
           '<span class="pill ' + state + '"><span class="led"></span>' + esc(label) + '</span> ' +
           '<span class="muted">' + (r.http != null ? "HTTP " + r.http + " · " : "") + r.ms + " ms</span><br>" +
-          'build v' + esc(h.version || "not reported") +
+          (h.version ? "build v" + esc(h.version)
+            : 'build <span class="muted">' + esc(BUILD_ABSENT) + "</span>") +
           (h.n_prices != null ? " · " + num(h.n_prices) + " price rows" : "") +
           (h.data_max_date ? "<br>newest arrival " + esc(h.data_max_date) : "<br>no arrival date reported") +
           (h.last_run_utc ? " · last run " + esc(ago(h.last_run_utc) || h.last_run_utc) : "") +
@@ -661,12 +462,171 @@
         var known = values.filter(function (v) { return v != null; });
         var differs = known.length > 1 && known.some(function (v) { return v !== known[0]; });
         return "<tr><td class=\"k\">" + esc(row[0]) + "</td>" +
-          values.map(function (v) {
-            if (v == null) return '<td class="v muted">not reported</td>';
+          values.map(function (v, c) {
+            if (v == null) return '<td class="v muted" title="' + esc(results[c].host.label) +
+              " does not publish this field in /health at all - an absent field, not a zero, a false or a failure." +
+              '">not reported</td>';
             return '<td class="v' + (differs ? " diff" : "") + '">' + esc(v) + "</td>";
           }).join("") + "</tr>";
       }).join("") +
       "</tbody></table>";
+  }
+
+  /* ----------------------------------------------------------- build skew --- */
+  /*
+   * The two instances are supposed to run the same image, and on 2026-10-01 they
+   * did not: the primary reported build 2.4.1 while the mirror answered a
+   * payload with no version field in it at all. A page can work only with what it
+   * is given, so this compares the payloads themselves. A field a build does not
+   * publish is absent - a different statement from false, from zero and from a
+   * failure - and that difference is what tells an older image apart from a
+   * broken one.
+   */
+  var BUILD_ABSENT = "not reported by this build";
+  var BUILD_LIST_MAX = 6;
+  // The fields this page reads as controls, named first when a build does not
+  // publish them: "23 fields are missing" is a number, but "it cannot say whether
+  // a rebuild is armed" is the part a reader has to know.
+  var BUILD_KEY_FIELDS = [
+    "version", "days_behind", "data_max_date", "refresh_scope", "unclean_refresh_runs",
+    "last_unclean_refresh", "safe_recovery", "auto_rebuild_allowed", "index_fault_pending",
+    "counts_age_s", "last_price_source", "mirror_configured"
+  ];
+
+  function keyFirst(names) {
+    var keyed = BUILD_KEY_FIELDS.filter(function (k) { return names.indexOf(k) >= 0; });
+    var rest = names.filter(function (k) { return keyed.indexOf(k) < 0; });
+    return keyed.concat(rest);
+  }
+
+  function buildProfile(r) {
+    var h = (r.health && typeof r.health === "object") ? r.health : null;
+    return {
+      label: r.host.label,
+      answered: r.state === "ok" && !!h,
+      version: h && h.version ? String(h.version) : null,
+      fields: h ? Object.keys(h).sort() : [],
+      lastRun: h && h.last_run_utc ? h.last_run_utc : null
+    };
+  }
+
+  function listFew(names) {
+    if (names.length <= BUILD_LIST_MAX) return names.join(", ");
+    return names.slice(0, BUILD_LIST_MAX).join(", ") + " and " + (names.length - BUILD_LIST_MAX) + " more";
+  }
+
+  function fieldSkew(a, b) {
+    var inA = {}, inB = {}, i;
+    for (i = 0; i < a.fields.length; i++) inA[a.fields[i]] = true;
+    for (i = 0; i < b.fields.length; i++) inB[b.fields[i]] = true;
+    return {
+      onlyA: a.fields.filter(function (k) { return !inB[k]; }),
+      onlyB: b.fields.filter(function (k) { return !inA[k]; })
+    };
+  }
+
+  // What can be said about the pair, from the payloads alone - and the pill that
+  // carries the one-line version of it.
+  function buildSkew(profiles) {
+    var answered = profiles.filter(function (p) { return p.answered; });
+    if (!answered.length) {
+      return {
+        state: "", pill: "builds unknown",
+        verdict: "No instance answered <code>/health</code>, so no build can be named. Everything below " +
+          "reads <code>not reported</code> because nothing was reported - not because a build is old."
+      };
+    }
+    if (answered.length === 1) {
+      return {
+        state: "", pill: "1 of 2 builds named",
+        verdict: "Only the " + esc(answered[0].label) + " instance answered, so there is nothing to compare " +
+          "it against. It reports " + (answered[0].version
+            ? "build <code>v" + esc(answered[0].version) + "</code>"
+            : "no build version at all") + " and publishes " + answered[0].fields.length +
+          " fields in <code>/health</code>."
+      };
+    }
+
+    var a = answered[0], b = answered[1];
+    var diff = fieldSkew(a, b);
+    var parts = [];
+    var same = a.version && b.version && a.version === b.version;
+
+    if (same) {
+      parts.push("Both instances report build <code>v" + esc(a.version) + "</code>, so whichever one answers, " +
+        "the same code is answering" + (diff.onlyA.length || diff.onlyB.length
+          ? "; their payloads still differ on " + (diff.onlyA.length + diff.onlyB.length) +
+            " field(s), which is data rather than code."
+          : " and they publish the same set of fields."));
+    } else if (a.version && b.version) {
+      parts.push("Build skew: the " + esc(a.label) + " runs build <code>v" + esc(a.version) + "</code> and the " +
+        esc(b.label) + " runs build <code>v" + esc(b.version) + "</code>.");
+    } else if (a.version || b.version) {
+      var named = a.version ? a : b, mute = a.version ? b : a;
+      parts.push("Build skew: the " + esc(named.label) + " reports build <code>v" + esc(named.version) +
+        "</code>, and the " + esc(mute.label) + " reports no build version at all - a payload of " +
+        mute.fields.length + " fields against " + named.fields.length +
+        " is an older image rather than a silent one.");
+    } else {
+      parts.push("Neither instance names its build, so what differs here is fields, not a version string.");
+    }
+
+    if (diff.onlyA.length) {
+      parts.push("The " + esc(a.label) + " publishes " + diff.onlyA.length + " field(s) the " + esc(b.label) +
+        " never sends (<code>" + esc(listFew(keyFirst(diff.onlyA))) + "</code>), so anything those fields would explain - " +
+        "the refresh scope, a deferred index repair, whether an automated rebuild is armed, how old its own " +
+        "counts are - cannot be read off the " + esc(b.label) + ", and their absence there is not a value.");
+    }
+    if (diff.onlyB.length) {
+      parts.push("The " + esc(b.label) + " publishes " + diff.onlyB.length + " field(s) the " + esc(a.label) +
+        " does not (<code>" + esc(listFew(diff.onlyB)) + "</code>). Payloads that disagree in both directions " +
+        "are not two containers of one build; whatever the older one still serves, it is not this code.");
+    }
+
+    var pill = same ? "same build on both" : (a.version && b.version ? "builds differ" : "1 build unlabelled");
+    return { state: same ? "ok" : "warn", pill: pill, verdict: parts.join(" ") };
+  }
+
+  function renderBuildSkew(results) {
+    var host = $("build-skew");
+    var pill = $("build-pill");
+    if (!host) return;
+    var profiles = results.map(buildProfile);
+    if (!profiles.length) {
+      host.innerHTML = '<p class="err">No instance was probed, so no build can be compared: the shared shell ' +
+        "(site.js) either did not load or lists no hosts.</p>";
+      if (pill) { pill.className = "pill"; pill.textContent = "builds unknown"; }
+      return;
+    }
+    var skew = buildSkew(profiles);
+
+    // "Absent from this build" is measured against the union of what either one
+    // publishes, so the word absent always means the build did not send it.
+    var every = {};
+    profiles.forEach(function (p) { p.fields.forEach(function (k) { every[k] = true; }); });
+    var union = Object.keys(every).sort();
+
+    host.innerHTML = '<p class="' + (skew.state === "warn" ? "err" : "hint") + '">' + skew.verdict + "</p>" +
+      '<table><thead><tr><th>instance</th><th>build it reports</th><th class="num">/health fields</th>' +
+      '<th>newest run it dates itself by</th><th>absent from this build</th></tr></thead><tbody>' +
+      profiles.map(function (p) {
+        var absent = union.filter(function (k) { return p.fields.indexOf(k) < 0; });
+        return '<tr><td class="k">' + esc(p.label) + (p.answered ? "" : " <span class=\"muted\">(no /health)</span>") + "</td>" +
+          '<td class="v' + (p.version ? "" : " diff") + '">' + (p.version
+            ? "v" + esc(p.version)
+            : '<span class="muted">' + esc(BUILD_ABSENT) + "</span>") + "</td>" +
+          '<td class="v num">' + (p.answered ? p.fields.length : 0) + "</td>" +
+          '<td class="v">' + (p.lastRun ? esc(ago(p.lastRun) || p.lastRun) : '<span class="muted">none reported</span>') + "</td>" +
+          '<td class="v' + (p.answered && absent.length ? " diff" : "") + '">' + (p.answered
+            ? (absent.length ? esc(keyFirst(absent).join(", ")) + " (" + absent.length + ")" : '<span class="muted">nothing</span>')
+            : '<span class="muted">nothing - it did not answer</span>') + "</td></tr>";
+      }).join("") + "</tbody></table>";
+
+    if (!pill) return;
+    pill.className = "pill" + (skew.state ? " " + skew.state : "");
+    pill.textContent = skew.pill;
+    pill.setAttribute("title", "Compared from the fields each instance publishes in /health. A field a build " +
+      "does not send is absent - not zero, not false, and not a failure.");
   }
 
   function reasonsFor(h) {
@@ -837,7 +797,8 @@
     } else {
       var fresh = win.health.days_behind != null && win.health.days_behind <= STALE_AFTER_DAYS;
       pill.className = "pill " + (fresh ? "ok" : "warn");
-      pill.innerHTML = '<span class="led"></span>serving: ' + esc(win.host.label) + " (v" + esc(win.health.version || "?") + ")";
+      pill.innerHTML = '<span class="led"></span>serving: ' + esc(win.host.label) +
+        (win.health.version ? " (v" + esc(win.health.version) + ")" : " (build unlabelled)");
     }
     var checked = $("checked-pill");
     checked.className = "pill" + (down ? " warn" : "");
@@ -845,24 +806,22 @@
       (down ? " · " + down + " of " + results.length + " down" : "");
   }
 
-  function refreshHealth() {
-    if (busy || !hosts.length) return Promise.resolve();
-    busy = true;
-    return Promise.all(hosts.map(probeHealth)).then(function (results) {
-      lastResults = results;
-      renderInstances(results);
-      renderMatrix(results);
-      renderReasons(results);
-      renderRaw(results);
-      setStatusPills(results);
-      recordTimeline(results);
-      renderTimeline();
-      busy = false;
-      return results;
-    }, function (err) {
-      busy = false;
-      throw err;
-    });
+  /*
+   * Every panel here is rendered from one reading of both instances, and that
+   * reading is the shell's: the same poll drives the LED in the nav, the downtime
+   * record and these cards, so they cannot contradict each other. The header's
+   * "Check now" asks the shell for a fresh round rather than starting a second
+   * clock of its own.
+   */
+  function applyResults(results) {
+    lastResults = results;
+    renderInstances(results);
+    renderBuildSkew(results);
+    renderMatrix(results);
+    renderReasons(results);
+    renderRaw(results);
+    setStatusPills(results);
+    renderTimeline();
   }
 
   function refreshRoutes() {
@@ -878,6 +837,7 @@
       $("matrix").innerHTML = '<p class="err">The shared shell (site.js) did not load, so the two instance URLs are unknown to this page.</p>';
       $("reasons").innerHTML = "";
       renderRaw([]);
+      renderBuildSkew([]);
       renderRoutes();
       renderTimeline();
       var p = $("serving-pill");
@@ -885,14 +845,26 @@
       p.innerHTML = '<span class="led"></span>shell missing';
       return;
     }
-    refreshHealth().then(refreshRoutes);
-    setInterval(refreshHealth, HEALTH_INTERVAL_MS);
+    // Subscribe first, so the reading the shell is already taking fills this page
+    // - including one it took a moment ago, since onProbe replays the last one.
+    var beganRoutes = false;
+    function onResults(results) {
+      applyResults(results);
+      if (!beganRoutes) {
+        beganRoutes = true;
+        refreshRoutes();
+      }
+    }
+    if (shell.onProbe) shell.onProbe(onResults);
+    else applyResults([]);
+
+    // The route probe is the expensive half, and it stays on this page: it runs
+    // once there are results to probe against, then every five minutes.
     setInterval(refreshRoutes, ROUTE_INTERVAL_MS);
-    document.addEventListener("visibilitychange", function () {
-      if (!document.hidden) refreshHealth();
-    });
+
     $("recheck").addEventListener("click", function () {
-      refreshHealth().then(function () { return refreshRoutes(); });
+      if (shell.probeNow) shell.probeNow().then(refreshRoutes, function () {});
+      else refreshRoutes();
     });
   }
 

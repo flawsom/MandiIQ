@@ -90,13 +90,22 @@
 # and /docs while the mirror answered /health normally - the edge had no
 # healthy container behind it. Every docs page and the landing page pointed at
 # the primary alone, so the whole public surface went dark with it.
-# docs/assets/site.js now probes /health on each host in order, remembers the
-# first that answers (sessionStorage), re-points the host-qualified nav and
+# docs/assets/site.js now probes /health on every host on one clock, remembers
+# the first that answers (sessionStorage), re-points the host-qualified nav and
 # footer links at the winner, and labels the nav LED with the instance - the
 # landing pill and the live console both read it through
 # window.MandiiqShell.resolveApi(). The mirror is a failover, not an equal: it
 # has been observed running an older build than the primary, so when the pages
 # fall back they say so instead of quietly mixing two builds' numbers.
+#
+# That one poll is also where every page's downtime record comes from
+# (window.MandiiqShell.downtime). The shell keeps one browser-local list of when
+# each instance stopped answering and what the instance or the platform edge
+# said at the time, and writes it into [data-downtime-summary] and
+# [data-downtime-pill] on whichever pages mount those hooks. The /health probe
+# itself moved out of status.html for the same reason: one reading drives the
+# nav LED, the instance cards and the record, so they cannot disagree, and a
+# page that kept its own copy would be a second clock with its own story.
 #
 # Check both by hand:
 #   for h in x4n8x4gkmzht zbvjrztgjqgw; do
@@ -108,23 +117,42 @@
 # the pipeline, and no client-side change can fix it.
 #
 # https://mandiiq.unifies.codes/status.html is that same check as a public page.
-# It probes both instances directly, reports each one's build, staleness and
-# /health fields side by side, marks the field where two live instances really
-# disagree, and lists the measured reasons the newest arrival is not from today.
-# It takes its host list from docs/assets/site.js, so it cannot drift from the
-# rest of the site.
+# It renders what the shared shell reports, reports each instance's build,
+# staleness and /health fields side by side, marks the field where two live
+# instances really disagree, and lists the measured reasons the newest arrival
+# is not from today. It takes its host list from docs/assets/site.js, so it
+# cannot drift from the rest of the site.
 #
-# It also keeps a short downtime timeline of its own: one entry per transition
-# between answering /health and not answering it, with the status text the
-# instance or the platform edge returned, the build it came back on, and - when
-# the container that returns reports a refresh run killed mid-flight - the step
-# that run died in. That list lives in the visitor's browser (localStorage),
-# is capped to the last few outages per instance, and the page says outright
-# that it is not a monitor: an outage that began and ended between two visits
-# was never observed, an outage already running at the first check is labelled
-# as such rather than dated to that check, and a browser that blocks storage is
-# told apart from one that has simply seen nothing. A pill in the header carries
-# the one-line version (running / recorded / none, browser-local, so titled).
+# "Build skew" is the panel for the case where two hostnames are not two
+# containers of one image. On 2026-10-01 the primary reported version 2.4.1
+# while the mirror answered a payload with no version field in it at all, so the
+# panel compares the published field sets rather than version strings: a field a
+# build does not send is absent - not zero, not false and not a failure - and the
+# fields this page actually reads as controls (refresh_scope,
+# index_fault_pending, auto_rebuild_allowed, counts_age_s, ...) are named first,
+# with the field counts on both sides. The header pill carries the one-line
+# verdict (same build / builds differ / 1 build unlabelled), and the matrix below
+# says "not reported" for a field one build never sends, with the build named in
+# the cell's title.
+#
+# The downtime list here is the long form of the shell's record: one entry per
+# transition between answering /health and not answering it, with the status
+# text the instance or the platform edge returned, the build it came back on, and
+# - when the container that returns reports a refresh run killed mid-flight - the
+# step that run died in. It lives in the visitor's browser (localStorage, key
+# mandiiq.timeline.v1, which adopts the entry the status page wrote before this
+# became shared), is capped to the last few outages per instance, and the page
+# says outright that it is not a monitor: an outage that began and ended between
+# two visits was never observed, an outage already running at the first check is
+# labelled as such rather than dated to that check, and a browser that blocks
+# storage is told apart from one that has simply seen nothing. A pill in the
+# header carries the one-line version (running / recorded / none, browser-local,
+# so titled).
+#
+# live.html and heartbeat-dashboard.html mount the same record in short form, so
+# the fact is not owned by one page: they need no code of their own beyond the
+# [data-downtime-summary] / [data-downtime-pill] mounts, and the shell fills them
+# from the same 60-second poll.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Keeping the service awake

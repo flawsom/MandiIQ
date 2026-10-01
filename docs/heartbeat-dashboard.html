@@ -29,6 +29,9 @@ html,body{background:var(--bg-base);color:var(--color-text-high);font-family:var
 .status-badge .dot.yellow{background:var(--color-warning);box-shadow:0 0 8px rgba(243,156,18,0.5)}
 .status-badge .dot.red{background:var(--color-danger);box-shadow:0 0 8px rgba(231,76,60,0.5)}
 .status-badge .dot.gray{background:var(--color-text-low)}
+.status-badge[data-state="ok"]{border-color:rgba(215,255,0,0.45);color:var(--color-primary)}
+.status-badge[data-state="warn"]{border-color:rgba(243,156,18,0.5);color:var(--color-warning)}
+.status-badge[data-state="down"]{border-color:rgba(231,76,60,0.5);color:var(--color-danger)}
 .summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-md);margin-bottom:var(--space-xl)}
 .summary-card{background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);transition:all var(--duration-base) var(--ease-out)}
 .summary-card:hover{background:var(--bg-surface-glass-hover);border-color:var(--hairline-strong)}
@@ -76,6 +79,7 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <h1><span class="accent">&hearts;</span> Heartbeat &amp; Dashboard Monitor</h1>
 <p>Live status from the 30-minute heartbeat workflow, dashboard cache freshness, and <code>md5_hash</code> stability tracking.</p>
 <span class="status-badge" id="liveBadge"><span class="dot gray"></span><span id="liveLabel">Checking...</span></span>
+<span class="status-badge" data-downtime-pill title="Recorded by this page in this browser only">downtime: no checks yet</span>
 </div>
 <div class="error-banner" id="errorBanner"><span id="errorMessage">Failed to fetch data.</span><button class="retry" onclick="refreshAll()">Retry</button></div>
 <div class="summary-bar" id="summaryBar">
@@ -91,6 +95,11 @@ td .ok{color:var(--color-success)}td .fail{color:var(--color-danger)}td .pending
 <table><thead><tr><th>Run</th><th>Status</th><th>Event</th><th>Commit</th><th>Triggered</th></tr></thead>
 <tbody id="workflowBody"><tr><td colspan="5" style="text-align:center;color:var(--color-text-low);">Loading...</td></tr></tbody></table>
 </div></div>
+<div class="section"><div class="section-title"><span>&#9201; Instance Downtime</span></div>
+<div style="background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);">
+<div data-downtime-summary><p style="color:var(--color-text-low);font-size:.9rem;">Reading /health...</p></div>
+</div>
+<p style="font-size:.75rem;color:var(--color-text-low);margin-top:var(--space-sm);font-family:var(--font-mono);">Recorded by the shared page shell in this browser, from the same 60-second /health poll the nav badge uses. The <a href="./status.html" style="color:var(--color-primary);">status page</a> shows every entry it kept, with the reason each instance returned.</p></div>
 <div class="section" style="margin-top:var(--space-xl);">
 <div class="section-title">&#8505;&#65039; About This Monitor</div>
 <div style="background:var(--bg-surface-glass);border:1px solid var(--hairline);border-radius:12px;padding:var(--space-lg);font-size:.85rem;color:var(--color-text-med);line-height:1.8;">

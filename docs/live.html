@@ -103,6 +103,7 @@
       <span id="status-pill" class="pill">connecting</span>
       <span id="api-pill" class="pill">api</span>
       <span id="age-pill" class="pill">data age ?</span>
+      <span id="downtime-pill" class="pill" data-downtime-pill title="Recorded by this page in this browser only">no checks yet</span>
       <button id="refresh">Refresh now</button>
       <span id="countdown" class="muted">auto in 60s</span>
     </div>
@@ -153,6 +154,14 @@
     <div class="provenance" id="provenance-strip">
       <span class="shell-pill" data-state="">reading /health...</span>
     </div>
+  </section>
+
+  <section class="panel">
+    <h2>Instance downtime</h2>
+    <p class="hint">When either instance stopped answering <code>/health</code>, and what the instance or the platform
+      edge said at the time. Recorded by the shared page shell in this browser, the same record the
+      <a href="./status.html">status page</a> shows in full.</p>
+    <div data-downtime-summary><p class="muted">Reading /health...</p></div>
   </section>
 
   <footer>

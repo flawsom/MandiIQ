@@ -22,7 +22,7 @@
 [![Version](https://img.shields.io/badge/version-2.4.1-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-219%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-222%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -119,7 +119,7 @@ Measured from the deployment serving traffic on **2026-10-01** (trimmed from `GE
 | RDD estimates computed | **33** | `$.n_rdd_results` |
 | NDVI coverage | **605 districts** | `$.n_ndvi_districts` |
 | FastAPI routes | **45** | `app.routes` |
-| Automated tests | **219 items** (201 test functions) | `python -m pytest mandi_rdd/tests -q` |
+| Automated tests | **222 items** (204 test functions) | `python -m pytest mandi_rdd/tests -q` |
 | Self-refresh cadence | **every 30 minutes** | `MANDIIQ_REFRESH_INTERVAL_MINUTES` |
 | Refresh scope | **light** (integrity, prices, rainfall) | `MANDIIQ_REFRESH_SCOPE=full` adds the analysis recompute |
 | External verification | **every 15 minutes**, at most one run per 20 | `refresh-live-data.yml` |
@@ -256,8 +256,7 @@ The container refreshes itself every 30 minutes; an external workflow triggers a
 MandiIQ is a data product, not a dashboard template: the surfaces below are the ones that exist. *(Vector renderings of the shipped pages — the counters are the measured `/health` payload and the chart shapes are illustrative. Each preview links to the live surface.)*
 
 <table>
-<tr>
-<td width="50%" align="center">
+<tr>        <td width="50%" align="center">
 
 **[Live console](https://mandiiq.unifies.codes/live.html)** — warehouse telemetry
 <img src="static/readme/console.svg" alt="MandiIQ live console: KPIs, price chart, discontinuity plot, provenance" width="100%">
@@ -301,8 +300,9 @@ MandiIQ is a data product, not a dashboard template: the surfaces below are the 
 | What | Where | Notes |
 |---|---|---|
 | 🖥 **Live cockpit** | [mandiiq.streamlit.app](https://mandiiq.streamlit.app/) | 15 pages; first load wakes a sleeping free-tier app |
-| 📡 **Live console** | [mandiiq.unifies.codes/live.html](https://mandiiq.unifies.codes/live.html) | Polls `/health` every 60 s, prints the instance that answered |
-| 💓 **Heartbeat monitor** | [mandiiq.unifies.codes/heartbeat-dashboard.html](https://mandiiq.unifies.codes/heartbeat-dashboard.html) | Dashboard-cache freshness, `md5_hash` lineage, workflow history |
+| 📡 **Live console** | [mandiiq.unifies.codes/live.html](https://mandiiq.unifies.codes/live.html) | Polls `/health` every 60 s, prints the instance that answered, and the downtime recorded in this browser |
+| 💓 **Heartbeat monitor** | [mandiiq.unifies.codes/heartbeat-dashboard.html](https://mandiiq.unifies.codes/heartbeat-dashboard.html) | Dashboard-cache freshness, `md5_hash` lineage, workflow history, the same downtime record |
+| 🚦 **Status** | [mandiiq.unifies.codes/status.html](https://mandiiq.unifies.codes/status.html) | Both instances probed side by side, the build skew between them, and the full downtime list |
 | 📖 **API reference** | [`/docs`](https://p01--mandiiq--x4n8x4gkmzht.code.run/docs) | Swagger UI over all 45 routes |
 | 🌾 **Findings walkthrough** | [mandiiq.unifies.codes](https://mandiiq.unifies.codes/) | The causal section, read as a narrative |
 
@@ -595,7 +595,7 @@ All public. No personal data is ingested, stored or inferred — see [Security](
 </td></tr>
 <tr><td><b>Testing &amp; tooling</b></td><td>
 
-![pytest](https://img.shields.io/badge/pytest-219%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-222%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
 ![Ruff](https://img.shields.io/badge/Ruff-lint%20%2B%20format-261230?style=flat-square&labelColor=0a0a0a)
 ![Mermaid](https://img.shields.io/badge/Mermaid-diagrams-FF3670?style=flat-square&labelColor=0a0a0a&logo=mermaid&logoColor=white)
 
@@ -735,17 +735,18 @@ MandiIQ/
 │   │   └── orchestrator.py       # tool selection + grounded answering
 │   ├── dashboard/                # Streamlit cockpit (20 modules · 15 pages)
 │   ├── scripts/                  # consumer_check · check_production_freshness · verify_live_data
-│   ├── tests/                    # 219 items (201 test functions)
+│   ├── tests/                    # 222 items (204 test functions)
 │   ├── data/                     # local warehouse + district coordinates
 │   └── sql/                      # analytical SQL kept beside the code that runs it
 ├── docs/                         # the whole public site; served at the domain root, no build step
 │   ├── index.html                # landing page · hero, findings, spec curve, live figures
 │   ├── overview.html             # the technical write-up the landing page used to share a URL with
-│   ├── live.html                 # console · KPIs, charts, provenance
-│   ├── status.html               # which instance is serving, why the data is behind,
-│   │                             #   and a short browser-local downtime timeline
+│   ├── live.html                 # console · KPIs, charts, provenance, shared downtime summary
+│   ├── status.html               # which instance is serving, the build skew between the two,
+│   │                             #   why the data is behind, and the full downtime record
 │   ├── heartbeat-dashboard.html  # cache freshness, hash lineage, workflow history
-│   └── assets/site.css|site.js   # shared shell: nav, footer, instance failover, status LED
+│   └── assets/site.css|site.js   # shared shell: nav, footer, instance failover, status LED,
+│                                 #   and the one browser-local downtime record every page reads
 ├── diagrams/                     # mermaid sources for the diagrams in this README
 ├── grafana/                      # dashboard JSON shipped to Grafana Cloud
 ├── worker/                       # Cloudflare Worker cron keep-alive
@@ -1121,7 +1122,7 @@ MandiIQ has no client-side application framework to audit: the public telemetry 
 ## 🧪 Testing
 
 ```bash
-# the full suite: 219 items, 201 test functions, no network and no database required
+# the full suite: 222 items, 204 test functions, no network and no database required
 python3 -m pytest mandi_rdd/tests -q
 
 # one module, verbose
@@ -1335,7 +1336,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 
 **Pull requests** — a PR is reviewable when it:
 
-1. Keeps the suite green (`219 passed, 1 skipped` before your change, and the same plus your tests after).
+1. Keeps the suite green (`222 passed, 1 skipped` before your change, and the same plus your tests after).
 2. States which endpoint, page or step it changes, and how you verified it — a copy-pasteable `curl`/`pytest` line beats a paragraph.
 3. Does not add a number to the README that no endpoint returns. If it is a measurement, say where it came from and when.
 4. Adds a test with the fix. The suite has a `test_no_mock_data.py` guard for a reason: fixtures have a way of reaching production paths here.
