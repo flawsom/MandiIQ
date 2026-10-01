@@ -256,6 +256,85 @@ _REBUILD_MIN_COPY_RATIO = 0.9
 # committed inside one transaction that can be rolled back as a unit.
 _REBUILD_BATCH_ROWS = 200_000
 
+# The two copies a rebuild can make. The dedupe one collapses a business key to
+# its lowest id; the plain one is a straight stream. Both are keyed off the id
+# range so the walk advances through the whole table.
+_REBUILD_COLUMNS = (
+    "id, state, district, market, commodity, variety, grade, "
+    "arrival_date, min_price, max_price, modal_price"
+)
+_REBUILD_PLAIN_INSERT = f"""
+    INSERT INTO prices_rebuild ({_REBUILD_COLUMNS})
+    SELECT {_REBUILD_COLUMNS}
+    FROM prices
+    WHERE id > ? AND id <= ?
+    ORDER BY id
+    ON CONFLICT DO NOTHING
+"""
+_REBUILD_DEDUPE_INSERT = f"""
+    INSERT INTO prices_rebuild ({_REBUILD_COLUMNS})
+    SELECT {_REBUILD_COLUMNS}
+    FROM (
+        SELECT *, row_number() OVER (
+            PARTITION BY market, commodity, variety, grade, arrival_date
+            ORDER BY id
+        ) AS _rn
+        FROM prices
+        WHERE id > ? AND id <= ?
+    )
+    WHERE _rn = 1
+    ORDER BY id
+    ON CONFLICT DO NOTHING
+"""
+
+# DuckDB sizes its default memory limit from the host's RAM, not the
+# container's cgroup limit. On a 512 MB instance that means it allocates until
+# the kernel kills the process - which is what got the first restore attempt
+# OOM-killed, and what a full-table rebuild does too if it is left unbounded.
+# 192MB leaves room for the serving process, the gzipped backup buffers and the
+# page cache on a 512 MB instance; the same cap the historical ingest uses.
+_BULK_MEMORY_LIMIT = os.environ.get("MANDIIQ_DUCKDB_MEMORY_LIMIT", "192MB")
+
+
+def _configure_bulk_memory(conn) -> None:
+    """Bound and spill a full-table operation so it cannot be OOM-killed.
+
+    A hard memory limit plus a temp directory makes DuckDB use disk for the
+    sorts and intermediate tables a rebuild needs. Without it the rebuild is
+    free to allocate until the container dies - the failure mode that has cost
+    this warehouse its rows more than once. Single-threaded and no insertion
+    order, because both cut peak memory and the rebuild does not care about
+    row order (the final table's order comes from ORDER BY id).
+    """
+    # The container's own scratch space first: it is far larger than the
+    # volume, and filling the volume would break the database itself. The
+    # volume is only a fallback for hosts whose /tmp is tiny or read-only.
+    import tempfile
+    spill_dir = None
+    for candidate in (
+        Path(tempfile.gettempdir()) / "mandiiq_duckdb_spill",
+        Path(DB_PATH).parent / ".duckdb_spill",
+    ):
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            spill_dir = candidate
+            break
+        except OSError:
+            continue
+
+    statements = [
+        f"SET memory_limit='{_BULK_MEMORY_LIMIT}'",
+        "SET threads=1",
+        "SET preserve_insertion_order=false",
+    ]
+    if spill_dir is not None:
+        statements.append(f"SET temp_directory='{spill_dir}'")
+    for statement in statements:
+        try:
+            conn.execute(statement)
+        except Exception as exc:  # a missing limit is not worth aborting a repair
+            logger.warning(f"Could not apply {statement!r}: {exc}")
+
 
 def rebuild_prices_table(conn) -> dict:
     """Rebuild `prices`, and with it every ART index over it - atomically.
@@ -273,12 +352,29 @@ def rebuild_prices_table(conn) -> dict:
     rolls back to the original table.
     """
     before = int(conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0)
+    _configure_bulk_memory(conn)
+
+    # The usual fault is a corrupt index, not duplicate rows, and collapsing
+    # duplicates costs a full sort per batch. Only pay for it when the broken
+    # index actually let duplicates through.
+    try:
+        duplicates = find_duplicate_price_keys(conn)
+    except Exception as exc:
+        logger.warning(f"Could not count duplicate price keys before rebuilding: {exc}")
+        duplicates = 0
+    insert_sql = _REBUILD_DEDUPE_INSERT if duplicates else _REBUILD_PLAIN_INSERT
+    logger.warning(
+        "Rebuilding the prices table (%d rows, %d duplicate business keys); "
+        "%s",
+        before, duplicates,
+        "deduping as it copies" if duplicates else "streaming copy, no dedupe needed",
+    )
 
     conn.execute("DROP TABLE IF EXISTS prices_rebuild")
     conn.execute(_PRICES_DDL.format(table="prices_rebuild"))
     conn.execute("BEGIN TRANSACTION")
     try:
-        # Copy in batches so the working set stays bounded. The row_number()
+        # Copy in batches so the working set stays bounded. The dedupe variant
         # keeps the lowest id for each business key, so duplicates that the
         # broken index was failing to prevent collapse instead of aborting the
         # rebuild with a constraint error.
@@ -296,27 +392,7 @@ def rebuild_prices_table(conn) -> dict:
         ]
         last_id = 0
         for upper in bounds:
-            cursor = conn.execute(
-                """
-                INSERT INTO prices_rebuild
-                    (id, state, district, market, commodity, variety, grade,
-                     arrival_date, min_price, max_price, modal_price)
-                SELECT id, state, district, market, commodity, variety, grade,
-                       arrival_date, min_price, max_price, modal_price
-                FROM (
-                    SELECT *, row_number() OVER (
-                        PARTITION BY market, commodity, variety, grade, arrival_date
-                        ORDER BY id
-                    ) AS _rn
-                    FROM prices
-                    WHERE id > ? AND id <= ?
-                )
-                WHERE _rn = 1
-                ORDER BY id
-                ON CONFLICT DO NOTHING
-                """,
-                [last_id, upper],
-            )
+            cursor = conn.execute(insert_sql, [last_id, upper])
             copied = int(cursor.fetchone()[0] or 0)
             last_id = upper
             logger.debug("Prices rebuild: window ending at %s copied %s rows", upper, copied)
@@ -776,6 +852,18 @@ def init_schema(conn) -> None:
         )
     """)
 
+    # Where a resumable walk of a paginated source stopped last time. Without
+    # it every run restarts from offset 0 and only ever re-reads the newest
+    # pages: the archive's tail is never reached no matter how many runs pass.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ingest_cursors (
+            source VARCHAR PRIMARY KEY,
+            cursor_offset INTEGER NOT NULL DEFAULT 0,
+            total_records INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS freshness_by_commodity (
             commodity VARCHAR PRIMARY KEY,
@@ -840,6 +928,46 @@ def find_duplicate_price_keys(conn) -> int:
         """
     ).fetchone()
     return int(row[0] or 0)
+
+
+def get_ingest_cursor(conn, source: str) -> dict:
+    """Where the previous walk of a paginated source stopped.
+
+    Returns ``{"offset": int, "total": int}`` and treats a missing row as the
+    start of a pass. The API's page ordering is not guaranteed to be stable,
+    so an offset is a hint that may re-read a page - never a promise to skip
+    one. Anything that changes the source (new rows land at the top) shifts
+    later offsets, which is exactly why the walk has to advance monotonically
+    and wrap rather than trust an offset to mean the same record twice.
+    """
+    try:
+        row = conn.execute(
+            "SELECT cursor_offset, total_records FROM ingest_cursors WHERE source = ?",
+            [source],
+        ).fetchone()
+    except Exception:
+        return {"offset": 0, "total": 0}
+    if not row:
+        return {"offset": 0, "total": 0}
+    return {"offset": int(row[0] or 0), "total": int(row[1] or 0)}
+
+
+def set_ingest_cursor(conn, source: str, offset: int, total: int = 0) -> None:
+    """Persist where the next walk of `source` should start."""
+    try:
+        conn.execute(
+            """
+            INSERT INTO ingest_cursors (source, cursor_offset, total_records, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (source) DO UPDATE SET
+                cursor_offset = excluded.cursor_offset,
+                total_records = excluded.total_records,
+                updated_at = excluded.updated_at
+            """,
+            [source, int(offset), int(total)],
+        )
+    except Exception as exc:
+        logger.warning("Could not persist the %s ingest cursor: %s", source, exc)
 
 
 FAULT_FLAG_NAME = "index_fault.flag"

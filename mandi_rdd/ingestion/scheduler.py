@@ -213,11 +213,26 @@ def _run_ingestion_locked(
         _t0 = time.monotonic()
         try:
             from mandi_rdd.ingestion.fetch_prices import iter_price_pages
+            # Resume where the last run stopped. Without this every run walked
+            # from offset 0 and spent its whole budget re-reading the newest
+            # pages, so a backfill never reached the older archive no matter
+            # how many runs passed. Only written back when this run made it
+            # past the page the cursor named - never backwards, so a failed
+            # run cannot reset the walk.
+            try:
+                from mandi_rdd.storage.duckdb_store import get_ingest_cursor
+                cursor_state = get_ingest_cursor(conn, "prices")["offset"]
+            except Exception:
+                cursor_state = 0
+            cursor_out: dict = {}
+            logger.info("Price fetch resuming from cursor offset %s", cursor_state)
             for page in iter_price_pages(
                 filters=filters,
                 max_records=max_records,
                 page_size=page_size,
                 max_run_seconds=run_budget_s,
+                start_offset=cursor_state,
+                cursor_out=cursor_out,
                 progress_callback=lambda done, total: logger.info(
                     f"  Prices: {done}/{total} records"
                 ),
@@ -244,6 +259,25 @@ def _run_ingestion_locked(
                     break
                 pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
             pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, True)
+            # Persist the walk's position so the next run continues the pass.
+            # The cursor only ever moves forward, except when a pass completes
+            # and deliberately wraps back to 0 for the next sweep.
+            if cursor_out:
+                next_offset = int(cursor_out.get("offset") or 0)
+                if next_offset > cursor_state or cursor_out.get("completed_pass"):
+                    try:
+                        from mandi_rdd.storage.duckdb_store import set_ingest_cursor
+                        set_ingest_cursor(
+                            conn, "prices", next_offset,
+                            int(cursor_out.get("total") or 0),
+                        )
+                        logger.info(
+                            "Price fetch cursor saved at offset %s (pass %s)",
+                            next_offset,
+                            "complete" if cursor_out.get("completed_pass") else "partial",
+                        )
+                    except Exception as exc:
+                        logger.warning(f"Could not persist the price fetch cursor: {exc}")
         except Exception as e:
             # A slow or briefly unreachable source must not abort the rainfall,
             # RDD and forecast work that can still run on the existing
@@ -268,6 +302,94 @@ def _run_ingestion_locked(
             )
     except Exception as e:
         logger.warning(f"Failed to record lineage for prices: {e}")
+
+    # 2a. CEDA/Ashoka mirror, when the documented feed yields nothing.
+    #     api.data.gov.in is unreachable from cloud networks (the TLS handshake
+    #     is dropped and the data.gov.in origin is unreachable from its own
+    #     CDN), so a run that fetched 0 rows is the normal case, not an error
+    #     to retry harder. CEDA republishes Agmarknet from an India-hosted API
+    #     that does answer, and needs only a token; without the token this step
+    #     is inert and the run stays degraded exactly as before.
+    served_by = source_info.get("source_name") if source_info else None
+    if n_prices == 0:
+        with pipeline_metrics.step("prices_ceda"):
+            n_ceda = 0
+            n_ceda_new = 0
+            try:
+                from mandi_rdd.ingestion.fetch_ceda import (
+                    ceda_available,
+                    iter_ceda_pages,
+                )
+
+                if not ceda_available():
+                    summary["steps"]["prices_ceda"] = {
+                        "status": "skipped",
+                        "reason": "MANDIIQ_CEDA_API_KEY not set",
+                    }
+                    logger.warning(
+                        "The data.gov.in feed is unreachable and no CEDA mirror "
+                        "token is configured, so the warehouse cannot advance. "
+                        "Set MANDIIQ_CEDA_API_KEY to fill prices from Agmarknet "
+                        "via CEDA (see NORTHFLANK_DEPLOY.md)."
+                    )
+                else:
+                    from mandi_rdd.storage.duckdb_store import (
+                        get_ingest_cursor,
+                        set_ingest_cursor,
+                    )
+
+                    ceda_cursor = get_ingest_cursor(conn, "prices_ceda")["offset"]
+                    ceda_out: dict = {}
+                    logger.info(
+                        "Price fetch from data.gov.in returned nothing; "
+                        "filling the last days from the CEDA Agmarknet mirror "
+                        "(resuming at pair %s)",
+                        ceda_cursor,
+                    )
+                    for page in iter_ceda_pages(
+                        start_index=ceda_cursor, cursor_out=ceda_out
+                    ):
+                        for record in page:
+                            source = record.pop("_source", None)
+                            if source is not None and served_by is None:
+                                served_by = source.get("source_name")
+                        n_ceda += len(page)
+                        try:
+                            n_ceda_new += upsert_prices(conn, page)
+                            pipeline_metrics.record_rows("prices_ceda", n_ceda, n_ceda_new)
+                        except Exception as ceda_write_error:
+                            logger.error(
+                                "CEDA price upsert failed; keeping the rows already "
+                                "written: %s",
+                                ceda_write_error,
+                            )
+                            summary["steps"]["prices_ceda"] = {
+                                "status": "error",
+                                "error": str(ceda_write_error),
+                                "fetched": n_ceda,
+                            }
+                            break
+                    summary["steps"].setdefault("prices_ceda", {})
+                    summary["steps"]["prices_ceda"].update(
+                        {"fetched": n_ceda, "new": n_ceda_new}
+                    )
+                    if ceda_out:
+                        next_index = int(ceda_out.get("offset") or 0)
+                        if next_index != ceda_cursor or ceda_out.get("completed_pass"):
+                            set_ingest_cursor(
+                                conn, "prices_ceda", next_index,
+                                int(ceda_out.get("total") or 0),
+                            )
+                    if n_ceda:
+                        logger.info(
+                            "CEDA mirror filled %d rows (%d new)", n_ceda, n_ceda_new
+                        )
+            except Exception as ceda_error:
+                logger.warning(f"CEDA mirror fallback skipped: {ceda_error}")
+                summary["steps"]["prices_ceda"] = {
+                    "status": "error",
+                    "error": str(ceda_error),
+                }
 
     # 2b. Supplementary variety-wise recent-price feed (resource 35985678).
     # Bounded + best-effort: never blocks the main pipeline if it fails.
@@ -311,11 +433,26 @@ def _run_ingestion_locked(
             logger.warning(f"Variety-wise supplement skipped: {e}")
             summary["steps"]["prices_varietywise"] = {"status": "error", "error": str(e)}
 
-    summary["steps"]["prices"] = {"fetched": n_prices, "new": n_new}
+    # Which source actually served this run, so /health can name it and a
+    # reader can tell "the documented feed is working" from "the mirror is
+    # carrying us". None when nothing answered.
+    summary["steps"]["prices"] = {
+        "fetched": n_prices,
+        "new": n_new,
+        "served_by": served_by,
+    }
     if price_fetch_error:
         summary["steps"]["prices"]["error"] = price_fetch_error
         summary["status"] = "degraded"
+        # Name the fill when the mirror carried the run: "degraded" should say
+        # whether the warehouse still advanced, because a reader who only sees
+        # "price source unavailable" cannot tell data loss from a fallback.
+        mirror_rows = (summary["steps"].get("prices_ceda") or {}).get("fetched") or 0
         summary["error"] = f"price source unavailable: {price_fetch_error}"
+        if mirror_rows:
+            summary["error"] += (
+                f"; filled {mirror_rows} rows from the CEDA Agmarknet mirror"
+            )
     if price_write_error:
         summary["steps"]["prices"]["write_error"] = price_write_error
         summary["status"] = "degraded"
@@ -660,6 +797,7 @@ def _write_ingest_status(summary: dict, status_path: Path = None) -> None:
         "new_price_rows": n_new,
         "duration_s": summary.get("duration_seconds"),
         "error": None if status == "ok" else summary.get("error"),
+        "price_source": prices_step.get("served_by") if isinstance(prices_step, dict) else None,
         "data_max_date": quality.get("max_date"),
         "days_behind": quality.get("days_behind"),
         "n_future_dates": quality.get("n_future_dates"),

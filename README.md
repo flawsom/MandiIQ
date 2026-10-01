@@ -668,6 +668,12 @@ MandiIQ/
 | `TRACKED_COMMODITIES` | No | Comma-separated focus list (default `Onion,Tomato,Potato,Wheat`) |
 | `MANDIIQ_AUTO_IMPORT` | No | `1` enables import on boot (default), `0` disables |
 | `USE_API` | No | `1` = ingest from live APIs (default) |
+| `MANDIIQ_PRICE_SOURCES` | No | Extra price hosts appended to the fallback chain, as `host` or `host|resource_id` (comma-separated). `api.data.gov.in` is always tried first, so this only adds mirrors - it never displaces the documented API |
+| `MANDIIQ_PRICE_FETCH_MAX_SECONDS` | No | Per-run budget for the price walk (default `900`). A walk cut short by the budget saves its cursor and resumes there next time |
+| `MANDIIQ_CEDA_API_KEY` | No | Token for the CEDA (Ashoka University) Agmarknet mirror - the one daily Agmarknet source reachable from cloud networks. When the data.gov.in feed yields nothing, the pipeline fills the last days from here. `CEDA_API_KEY` also works. Request a token at `api.ceda.ashoka.edu.in/documentation/` |
+| `MANDIIQ_CEDA_LOOKBACK_DAYS` | No | Days of history each CEDA pass fills (default `7`) |
+| `MANDIIQ_CEDA_MAX_CALLS` | No | Calls per CEDA pass (default `150`); the walk saves its cursor and resumes next run |
+| `MANDIIQ_DUCKDB_MEMORY_LIMIT` | No | Memory ceiling for full-table work such as the index rebuild (default `192MB`). DuckDB otherwise sizes itself from the host's RAM and gets OOM-killed on small containers |
 | `RDD_BANDWIDTH_RANGE` / `RDD_BOOTSTRAP_ITERATIONS` | No | RDD robustness configuration |
 
 **Storage, observability & ops**
@@ -1073,15 +1079,16 @@ ruff check mandi_rdd/
 
 **Data policy:** MandiIQ ingests only public government/agency data (`data.gov.in`, IMD, Sentinel Hub, Ashoka CEDA). There is no mock/fabricated dataset in the shipping product, and the live counters in this README are read from production. The `test_no_mock_data` guard enforces this on every push.
 
-**156 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
+**170 tests passing, 1 skipped** - the skip is the warehouse-dependent integrity check, which needs a DuckDB file the CI runner does not have.
 
 **Suite layout** (`mandi_rdd/tests/`):
 
 | File | Tests | Covers |
 | :--- | :---- | :----- |
 | `test_spec_curve.py` | 20 | The general estimator must reproduce the local-linear one; a real effect survives all 30 specifications and a null one does not; BH q-values; collapsed fits are kept out of the family |
-| `test_storage_repair.py` | 18 | Index-fault detection and repair, self-healing writes, the memory cap that caused the fault, the fault marker surviving a restart |
-| `test_scheduler_integrity.py` | 18 | Missing-key failure, idempotent upserts, lazily streamed price pages, write/time budgets, index-fault marker reading + persistence, workflow schedule/secret/CI policy |
+| `test_storage_repair.py` | 23 | Index-fault detection and repair, atomic batched rebuilds that refuse a short copy, self-healing writes, the memory cap that caused the fault, the fault marker surviving a restart |
+| `test_scheduler_integrity.py` | 24 | Missing-key failure, idempotent upserts, lazily streamed price pages, write/time budgets, host-fallback price sources, source diagnostics, operator source override, resumable backfill cursor, index-fault marker reading + persistence, workflow schedule/secret/CI policy |
+| `test_ceda_mirror.py` | 8 | The CEDA Agmarknet mirror: inert without a token, rows normalised into the `prices` shape, bounded resumable walk, one bad cell not killing a sweep, catalogue cached per process, probe reporting reachability |
 | `test_api_contract.py` | 19 | Documented routes exist, `/fdr` and `/spec-curve/{commodity}` schema, `/health` truthfulness, price-index heal reporting, `/ask` schemas stay backwards compatible |
 | `test_date_integrity.py` | 14 | Day-first date parsing, future-date rejection, warehouse repair, run locking |
 | `test_analytics.py` | 14 | Conformal, drift, EVT, DML and Kalman estimators on synthetic ground truth |

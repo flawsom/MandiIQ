@@ -1394,6 +1394,12 @@ def _live_snapshot() -> dict:
         "last_refresh_error": live.get("last_refresh_error"),
         "interval_s": live.get("refresh_interval_s"),
         "version": live.get("version"),
+        # Which source last served a price fetch, and whether the one mirror
+        # that is reachable from cloud networks is armed. Without these two, a
+        # stale banner can only say "the data is old" - with them it can say
+        # why, which is the difference between a blocker and a known outage.
+        "last_price_source": live.get("last_price_source"),
+        "mirror_configured": bool(live.get("mirror_configured")),
     }
 
 
@@ -1423,6 +1429,19 @@ if _live["status"] != "healthy":
         _facts.append("<b>%s impossible date(s)</b>" % _live["future"])
     if _live["last_refresh_error"]:
         _facts.append("last refresh error: %s" % str(_live["last_refresh_error"])[:180])
+    if _live["last_price_source"]:
+        _facts.append("prices last served by %s" % str(_live["last_price_source"])[:120])
+    elif _live["status"] in ("stale", "degraded"):
+        # "No rows arrived" and "no source answered" are different problems.
+        _facts.append("no price source has answered yet")
+    if not _live["mirror_configured"] and _live["status"] in ("stale", "degraded"):
+        # The documented feed is unreachable from cloud networks, so this is
+        # the one action that restores the daily update - say it in the app
+        # rather than in a deploy note nobody opens.
+        _facts.append(
+            "api.data.gov.in is unreachable from cloud networks - set "
+            "MANDIIQ_CEDA_API_KEY (Agmarknet via CEDA) to restore the daily feed"
+        )
     st.html(
         '<style>'
         '.mandiq-live-banner{display:flex;gap:14px;align-items:flex-start;margin:0 0 18px;'

@@ -27,6 +27,17 @@
 # - MANDIIQ_SELF_REFRESH=1                     (optional; disable with 0)
 # - MANDIIQ_REFRESH_INTERVAL_MINUTES=60        (optional; min 5)
 # - MANDIIQ_REFRESH_INITIAL_DELAY_S=90         (optional; min 5)
+# - MANDIIQ_PRICE_SOURCES=<mirror|resource_id,..>  (optional; extra price hosts)
+#     api.data.gov.in is always tried first, so this only adds fallbacks - it
+#     never displaces the documented API. Any host must serve the same
+#     data.gov.in response shape ({"records": [...], "total": n}).
+# - MANDIIQ_CEDA_API_KEY=<token>                   (recommended; see below)
+#     Token for the CEDA (Ashoka University) Agmarknet mirror. This is the one
+#     daily Agmarknet host that answers cloud networks, so it is what keeps the
+#     warehouse advancing while api.data.gov.in stays unreachable.
+# - MANDIIQ_CEDA_LOOKBACK_DAYS=7                   (optional)
+# - MANDIIQ_CEDA_MAX_CALLS=150                     (optional)
+# - MANDIIQ_DUCKDB_MEMORY_LIMIT=192MB              (optional; rebuild ceiling)
 
 # Persistent Volume:
 # - Name: mandiiq-data
@@ -162,3 +173,80 @@
 # If the upstream feed (api.data.gov.in) is unreachable, /health reports a
 # degraded run and the warehouse keeps serving what it has - the pipeline
 # skips the price fetch and still refreshes rainfall, RDD and the forecast.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Price sources and the resumable backfill
+# ─────────────────────────────────────────────────────────────────────────────
+# A single hard-coded host made the whole feed depend on one DNS name. The
+# fetch now walks a chain of hosts - api.data.gov.in first, then any
+# MANDIIQ_PRICE_SOURCES mirrors. A 4xx other than 429 stops the walk
+# immediately (a bad key fails the same everywhere); a refused connection,
+# timeout or 5xx is retried on the current host and then falls through to the
+# next, so one host being down degrades to "slower" rather than "no prices".
+#
+# agmarknet.gov.in is not in that chain on purpose: it is a portal, not a
+# data.gov.in resource endpoint, so agmarknet.gov.in/resource/<id> answers 403
+# for every caller and could never serve a row.
+#
+# The walk is also resumable. Each run reads its start offset from the
+# `ingest_cursors` table, and when the MANDIIQ_PRICE_FETCH_MAX_SECONDS budget
+# cuts a pass short it writes the offset it reached back. Before this, every
+# run restarted at offset 0 and only re-read the newest pages, so the older
+# tail of the archive was never reached however many runs passed. Re-reading a
+# resumed page is safe because upserts are idempotent.
+#
+# Inspect or reset the cursor directly:
+#   SELECT source, cursor_offset, total_records, updated_at FROM ingest_cursors;
+#   DELETE FROM ingest_cursors WHERE source = 'prices';   -- restart from the top
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Why the warehouse goes stale, and the only fix that works
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagnosed 2026-10-01, from three independent networks (a GitHub Actions
+# runner, a Daytona sandbox and the Northflank container):
+#
+#   * api.data.gov.in completes the TCP handshake and then drops every TLS
+#     handshake ("unexpected eof"). No TLS version or cipher set gets in, and
+#     a bare GET without a key behaves the same - it is the network path, not
+#     the request.
+#   * www.data.gov.in is fronted by Akamai and answers "503 Service Unavailable
+#     - Fail to connect": the CDN cannot reach its own origin either.
+#   * the public CORS relays answer 522 for the same URL, which rules out
+#     Cloudflare Workers and similar side-channels: only an Indian network
+#     reaches the host.
+#
+# So no retry, mirror-list or worker on a cloud network can restore the
+# documented feed, and "days_behind" growing past 3 is expected until the host
+# comes back or another source is armed. The pipeline is honest about it: the
+# run is reported degraded, /health shows status "stale", and the warehouse
+# keeps serving what it has instead of pretending.
+#
+# The reachable replacement is CEDA (Centre for Economic Data and Analysis,
+# Ashoka University), which republishes Agmarknet from an India-hosted API:
+#
+#   POST https://api.ceda.ashoka.edu.in/v1/agmarknet/prices
+#     -> daily {date, commodity_id, census_state_id, census_district_id,
+#               market_id, min_price, max_price, modal_price}
+#
+# Request a token at https://api.ceda.ashoka.edu.in/documentation/ (the
+# endpoints answer 401 "no api key passed" without one), set
+# MANDIIQ_CEDA_API_KEY, and the scheduler fills the last
+# MANDIIQ_CEDA_LOOKBACK_DAYS (default 7) of daily prices on any run where the
+# documented feed yields nothing. Rows land in the same `prices` table with
+# market = district name and variety/grade = "Agmarknet daily (CEDA)", so they
+# never collide with the variety-level rows the primary feed writes.
+#
+# Verify both paths from production, without waiting for the next tick:
+#
+#   curl -sS "$API/admin/source-probe" | python3 -m json.tool
+#
+# It reports, per configured host, whether it answered (and the newest arrival
+# date it serves), whether the CEDA mirror is armed and reachable, and a
+# single verdict field `can_ingest_live_data`. /health also carries
+# `last_price_source` and `mirror_configured`, so "stale because upstream is
+# dark" and "stale because we are misconfigured" stop looking identical.
+#
+# When the CEDA token is set, the fallback runs inside the normal pipeline -
+# no extra cron entry, no manual step. Its walk is bounded by
+# MANDIIQ_CEDA_MAX_CALLS and resumable through the same `ingest_cursors`
+# table (`source = 'prices_ceda'`), so one tick cannot run for hours.

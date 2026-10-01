@@ -157,11 +157,11 @@ def test_price_pages_are_yielded_lazily(monkeypatch):
     ]
     calls = {"n": 0}
 
-    def _fake_fetch_page(offset=0, limit=1000, filters=None, format="json"):
+    def _fake_fetch_page(resource_id, offset=0, limit=1000, filters=None, format="json"):
         calls["n"] += 1
-        return pages.pop(0)
+        return pages.pop(0), fetch_prices.PRIMARY_HOST
 
-    monkeypatch.setattr(fetch_prices, "fetch_page", _fake_fetch_page)
+    monkeypatch.setattr(fetch_prices, "fetch_page_with_source", _fake_fetch_page)
 
     iterator = fetch_prices.iter_price_pages(page_size=3)
     first = next(iterator)
@@ -180,10 +180,11 @@ def test_price_pages_respect_the_record_budget(monkeypatch):
     monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(
         fetch_prices,
-        "fetch_page",
-        lambda offset=0, limit=1000, filters=None, format="json": {
-            "records": [{"commodity": "Onion"}], "total": 10_000,
-        },
+        "fetch_page_with_source",
+        lambda resource_id, offset=0, limit=1000, filters=None, format="json": (
+            {"records": [{"commodity": "Onion"}], "total": 10_000},
+            fetch_prices.PRIMARY_HOST,
+        ),
     )
     pages = list(fetch_prices.iter_price_pages(page_size=1, max_records=3))
     assert sum(len(p) for p in pages) == 3
@@ -197,10 +198,11 @@ def test_price_pages_stop_at_the_time_budget(monkeypatch):
     monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(
         fetch_prices,
-        "fetch_page",
-        lambda offset=0, limit=1000, filters=None, format="json": {
-            "records": [{"commodity": "Onion"}], "total": 10_000,
-        },
+        "fetch_page_with_source",
+        lambda resource_id, offset=0, limit=1000, filters=None, format="json": (
+            {"records": [{"commodity": "Onion"}], "total": 10_000},
+            fetch_prices.PRIMARY_HOST,
+        ),
     )
     clock = {"t": 0.0}
 
@@ -213,18 +215,226 @@ def test_price_pages_stop_at_the_time_budget(monkeypatch):
     assert len(pages) <= 3, f"time budget ignored: {len(pages)} pages"
 
 
+def _refusing_urlopen(tried, refuse_substring, body: bytes = b'{"records": [], "total": 0}'):
+    """A urlopen stand-in that refuses one host and answers for the rest.
+
+    Mirrors what api.data.gov.in does to every cloud network: the connection
+    is refused outright rather than answered slowly.
+    """
+    import urllib.error
+
+    def _fake_urlopen(req, timeout=None, context=None):
+        tried.append(req.full_url)
+        if refuse_substring in req.full_url:
+            raise urllib.error.URLError("Connection refused")
+
+        class _FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_exc):
+                return False
+
+            def read(self):
+                return body
+
+        return _FakeResponse()
+
+    return _fake_urlopen
+
+
+def test_no_phantom_fallback_host_is_configured(monkeypatch):
+    """With no operator mirror, api.data.gov.in is the only source that is tried.
+
+    The chain used to list agmarknet.gov.in as a second resource endpoint, but
+    that host is a portal, not a data.gov.in resource API: it answers 403 for
+    every caller, so the fallback could never serve a row and only added a
+    failed round trip to each fetch. The real mirror (CEDA) needs its own
+    adapter, so nothing else belongs in this chain.
+    """
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.delenv("MANDIIQ_PRICE_SOURCES", raising=False)
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+
+    hosts = fetch_prices._source_candidates()
+    assert [host for host, _rid in hosts] == [fetch_prices.PRIMARY_HOST]
+
+    tried = []
+    monkeypatch.setattr(
+        fetch_prices.urllib.request,
+        "urlopen",
+        _refusing_urlopen(tried, fetch_prices.PRIMARY_HOST),
+    )
+    with pytest.raises(Exception):
+        fetch_prices.fetch_page_with_source(fetch_prices.PRIMARY_RESOURCE_ID, limit=1)
+    assert tried and all(fetch_prices.PRIMARY_HOST in url for url in tried)
+
+
+def test_operator_mirror_takes_over_when_the_primary_host_refuses(monkeypatch):
+    """A configured mirror must carry the feed when the primary is unreachable.
+
+    api.data.gov.in began refusing connections outright on 2026-09-30 and the
+    warehouse had no way to get prices from anywhere else. An operator can arm
+    a mirror with MANDIIQ_PRICE_SOURCES without a code change.
+    """
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("MANDIIQ_PRICE_SOURCES", "mirror.example.org|real-resource-id")
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+
+    tried = []
+    monkeypatch.setattr(
+        fetch_prices.urllib.request,
+        "urlopen",
+        _refusing_urlopen(
+            tried,
+            fetch_prices.PRIMARY_HOST,
+            body=b'{"records": [{"commodity": "Onion"}], "total": 1}',
+        ),
+    )
+
+    payload, host = fetch_prices.fetch_page_with_source(
+        fetch_prices.PRIMARY_RESOURCE_ID, limit=1
+    )
+
+    assert host == "mirror.example.org", "the mirror did not carry the fallback"
+    assert payload["total"] == 1
+    assert any("mirror.example.org" in url for url in tried)
+
+
+def test_source_diagnostics_reports_an_unreachable_host(monkeypatch):
+    """The probe must name the failure, not just fail silently.
+
+    "Stale data" has two opposite causes - nothing newer upstream, or no route
+    to upstream - and the ingest used to report both as "0 fetched".
+    """
+    import urllib.error
+
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.delenv("MANDIIQ_PRICE_SOURCES", raising=False)
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+
+    def _refuse(req, timeout=None, context=None):
+        raise urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr(fetch_prices.urllib.request, "urlopen", _refuse)
+    report = fetch_prices.source_diagnostics(timeout=1.0)
+
+    assert len(report) == 1
+    assert report[0]["host"] == fetch_prices.PRIMARY_HOST
+    assert report[0]["ok"] is False
+    assert "Connection refused" in report[0]["error"]
+
+
+def test_source_diagnostics_reports_the_newest_date_served(monkeypatch):
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.delenv("MANDIIQ_PRICE_SOURCES", raising=False)
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(
+        fetch_prices.urllib.request,
+        "urlopen",
+        _refusing_urlopen(
+            [],
+            "__never__",
+            body=(
+                b'{"records": [{"arrival_date": "30/09/2026"}], '
+                b'"total": 42}'
+            ),
+        ),
+    )
+    report = fetch_prices.source_diagnostics(timeout=1.0)
+
+    assert report[0]["ok"] is True
+    assert report[0]["newest_in_sample"] == "30/09/2026"
+    assert report[0]["total"] == 42
+
+
+def test_price_sources_accept_an_operator_override(monkeypatch):
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("MANDIIQ_PRICE_SOURCES", "mirror.example.org|abc123")
+    chain = fetch_prices._source_candidates()
+
+    assert chain[0][0] == fetch_prices.PRIMARY_HOST, (
+        "an override adds mirrors; it must not displace the documented API"
+    )
+    assert ("mirror.example.org", "abc123") in chain
+
+
+def test_a_cut_short_walk_resumes_where_it_stopped(monkeypatch):
+    """The backfill cursor is what lets the archive's tail be reached.
+
+    Starting every run at offset 0 meant only the newest pages were ever read,
+    however many runs passed.
+    """
+    from mandi_rdd.ingestion import fetch_prices
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
+    monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+
+    def _page(resource_id, offset=0, limit=1000, filters=None, format="json"):
+        return (
+            {"records": [{"commodity": "Onion"}], "total": 10_000},
+            fetch_prices.PRIMARY_HOST,
+        )
+
+    monkeypatch.setattr(fetch_prices, "fetch_page_with_source", _page)
+
+    # A run that stops on the time budget keeps its place.
+    clock = {"t": 0.0}
+    ticks = {"n": 0}
+
+    def _monotonic():
+        ticks["n"] += 1
+        if ticks["n"] > 2:
+            clock["t"] += 10_000.0
+        return clock["t"]
+
+    monkeypatch.setattr(fetch_prices.time, "monotonic", _monotonic)
+    cursor = {}
+    list(fetch_prices.iter_price_pages(
+        page_size=1, max_run_seconds=100.0, start_offset=400, cursor_out=cursor,
+    ))
+
+    assert cursor["completed_pass"] is False
+    assert cursor["offset"] > 400, "a partial walk must keep its progress"
+
+    # A run that reaches the end wraps for the next sweep.
+    monkeypatch.setattr(
+        fetch_prices,
+        "fetch_page_with_source",
+        lambda resource_id, offset=0, limit=1000, filters=None, format="json": (
+            {"records": [{"commodity": "Onion"}], "total": 1},
+            fetch_prices.PRIMARY_HOST,
+        ),
+    )
+    cursor = {}
+    list(fetch_prices.iter_price_pages(page_size=1, start_offset=0, cursor_out=cursor))
+
+    assert cursor["completed_pass"] is True
+    assert cursor["offset"] == 0, "a completed pass starts the next one from the top"
+
+
 def test_fetch_all_prices_still_honours_max_records(monkeypatch):
     """The list-returning wrapper is used by the CLI and must behave as before."""
     from mandi_rdd.ingestion import fetch_prices
 
     monkeypatch.setenv("DATA_GOV_IN_API_KEY", "0123456789abcdef0123")
     monkeypatch.setattr(fetch_prices.time, "sleep", lambda _seconds: None)
+    # fetch_all_prices delegates to iter_price_pages, which fetches through
+    # fetch_page_with_source (the host-aware entry point), not fetch_page.
     monkeypatch.setattr(
         fetch_prices,
-        "fetch_page",
-        lambda offset=0, limit=1000, filters=None, format="json": {
-            "records": [{"commodity": "Onion"}] * 4, "total": 100,
-        },
+        "fetch_page_with_source",
+        lambda resource_id, offset=0, limit=1000, filters=None, format="json": (
+            {"records": [{"commodity": "Onion"}] * 4, "total": 100},
+            fetch_prices.PRIMARY_HOST,
+        ),
     )
     records = fetch_prices.fetch_all_prices(page_size=4, max_records=8)
     assert len(records) == 8

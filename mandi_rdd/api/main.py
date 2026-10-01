@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.3.0"
+    version: str = "2.4.0"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -106,6 +106,12 @@ class HealthResponse(BaseModel):
     # backup in RAM - can never be mistaken for a safe recovery target just
     # because the field is absent from its response.
     safe_recovery: bool = False
+    # Which source actually served the last price fetch, and whether the CEDA
+    # Agmarknet mirror (the one host reachable from cloud networks) is armed.
+    # Without the mirror, an outage of api.data.gov.in is unfixable from here -
+    # these two fields say so without the caller having to run a probe.
+    last_price_source: Optional[str] = None
+    mirror_configured: bool = False
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
@@ -351,6 +357,19 @@ def _index_fault_pending() -> bool:
     try:
         from mandi_rdd.storage.duckdb_store import index_fault_flagged
         return bool(index_fault_flagged())
+    except Exception:
+        return False
+
+
+def _ceda_configured() -> bool:
+    """Is the CEDA Agmarknet mirror armed with a token?
+
+    Kept out of /health's cost: this only reads the environment, it never calls
+    the mirror. Use /admin/source-probe to actually reach it.
+    """
+    try:
+        from mandi_rdd.ingestion.fetch_ceda import ceda_available
+        return bool(ceda_available())
     except Exception:
         return False
 
@@ -641,7 +660,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
     * `/refresh` - Manual re-run of the full pipeline
     """,
-    version="2.3.0",
+    version="2.4.0",
     lifespan=lifespan,
 )
 
@@ -691,6 +710,7 @@ async def health():
         # Read last ingest status
         last_run_utc = None
         last_outcome = None
+        last_price_source = None
         try:
             status_path = (
                 Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
@@ -700,6 +720,7 @@ async def health():
                     record = json.load(f)
                 last_run_utc = record.get("last_run_utc")
                 last_outcome = record.get("outcome")
+                last_price_source = record.get("price_source")
         except Exception:
             pass
 
@@ -743,6 +764,8 @@ async def health():
             last_index_check=index_check,
             index_fault_pending=_index_fault_pending(),
             safe_recovery=True,
+            last_price_source=last_price_source,
+            mirror_configured=_ceda_configured(),
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),
@@ -895,6 +918,80 @@ async def admin_rebuild_prices():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+@app.get("/admin/source-probe", tags=["Admin"])
+async def admin_source_probe(timeout: float = 20.0):
+    """Ask every configured price source whether it can be reached from here.
+
+    Written because "the data is stale" has two completely different causes -
+    the upstream has nothing newer, or we cannot reach the upstream at all -
+    and they used to look identical from the outside. The probe runs from the
+    same network (and the same container) as the ingest, reports the newest
+    arrival date each host serves, and checks the CEDA mirror, which is the one
+    Agmarknet host that answers cloud networks.
+
+    curl -sS "$API/admin/source-probe" | python3 -m json.tool
+    """
+    import anyio
+
+    def run() -> dict:
+        report: dict = {
+            "checked_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "sources": [],
+            "ceda": {},
+            "live_paths": {
+                "data_gov_in": "primary - unreachable from cloud networks",
+                "ceda_mirror": "fallback - reachable, needs MANDIIQ_CEDA_API_KEY",
+            },
+        }
+        try:
+            from mandi_rdd.ingestion.fetch_prices import source_diagnostics
+            report["sources"] = source_diagnostics(timeout=timeout)
+        except Exception as exc:
+            report["sources"] = [
+                {"host": "unknown", "ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            ]
+        try:
+            from mandi_rdd.ingestion.fetch_ceda import probe as ceda_probe
+            report["ceda"] = ceda_probe(timeout=timeout)
+        except Exception as exc:
+            report["ceda"] = {
+                "configured": False,
+                "reachable": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        try:
+            status_path = (
+                Path(__file__).resolve().parent.parent / "data" / "last_ingest_status.json"
+            )
+            if status_path.exists():
+                with open(status_path) as f:
+                    record = json.load(f)
+                report["last_ingest"] = {
+                    key: record.get(key)
+                    for key in (
+                        "last_run_utc", "outcome", "error", "price_source",
+                        "data_max_date", "days_behind",
+                    )
+                }
+        except Exception:
+            pass
+        # The verdict the caller actually needs: can this deployment move data?
+        data_gov_ok = any(s.get("ok") for s in report["sources"])
+        ceda = report.get("ceda") or {}
+        ceda_ok = bool(ceda.get("configured") and ceda.get("reachable"))
+        report["can_ingest_live_data"] = bool(data_gov_ok or ceda_ok)
+        if not report["can_ingest_live_data"]:
+            report["hint"] = (
+                "No reachable price source. api.data.gov.in is blocked from cloud "
+                "networks; request a free token at "
+                "https://api.ceda.ashoka.edu.in/documentation/ and set "
+                "MANDIIQ_CEDA_API_KEY to restore the daily feed."
+            )
+        return report
+
+    return await anyio.to_thread.run_sync(run)
 
 
 @app.get("/freshness", tags=["System"])
