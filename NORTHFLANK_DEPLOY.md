@@ -350,6 +350,29 @@
 # while the pipeline writes. `version` is how you tell it from the 2.4.0 build
 # that crash-looped on 2026-10-01.
 #
+# 2.4.2 is the build whose admin recovery endpoints run off the event loop, and
+# that is what makes the rebuild survivable on a small tier at all. They are
+# declared sync (`def`, not `async def`), so FastAPI runs the body in its worker
+# threadpool and the event loop stays free to answer /health while the copy
+# works. Measured on 2026-10-01: POST /admin/rebuild-prices was `async`, so the
+# rebuild held the loop for its whole duration, the liveness probe went
+# unanswered, and the platform stopped routing to the container - `503 no
+# healthy upstream` for 16 minutes - with the fault marker still set and no
+# repair recorded when it came back. A capability that only completes while the
+# process is alive has to leave the loop free to prove the process is alive.
+# The same rule covers /admin/restore-from-r2, /admin/backup-to-r2 and
+# /admin/repair-dates, and mandi_rdd/tests/test_api_contract.py enforces it for
+# all four: a new admin route that does minutes of blocking work must be a
+# plain `def` for exactly this reason.
+#
+# POST /refresh?scope=full is NOT a substitute for /admin/rebuild-prices. It
+# does heal the index - index_health is the second step of the run - but it then
+# continues into the analysis recompute, and on a 512 MB instance that is what
+# de-routes the container. Measured on 2026-10-01: the full run took the primary
+# off the edge for 16 minutes (the process survived, its probe did not), and it
+# leaves refresh_scope=full and a stale counts snapshot behind it. Ask for the
+# rebuild on its own; the tick's scope stays light.
+#
 # The refresh-live-data.yml workflow runs both of the recovery operations above
 # when /health says index_fault_pending, or when n_prices is 0 - but the
 # rebuild is now behind MANDIIQ_ALLOW_AUTO_REBUILD (see the self-refresh

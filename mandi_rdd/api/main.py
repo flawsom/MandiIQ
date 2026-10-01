@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.4.1"
+    version: str = "2.4.2"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -894,7 +894,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)        * `/refresh` - Manual re-run of the pipeline (scope=light is the default,
           scope=full runs the analysis recompute too)
     """,
-    version="2.4.1",
+    version="2.4.2",
     lifespan=lifespan,
 )
 
@@ -924,6 +924,13 @@ app.add_middleware(
 # a backoff after a run is killed mid-flight, /health answering from a snapshot
 # while the pipeline writes). /health.version is how an operator tells that
 # build from the one that crashed in a loop on 2026-10-01.
+#
+# 2.4.2 is the build whose admin recovery endpoints run off the event loop. A
+# rebuild is minutes of full-table copying, and declared ``async`` it held the
+# loop for its whole duration: /health went unanswered, the platform read the
+# container as dead, and the restart left the fault it was healing in place.
+# A capability that only works while the process is alive has to leave the loop
+# free to prove the process is alive.
 SAFE_RECOVERY_VERSION = (2, 4, 0)
 
 
@@ -1087,13 +1094,19 @@ async def data_quality_endpoint():
 
 
 @app.post("/admin/repair-dates", tags=["Admin"])
-async def admin_repair_dates(dry_run: bool = Query(True)):
+def admin_repair_dates(dry_run: bool = Query(True)):
     """Correct price rows whose arrival date cannot be true.
 
     A future arrival date is the inverse of a month-first mis-parse of a
     DD/MM/YYYY source, so the day and month are swapped back
     (2026-12-09 -> 2026-09-12). Rows that stay impossible are dropped.
     Pass ``dry_run=false`` to apply; defaults to a report-only dry run.
+
+    Declared sync on purpose. The scan touches every row the warehouse has, so
+    it runs on FastAPI's worker threadpool rather than on the event loop: the
+    loop has to stay free to answer the platform's /health probe while this
+    works. Blocking it for longer than the probe's timeout is exactly how a
+    long repair gets the container killed under it (see /admin/rebuild-prices).
     """
     conn = get_connection()
     init_schema(conn)
@@ -1277,7 +1290,7 @@ async def admin_backfill_ceda(
 
 
 @app.post("/admin/rebuild-prices", tags=["Admin"])
-async def admin_rebuild_prices():
+def admin_rebuild_prices():
     """Rebuild the prices table to clear an inconsistent ART index.
 
     DuckDB's unique index can be left inconsistent by a bulk load that runs out
@@ -1291,6 +1304,15 @@ async def admin_rebuild_prices():
     fault. It used to call rebuild_prices_table() directly, which never cleared
     the marker - so a manual heal left /health reporting a fault that was
     already repaired, and the next run rebuilt the whole table a second time.
+
+    Declared sync on purpose, and this is the endpoint where it matters most.
+    The rebuild copies all ~2M rows, so it takes minutes on a small instance.
+    FastAPI runs a non-``async`` endpoint in its worker threadpool and the event
+    loop stays free; declared ``async``, the loop is blocked for the whole
+    rebuild, /health cannot be answered, the platform reads the container as
+    dead and restarts it mid-copy. Measured on 2026-10-01: the request died at
+    78s with the edge reporting ``503 no healthy upstream``, and the fresh
+    container came back with the fault marker still set and no repair recorded.
     """
     conn = get_connection()
     init_schema(conn)
@@ -2441,7 +2463,7 @@ def _r2_download_to(dest: Path) -> int:
 
 
 @app.post("/admin/restore-from-r2", tags=["Admin"])
-async def admin_restore_from_r2():
+def admin_restore_from_r2():
     """Restore the DuckDB database from the latest Cloudflare R2 backup.
     Downloads mandi_iq.duckdb.gz from R2, decompresses it, and replaces
     the local DuckDB file. Existing connections to the old database will
@@ -2453,6 +2475,11 @@ async def admin_restore_from_r2():
     to be configured as environment variables.
     Returns:
         dict with status, message, bytes downloaded, and file size.
+
+    Declared sync on purpose: the download and the decompress run for as long
+    as the backup takes, on FastAPI's worker threadpool rather than on the
+    event loop, so the platform's /health probe is still answered while the
+    warehouse is being replaced underneath it.
     """
     import gzip
     import shutil as _shutil
@@ -2672,12 +2699,16 @@ def admin_ingest_historical(file: UploadFile = File(...)):
 
 
 @app.post("/admin/backup-to-r2", tags=["Admin"])
-async def admin_backup_to_r2():
+def admin_backup_to_r2():
     """Upload the current DuckDB database to Cloudflare R2 as a gzipped backup.
     Reads the local DuckDB file, compresses it, and uploads to R2 as
     mandi_iq.duckdb.gz. Requires R2 credentials configured as environment variables.
     Returns:
         dict with status, message, bytes uploaded, and compression ratio.
+
+    Declared sync on purpose: compressing and uploading the whole database
+    takes minutes, so it runs on FastAPI's worker threadpool and leaves the
+    event loop free to answer the platform's /health probe.
     """
     try:
         from mandi_rdd.storage.duckdb_store import DB_PATH

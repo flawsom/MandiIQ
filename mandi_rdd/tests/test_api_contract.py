@@ -70,6 +70,52 @@ def test_openapi_schema_builds(app_module):
     assert len(spec["paths"]) >= 20
 
 
+# Admin work that takes minutes must not be declared ``async``. uvicorn serves
+# this app in a single process, so an ``async def`` endpoint runs its body on
+# the event loop: while it copies the whole prices table there is no loop left
+# to answer /health with, the platform reads that as a dead container and
+# restarts it mid-operation. FastAPI runs a plain ``def`` endpoint in its
+# worker threadpool instead, which keeps the probe alive - the difference
+# between a rebuild that finishes and one that dies holding the fault marker.
+BLOCKING_ADMIN_ROUTES = (
+    "/admin/rebuild-prices",
+    "/admin/restore-from-r2",
+    "/admin/backup-to-r2",
+    "/admin/repair-dates",
+)
+
+
+def test_heavy_admin_routes_run_off_the_event_loop(app_module):
+    """A multi-minute admin endpoint must be sync, not async.
+
+    Measured on 2026-10-01: POST /admin/rebuild-prices was declared ``async``
+    and ran the full-table copy inline, so /health went unanswered, the edge
+    reported ``503 no healthy upstream`` at 78s, and the container came back
+    with the fault marker intact and no repair recorded.
+    """
+    import inspect
+
+    registered = {}
+    for route in app_module.app.routes:
+        path = getattr(route, "path", "")
+        if path in BLOCKING_ADMIN_ROUTES:
+            registered[path] = getattr(route, "endpoint", None)
+
+    missing = sorted(set(BLOCKING_ADMIN_ROUTES) - set(registered))
+    assert not missing, f"Admin routes not registered: {missing}"
+
+    on_the_loop = sorted(
+        path
+        for path, endpoint in registered.items()
+        if inspect.iscoroutinefunction(endpoint)
+    )
+    assert not on_the_loop, (
+        "These admin endpoints are declared async but do blocking work, so they "
+        "stop /health being answered and the platform kills the container "
+        f"mid-operation: {on_the_loop}"
+    )
+
+
 def test_health_reports_live_provenance(app_module):
     """A caller must be able to tell how fresh the data is without a second
     request, so /health carries the newest arrival date and its age."""

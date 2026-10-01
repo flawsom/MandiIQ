@@ -19,7 +19,7 @@
 <br>
 
 <!-- release / licence / runtime -->
-[![Version](https://img.shields.io/badge/version-2.4.1-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
+[![Version](https://img.shields.io/badge/version-2.4.2-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-235%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
@@ -923,7 +923,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 ```jsonc
 {
   "status": "healthy",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "n_prices": 1994318,
   "n_commodities": 423,
   "n_states": 36,
@@ -1236,12 +1236,12 @@ fly logs                        # confirm "Self-refresh scheduler started"
 <br>
 
 ```bash
-docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.1 .
+docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.2 .
 docker run -d --name mandiiq -p 8080:8080 \
   -v mandiiq_data:/data \
   -e MANDIIQ_DB_PATH=/data/mandi_iq.duckdb \
   -e DATA_GOV_IN_API_KEY="$DATA_GOV_IN_API_KEY" \
-  ghcr.io/<you>/mandiiq:2.4.1
+  ghcr.io/<you>/mandiiq:2.4.2
 ```
 
 | Target | Notes for this workload |
@@ -1363,11 +1363,13 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [x] Atomic, memory-capped index recovery with a version-gated leash
 - [x] Declared run scope, a backoff after a run is killed mid-flight, and /health that answers while the pipeline writes
 - [x] CEDA archive backfill that walks backwards from the oldest stored row
-- [ ] **Deploy 2.4.1 to the primary instance**, then arm or run the index rebuild
-      (`MANDIIQ_ALLOW_AUTO_REBUILD=1`, or `POST /admin/rebuild-prices`) on an
-      instance with the memory for it: a 2.4.0 build served the warehouse fine
-      but restarted repeatedly while its own refresh ran the analysis, and the
-      rebuild is still deferred by default
+- [ ] **Deploy 2.4.2 to the primary instance**, then run the index rebuild
+      (`POST /admin/rebuild-prices`) on an instance with the memory for it: a
+      2.4.0 build served the warehouse fine but restarted repeatedly while its
+      own refresh ran the analysis, and the rebuild is still deferred by
+      default. 2.4.2 is what makes the rebuild survivable on a small tier - the
+      endpoint is a sync `def`, so FastAPI runs the copy in its worker
+      threadpool and /health keeps answering the liveness probe while it works
 - [ ] **Shared-secret gate for `/admin/*`** (env-driven, no-op when unset)
 - [ ] Warehouse freshness without a live upstream: evaluate additional Agmarknet mirrors
 - [ ] eNAM as an ingestion source — blocked: the dashboard answers 200, its data controller returns an empty 500 to every request shape from outside India
