@@ -349,7 +349,7 @@ def test_health_exposes_a_pending_fault_and_the_check(app_module, tmp_path, monk
 
     monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
     fields = set(app_module.HealthResponse.model_fields)
-    assert {"last_index_check", "index_fault_pending"} <= fields
+    assert {"last_index_check", "index_fault_pending", "index_repair_in_progress"} <= fields
 
     assert app_module._index_fault_pending() is False
     duckdb_store.note_index_fault(
@@ -358,6 +358,38 @@ def test_health_exposes_a_pending_fault_and_the_check(app_module, tmp_path, monk
     assert app_module._index_fault_pending() is True
     duckdb_store.clear_index_fault()
     assert app_module._index_fault_pending() is False
+
+
+def test_a_failed_rebuild_records_why_on_health(app_module, tmp_path, monkeypatch):
+    """/admin/rebuild-prices used to answer a 500 with the reason and keep
+    nothing, so a repair that kept failing looked on /health exactly like a
+    repair that was never attempted - which is how a rebuild spent an hour
+    failing invisibly. The reason now outlives the request."""
+    from fastapi import HTTPException
+
+    from mandi_rdd.storage import duckdb_store
+
+    monkeypatch.setattr(duckdb_store, "DB_PATH", tmp_path / "vol" / "mandi_iq.duckdb")
+    saved = _keep_refresh_state(app_module)
+
+    def _die(_conn, force=False):
+        raise RuntimeError("refusing to publish a rebuild that copied 3 of 12 rows")
+
+    monkeypatch.setattr(duckdb_store, "ensure_price_index", _die)
+    try:
+        with pytest.raises(HTTPException) as raised:
+            app_module.admin_rebuild_prices()
+
+        assert raised.value.status_code == 500
+        check = app_module._REFRESH_STATE["last_index_check"]
+        assert check["source"] == "admin_rebuild_failed"
+        assert check["rebuilt"] is False
+        assert check["error"] == "refusing to publish a rebuild that copied 3 of 12 rows"
+        assert app_module._REFRESH_STATE["last_index_repair"] is None, (
+            "a failed rebuild must not be reported as a repair"
+        )
+    finally:
+        _restore_refresh_state(app_module, saved)
 
 
 def test_a_fatal_probe_is_recorded_and_healed_in_the_same_tick(

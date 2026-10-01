@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.4.2"
+    version: str = "2.4.3"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -99,6 +99,11 @@ class HealthResponse(BaseModel):
     # yet (it clears on the next successful rebuild).
     last_index_check: Optional[dict] = None
     index_fault_pending: bool = False
+    # A rebuild copies the whole prices table, so it is the one operation that
+    # holds the warehouse for minutes. This says one is running right now, which
+    # is otherwise invisible: the pipeline's run lock does not cover the admin
+    # endpoints, and a rebuild that is killed mid-copy leaves no record at all.
+    index_repair_in_progress: bool = False
     # Capability flag: a caller that wants to run an automated recovery needs
     # to know the deployed build can actually do it. This one says the rebuild
     # is atomic and the R2 restore streams. It defaults to False so an older
@@ -310,14 +315,34 @@ def _count_warehouse(conn) -> dict:
     return values
 
 
+def _warehouse_maintenance() -> bool:
+    """Is a warehouse-wide write (a rebuild, a restore) in flight right now?"""
+    try:
+        from mandi_rdd.storage.duckdb_store import maintenance_in_progress
+        return bool(maintenance_in_progress())
+    except Exception:
+        return False
+
+
+def _warehouse_busy() -> bool:
+    """Is something holding the warehouse for a while?
+
+    Two things do: a pipeline run (its own lock) and an admin recovery (the
+    maintenance marker). Either one means /health must answer from its snapshot
+    instead of sampling - see _warehouse_counts().
+    """
+    return _ingestion_running() or _warehouse_maintenance()
+
+
 def _warehouse_counts(conn) -> tuple:
     """Return ``(counts, age_seconds)`` without ever making /health wait.
 
-    A snapshot is refreshed only when no run is in flight and the TTL has
-    passed. When a run is in flight the previous snapshot is served instead:
-    the probe must not queue behind a DuckDB write or a table swap, because the
-    platform reads a slow probe as a dead container and restarts it - which
-    turns a busy instance into a crash loop.
+    A snapshot is refreshed only when nothing is writing the warehouse and the
+    TTL has passed. While a run - or a rebuild, which holds the warehouse for
+    minutes and is not covered by the run lock - is in flight, the previous
+    snapshot is served instead: the probe must not queue behind a DuckDB write
+    or a table swap, because the platform reads a slow probe as a dead container
+    and de-routes it, which is what turned a repair in flight into an outage.
     """
     now = time.time()
     cached = _COUNT_CACHE.get("data")
@@ -328,10 +353,18 @@ def _warehouse_counts(conn) -> tuple:
         # changes the warehouse continuously, so the signature below would
         # report "changed" on every page and send the probe back to the database
         # it is supposed to stay out of.
-        if _ingestion_running():
+        if _warehouse_busy():
             return cached, age
         if _COUNT_CACHE.get("key") == signature and age is not None and age < _health_count_ttl_s():
             return cached, age
+    if cached is None and _warehouse_busy():
+        # Nothing sampled yet and the warehouse is held by a writer: answer the
+        # probe as degraded rather than queue nine full counts behind the copy
+        # that is holding it. /health's handler turns this into the degraded
+        # response, which is a probe the platform still reads as alive.
+        raise RuntimeError(
+            "warehouse maintenance in flight and no counts snapshot to serve"
+        )
     try:
         data = _count_warehouse(conn)
     except Exception as exc:
@@ -356,10 +389,14 @@ def _cached_date_quality(conn, ttl_seconds: float = 60.0) -> dict:
     """
     now = time.time()
     cached = _QUALITY_CACHE.get("data")
-    if cached is not None and _ingestion_running():
+    if cached is not None and _warehouse_busy():
         return cached
     if cached is not None and now - float(_QUALITY_CACHE.get("at") or 0.0) < ttl_seconds:
         return cached
+    if cached is None and _warehouse_busy():
+        # Same reason as the counts: no reading yet, and the probe is not going
+        # to be the reader that waits behind a table copy.
+        return {}
     try:
         from mandi_rdd.core.dates import date_quality
         data = date_quality(conn)
@@ -894,7 +931,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)        * `/refresh` - Manual re-run of the pipeline (scope=light is the default,
           scope=full runs the analysis recompute too)
     """,
-    version="2.4.2",
+    version="2.4.3",
     lifespan=lifespan,
 )
 
@@ -931,6 +968,14 @@ app.add_middleware(
 # container as dead, and the restart left the fault it was healing in place.
 # A capability that only works while the process is alive has to leave the loop
 # free to prove the process is alive.
+#
+# 2.4.3 is the build whose rebuild finishes. Off the loop was necessary and not
+# sufficient: the copy was the problem. `ON CONFLICT DO NOTHING` in the copy's
+# INSERT makes DuckDB probe the unique index once per row, so on the live
+# 2,000,001-row warehouse the second 200k-row window took 132s against 0.9s for
+# the first - tens of minutes per repair, which is why two rebuilds on the 2.4.2
+# build answered /health the whole time and still recorded nothing. The copy is
+# a plain INSERT now, and `index_repair_in_progress` says when one is running.
 SAFE_RECOVERY_VERSION = (2, 4, 0)
 
 
@@ -1034,6 +1079,7 @@ async def health():
             last_index_repair=index_repair,
             last_index_check=index_check,
             index_fault_pending=_index_fault_pending(),
+            index_repair_in_progress=_warehouse_maintenance(),
             safe_recovery=_recovery_is_safe(),
             last_price_source=last_price_source,
             mirror_configured=_ceda_configured(),
@@ -1313,6 +1359,18 @@ def admin_rebuild_prices():
     dead and restarts it mid-copy. Measured on 2026-10-01: the request died at
     78s with the edge reporting ``503 no healthy upstream``, and the fresh
     container came back with the fault marker still set and no repair recorded.
+
+    Running off the loop was necessary and not sufficient. On 2026-10-01, on
+    this build's predecessor, the same endpoint was then run twice against the
+    live warehouse: /health stayed answerable (0.4s-2.2s) both times and neither
+    rebuild produced a report at all. The copy itself was the problem - with
+    ``ON CONFLICT DO NOTHING`` in the INSERT it took 0.9s for the first 200k-row
+    window and 132s for the second, so a 2M-row repair needed tens of minutes,
+    each attempt walking away from a fault marker it never reached. The copy is
+    a plain INSERT now (see rebuild_prices_table), the rebuild marks itself as
+    warehouse maintenance for /health while it runs, and a failure is recorded
+    rather than returning a 500 that leaves the next reader looking at a fault
+    with no evidence anything was tried.
     """
     conn = get_connection()
     init_schema(conn)
@@ -1329,6 +1387,14 @@ def admin_rebuild_prices():
         _note_index_health(report, source="admin_rebuild")
         return report
     except Exception as e:
+        # Record the failure where it outlives the request. A rebuild that died
+        # mid-copy used to leave /health indistinguishable from a rebuild that
+        # was never attempted, which is how a repair that kept failing stayed
+        # invisible for the length of an incident.
+        _note_index_health(
+            {"rebuilt": False, "trigger": "admin_rebuild", "error": str(e)[:200]},
+            source="admin_rebuild_failed",
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()

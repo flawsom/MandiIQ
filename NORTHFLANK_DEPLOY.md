@@ -365,6 +365,32 @@
 # all four: a new admin route that does minutes of blocking work must be a
 # plain `def` for exactly this reason.
 #
+# 2.4.3 is the build whose rebuild actually finishes. Off the loop was necessary
+# and not sufficient: the copy was the problem. With `ON CONFLICT DO NOTHING` in
+# the INSERT, DuckDB probes the unique index once per row. Measured on
+# 2026-10-01 against the live 2,000,001-row warehouse, under the rebuild's own
+# memory cap and single thread: the first 200k-row window copied in 0.9s and the
+# second one took 132s. Two POSTs to /admin/rebuild-prices on the 2.4.2 build
+# both left /health answerable (0.4s-2.2s, no `503 no healthy upstream`) and
+# neither produced a report at all - the repair needed tens of minutes and never
+# reached its own swap, so the fault marker it was meant to clear was still set
+# afterwards. Both copies are plain INSERTs now (0.9s per window, flat), and the
+# dedupe copy is one pass over the whole table, so a business key that straddles
+# two id windows is still collapsed rather than rejected by the constraint.
+#
+# Two things make the repair observable while it runs, which is what those two
+# attempts were missing. The rebuild marks itself as warehouse maintenance, so
+# /health answers from its last counts snapshot instead of sampling nine counts
+# of the prices table behind the copy - that snapshot is one TTL old by design,
+# and `counts_age_s` is how a caller sees that. And a rebuild that fails now
+# writes its reason to `last_index_check` (source `admin_rebuild_failed`)
+# instead of answering a 500 and keeping nothing.
+#
+# To clear a pending fault: deploy 2.4.3, POST /admin/rebuild-prices, then check
+# /health - `index_repair_in_progress` is true while the copy runs, and
+# `index_fault_pending` must be false with a `last_index_repair` record once it
+# finishes.
+#
 # POST /refresh?scope=full is NOT a substitute for /admin/rebuild-prices. It
 # does heal the index - index_health is the second step of the run - but it then
 # continues into the analysis recompute, and on a 512 MB instance that is what

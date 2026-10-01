@@ -19,10 +19,10 @@
 <br>
 
 <!-- release / licence / runtime -->
-[![Version](https://img.shields.io/badge/version-2.4.2-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
+[![Version](https://img.shields.io/badge/version-2.4.3-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-235%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-245%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -119,7 +119,7 @@ Measured from the deployment serving traffic on **2026-10-01** (trimmed from `GE
 | RDD estimates computed | **33** | `$.n_rdd_results` |
 | NDVI coverage | **605 districts** | `$.n_ndvi_districts` |
 | FastAPI routes | **45** | `app.routes` |
-| Automated tests | **235 items** (217 test functions) | `python -m pytest mandi_rdd/tests -q` |
+| Automated tests | **245 items** (227 test functions) | `python -m pytest mandi_rdd/tests -q` |
 | Self-refresh cadence | **every 30 minutes** | `MANDIIQ_REFRESH_INTERVAL_MINUTES` |
 | Refresh scope | **light** (integrity, prices, rainfall) | `MANDIIQ_REFRESH_SCOPE=full` adds the analysis recompute |
 | External verification | **every 15 minutes**, at most one run per 20 | `refresh-live-data.yml` |
@@ -595,7 +595,7 @@ All public. No personal data is ingested, stored or inferred — see [Security](
 </td></tr>
 <tr><td><b>Testing &amp; tooling</b></td><td>
 
-![pytest](https://img.shields.io/badge/pytest-235%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-245%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
 ![Ruff](https://img.shields.io/badge/Ruff-lint%20%2B%20format-261230?style=flat-square&labelColor=0a0a0a)
 ![Mermaid](https://img.shields.io/badge/Mermaid-diagrams-FF3670?style=flat-square&labelColor=0a0a0a&logo=mermaid&logoColor=white)
 
@@ -735,7 +735,7 @@ MandiIQ/
 │   │   └── orchestrator.py       # tool selection + grounded answering
 │   ├── dashboard/                # Streamlit cockpit (20 modules · 15 pages)
 │   ├── scripts/                  # consumer_check · check_production_freshness · verify_live_data
-│   ├── tests/                    # 235 items (217 test functions)
+│   ├── tests/                    # 245 items (227 test functions)
 │   ├── data/                     # local warehouse + district coordinates
 │   └── sql/                      # analytical SQL kept beside the code that runs it
 ├── docs/                         # the whole public site; served at the domain root, no build step
@@ -923,7 +923,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 ```jsonc
 {
   "status": "healthy",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "n_prices": 1994318,
   "n_commodities": 423,
   "n_states": 36,
@@ -933,6 +933,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
   "n_future_dates": 0,
   "last_outcome": "degraded",
   "index_fault_pending": false,
+  "index_repair_in_progress": false,
   "safe_recovery": true,
   "last_price_source": "resource_9ef84268",
   "mirror_configured": true,
@@ -954,6 +955,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 | `n_future_dates` | Rows with an impossible arrival date | Non-zero → run `/admin/repair-dates` |
 | `last_outcome` | Result of the most recent pipeline run | `degraded` is expected while a source is unreachable |
 | `index_fault_pending` | A DuckDB index inconsistency was recorded | Non-zero → the next run rebuilds; `/admin/rebuild-prices` does it now |
+| `index_repair_in_progress` | A rebuild is holding the warehouse right now | While true `/health` answers from its last snapshot, so its counts and dates are one TTL old by design |
 | `safe_recovery` | Whether **this build** may repair the warehouse unattended | `false` → deploy a current build before automating recovery |
 | `last_price_source` | Host that produced the newest rows | `null` on builds older than 2.4.0 |
 | `refresh_failures` | Failed self-refresh ticks | Rising numbers with a flat `refresh_runs` means the loop is dying |
@@ -1123,7 +1125,7 @@ MandiIQ has no client-side application framework to audit: the public telemetry 
 ## 🧪 Testing
 
 ```bash
-# the full suite: 235 items, 217 test functions, no network and no database required
+# the full suite: 245 items, 227 test functions, no network and no database required
 python3 -m pytest mandi_rdd/tests -q
 
 # one module, verbose
@@ -1236,12 +1238,12 @@ fly logs                        # confirm "Self-refresh scheduler started"
 <br>
 
 ```bash
-docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.2 .
+docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.3 .
 docker run -d --name mandiiq -p 8080:8080 \
   -v mandiiq_data:/data \
   -e MANDIIQ_DB_PATH=/data/mandi_iq.duckdb \
   -e DATA_GOV_IN_API_KEY="$DATA_GOV_IN_API_KEY" \
-  ghcr.io/<you>/mandiiq:2.4.2
+  ghcr.io/<you>/mandiiq:2.4.3
 ```
 
 | Target | Notes for this workload |
@@ -1337,7 +1339,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 
 **Pull requests** — a PR is reviewable when it:
 
-1. Keeps the suite green (`235 passed, 1 skipped` before your change, and the same plus your tests after).
+1. Keeps the suite green (`245 passed, 1 skipped` before your change, and the same plus your tests after).
 2. States which endpoint, page or step it changes, and how you verified it — a copy-pasteable `curl`/`pytest` line beats a paragraph.
 3. Does not add a number to the README that no endpoint returns. If it is a measurement, say where it came from and when.
 4. Adds a test with the fix. The suite has a `test_no_mock_data.py` guard for a reason: fixtures have a way of reaching production paths here.
@@ -1363,13 +1365,16 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [x] Atomic, memory-capped index recovery with a version-gated leash
 - [x] Declared run scope, a backoff after a run is killed mid-flight, and /health that answers while the pipeline writes
 - [x] CEDA archive backfill that walks backwards from the oldest stored row
-- [ ] **Deploy 2.4.2 to the primary instance**, then run the index rebuild
-      (`POST /admin/rebuild-prices`) on an instance with the memory for it: a
-      2.4.0 build served the warehouse fine but restarted repeatedly while its
-      own refresh ran the analysis, and the rebuild is still deferred by
-      default. 2.4.2 is what makes the rebuild survivable on a small tier - the
-      endpoint is a sync `def`, so FastAPI runs the copy in its worker
-      threadpool and /health keeps answering the liveness probe while it works
+- [ ] **Deploy 2.4.3 to the primary instance**, then run the index rebuild
+      (`POST /admin/rebuild-prices`) and watch `index_fault_pending` clear.
+      2.4.2 made the endpoint run off the event loop and that was necessary but
+      not sufficient: measured against the live warehouse on 2026-10-01, the
+      copy's `ON CONFLICT DO NOTHING` cost 0.9s for the first 200k-row window
+      and 132s for the second, so a 2.0M-row repair was tens of minutes and
+      never reached its own swap. 2.4.3 copies with plain INSERTs (0.9s per
+      window, flat), marks the warehouse busy so `/health` answers from its
+      snapshot instead of sampling while the copy runs, and records a failed
+      rebuild in `last_index_check` instead of only returning a 500
 - [ ] **Shared-secret gate for `/admin/*`** (env-driven, no-op when unset)
 - [ ] Warehouse freshness without a live upstream: evaluate additional Agmarknet mirrors
 - [ ] eNAM as an ingestion source — blocked: the dashboard answers 200, its data controller returns an empty 500 to every request shape from outside India
@@ -1377,7 +1382,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [ ] Per-commodity conformal coverage chart in the cockpit
 - [ ] WASM/parquet export so the analytical panel can be queried without the API
 
-> The open items are the honest state of the deployment, not wishlist entries: the recorded index fault is still pending because clearing it means rebuilding the prices table, which is the work that restarts a container this size - so it waits for an operator or a bigger instance instead of firing on a schedule (`MANDIIQ_ALLOW_AUTO_REBUILD`), and `/admin/*` is unauthenticated until the gate lands.
+> The open items are the honest state of the deployment, not wishlist entries: the recorded index fault is still pending because every rebuild attempt so far died mid-copy - the repair is tens of minutes of single-threaded index probing on the deployed build, and the run that was in flight when the container was de-routed left the marker it was meant to clear. On 2.4.3 the copy is a flat 0.9s per 200k-row window, so the repair runs on an operator's command; it stays behind `MANDIIQ_ALLOW_AUTO_REBUILD` rather than firing on a schedule, and `/admin/*` is unauthenticated until the gate lands.
 
 [↑ Back to top](#table-of-contents)
 

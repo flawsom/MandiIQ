@@ -318,6 +318,58 @@ def test_the_date_scan_still_refreshes_when_nothing_is_running(app_module, monke
     assert app_module._cached_date_quality(None, ttl_seconds=0)["days_behind"] == 6
 
 
+def test_health_serves_its_snapshot_while_a_rebuild_holds_the_warehouse(app_module, monkeypatch):
+    """A rebuild holds the warehouse for minutes and is not a pipeline run.
+
+    The run lock does not cover the admin recoveries. Without the maintenance
+    mark the probe samples nine full counts of the prices table while the copy
+    holds it - and a probe that waits is the probe the platform reads as a dead
+    container, which is how a repair in flight became an outage.
+    """
+    monkeypatch.setattr(app_module, "_COUNT_CACHE", {"at": 0.0, "data": dict(SNAPSHOT)})
+    monkeypatch.setattr(app_module, "_ingestion_running", lambda: False)
+    monkeypatch.setattr(app_module, "_warehouse_maintenance", lambda: True)
+    monkeypatch.setattr(
+        app_module, "_count_warehouse",
+        lambda conn: pytest.fail("a probe during a rebuild must not query the warehouse"),
+    )
+
+    counts, age = app_module._warehouse_counts(None)
+
+    assert counts["n_prices"] == SNAPSHOT["n_prices"]
+    assert age is not None and age > 0, "the caller is told how old the snapshot is"
+
+
+def test_health_does_not_rescan_dates_while_a_rebuild_holds_the_warehouse(app_module, monkeypatch):
+    quality = {"max_date": "2026-09-25", "days_behind": 6, "n_future_dates": 0}
+    monkeypatch.setattr(app_module, "_QUALITY_CACHE", {"at": time.time(), "data": quality})
+    monkeypatch.setattr(app_module, "_ingestion_running", lambda: False)
+    monkeypatch.setattr(app_module, "_warehouse_maintenance", lambda: True)
+    monkeypatch.setattr(
+        "mandi_rdd.core.dates.date_quality",
+        lambda conn: pytest.fail("a probe during a rebuild must not rescan the warehouse"),
+    )
+
+    assert app_module._cached_date_quality(None, ttl_seconds=0) == quality
+
+
+def test_a_probe_with_no_snapshot_yet_degrades_instead_of_waiting(app_module, monkeypatch):
+    """A cold cache during a rebuild must not become nine full counts."""
+    monkeypatch.setattr(app_module, "_COUNT_CACHE", {"at": 0.0, "data": None, "key": None})
+    monkeypatch.setattr(app_module, "_ingestion_running", lambda: False)
+    monkeypatch.setattr(app_module, "_warehouse_maintenance", lambda: True)
+    monkeypatch.setattr(
+        app_module, "_count_warehouse",
+        lambda conn: pytest.fail("nothing to serve is not a reason to sample"),
+    )
+
+    with pytest.raises(RuntimeError, match="maintenance in flight"):
+        app_module._warehouse_counts(None)
+    # /health's handler turns that into the degraded response, which is still a
+    # probe the platform reads as alive.
+    assert app_module._cached_date_quality(None, ttl_seconds=0) == {}
+
+
 def test_the_deployed_build_can_be_told_apart(app_module):
     """`version` is how an operator knows which behaviour is actually running.
 

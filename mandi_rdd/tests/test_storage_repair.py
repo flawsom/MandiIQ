@@ -360,8 +360,9 @@ def test_a_rebuild_that_cannot_copy_everything_keeps_the_original_table(
     The rebuild used to commit the staging copy, then run `DROP TABLE prices`
     as its own committed statement. When the copy was short - it ran out of
     memory on the 512 MB container - the delete still went through and the
-    live warehouse was left with an empty prices table. Everything now runs in
-    one transaction, so a failure has to roll back to the original rows.
+    live warehouse was left with an empty prices table. Nothing is copied into
+    `prices` itself any more: the copy lands in a staging table, the swap is the
+    only atomic step, and a failure has to leave the original rows in place.
     """
     duckdb_store.upsert_prices(conn, [
         _record(), _record(commodity="Tomato"), _record(commodity="Potato"),
@@ -425,6 +426,131 @@ def test_a_rebuild_copies_across_several_batches(conn, monkeypatch):
     assert report["rows_before"] == 7
     assert report["rows_after"] == 7, "every batch window must be copied"
     assert report["probed"] is True
+
+
+def test_a_duplicate_key_straddling_two_windows_is_still_collapsed(conn, monkeypatch):
+    """    The dedupe copy has to be bucketed by the business key, not by the id.
+
+    The copy is a plain INSERT now - the `ON CONFLICT DO NOTHING` clause it used
+    to carry probes the unique index once per row and turned a 2M-row repair
+    into tens of minutes - so nothing absorbs a duplicate the copy lets through.
+    Under id windows the second copy of this key would land in the second window,
+    hit the constraint, and fail the whole rebuild. Here one copy sits in id
+    window 1 and the other in id window 2, and both must still be in one pass.
+    """
+    monkeypatch.setattr(duckdb_store, "_REBUILD_BATCH_ROWS", 2)
+    _bare_prices_table(conn)
+    _insert_raw(conn, [_record(), _record(commodity="Tomato"), _record()])
+    assert [r[0] for r in conn.execute("SELECT id FROM prices ORDER BY id").fetchall()] == [1, 2, 3], (
+        "the fixture must put one copy of the key in each window"
+    )
+
+    report = duckdb_store.rebuild_prices_table(conn)
+
+    assert report["rows_before"] == 3
+    assert report["rows_after"] == 2
+    assert report["rows_removed"] == 1
+    assert [r[0] for r in conn.execute("SELECT id FROM prices ORDER BY id").fetchall()] == [1, 2], (
+        "the lowest id must be the one that survives"
+    )
+
+
+class _DiesOnTheSecondWindow:
+    """Proxy that fails the copy once it is past the first id window."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def execute(self, sql, *args, **kwargs):
+        window = args[0] if args else None
+        if (
+            isinstance(window, list) and len(window) == 2 and window[0] > 0
+            and "INSERT INTO prices_rebuild" in sql
+        ):
+            raise RuntimeError("copy killed mid-way")
+        return self._real.execute(sql, *args, **kwargs)
+
+    def register(self, *a, **k):
+        return self._real.register(*a, **k)
+
+    def unregister(self, *a, **k):
+        return self._real.unregister(*a, **k)
+
+
+def test_a_copy_that_dies_half_way_leaves_the_live_warehouse_alone(conn, monkeypatch):
+    """The copy commits window by window, so the guarantee cannot come from a
+    rollback any more - it comes from where the copy lands.
+
+    One transaction around the whole copy accumulated every window in the
+    transaction's local storage and hit the cap on the live-shaped warehouse
+    (`could not allocate block of size 256.0 KiB (183.0 MiB/183.1 MiB used)`),
+    and the copy does not need that transaction: it writes to a table nobody
+    reads. What has to survive an interrupted copy is the live warehouse.
+    """
+    monkeypatch.setattr(duckdb_store, "_REBUILD_BATCH_ROWS", 2)
+    duckdb_store.upsert_prices(conn, [
+        _record(arrival_date=f"2026-09-{day:02d}") for day in range(1, 8)
+    ])
+
+    with pytest.raises(RuntimeError, match="copy killed mid-way"):
+        duckdb_store.rebuild_prices_table(_DiesOnTheSecondWindow(conn))
+
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 7, (
+        "an interrupted copy must not touch the live warehouse"
+    )
+    staged = conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0]
+    assert 0 < staged < 7, (
+        "the staging table is all a half-finished copy leaves behind"
+    )
+
+
+def test_the_copy_does_not_probe_the_index_per_row():
+    """Pin the clause that made the rebuild un-shippable on the 512 MB box.
+
+    Measured on 2026-10-01 against a 2,000,001-row warehouse, under the memory
+    cap and single thread the rebuild sets itself, each statement on its own:
+    the first 200k-row window copied in 0.9s and the next one in 0.9s, but with
+    `ON CONFLICT DO NOTHING` the second window took 132s (the conflict check
+    probes the unique index once per row). A rebuild of that warehouse was
+    therefore tens of minutes - long enough that it was still being killed
+    mid-copy, leaving the fault marker it was meant to clear.
+    """
+    assert "ON CONFLICT" not in duckdb_store._REBUILD_PLAIN_INSERT
+    assert "ON CONFLICT" not in duckdb_store._REBUILD_DEDUPE_INSERT
+
+
+def test_a_rebuild_marks_the_warehouse_busy_for_exactly_its_duration(conn, monkeypatch):
+    """/health serves its snapshot instead of sampling while a rebuild holds the
+    warehouse, so the mark has to be on while the copy runs and off after it."""
+    stamp = []
+    real = duckdb_store.find_duplicate_price_keys
+
+    def spy(connection):
+        stamp.append(duckdb_store.maintenance_in_progress())
+        return real(connection)
+
+    monkeypatch.setattr(duckdb_store, "find_duplicate_price_keys", spy)
+    duckdb_store.upsert_prices(conn, [_record()])
+    assert duckdb_store.maintenance_in_progress() is False
+
+    duckdb_store.rebuild_prices_table(conn)
+
+    assert stamp == [True], "the mark must be set while the rebuild is running"
+    assert duckdb_store.maintenance_in_progress() is False
+
+
+def test_a_failed_rebuild_does_not_leave_the_warehouse_marked_busy(conn, monkeypatch):
+    """A raised rebuild must clear the mark, or /health would serve a stale
+    snapshot for the rest of the process's life."""
+    monkeypatch.setattr(
+        duckdb_store, "_PRICES_DDL",
+        duckdb_store._PRICES_DDL.replace("min_price DOUBLE,", "min_price DOUBLE_typo,"),
+    )
+
+    with pytest.raises(Exception):
+        duckdb_store.rebuild_prices_table(conn)
+
+    assert duckdb_store.maintenance_in_progress() is False
 
 
 # ── self-healing writes ─────────────────────────────────────────────────────

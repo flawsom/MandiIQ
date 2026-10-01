@@ -1,4 +1,6 @@
+import functools
 import os
+import threading
 
 # Load .env so local/unattended runs pick up secrets (DATA_GOV_IN_API_KEY, etc.)
 
@@ -251,14 +253,19 @@ _PRICES_INDEXES = (
 # as a failed copy rather than a dedupe. A real dedupe removes a handful of
 # rows; a copy interrupted by an out-of-memory kill can be arbitrarily short.
 _REBUILD_MIN_COPY_RATIO = 0.9
-# Rows copied per INSERT ... SELECT by the rebuild. Bounded so a 1.6M-row table
-# does not need its working set in memory all at once, and so each page is
-# committed inside one transaction that can be rolled back as a unit.
+# Rows copied per INSERT ... SELECT by the rebuild, one statement per window.
+# Bounded so a 1.6M-row table does not need its working set in memory all at
+# once, and so a window that fails costs that window rather than the whole copy.
 _REBUILD_BATCH_ROWS = 200_000
 
-# The two copies a rebuild can make. The dedupe one collapses a business key to
-# its lowest id; the plain one is a straight stream. Both are keyed off the id
-# range so the walk advances through the whole table.
+# The two copies a rebuild can make, both plain INSERTs. `ON CONFLICT DO
+# NOTHING` used to be on both of them and it is what made the rebuild
+# unshippable - see the measurements in rebuild_prices_table().
+#
+# The plain one is a straight stream over one id window. The dedupe one walks
+# business-key buckets instead: every row of a key hashes to the same bucket, so
+# the collapse is global, where id windows would put one copy of a key in a
+# later window and the constraint would reject it instead of collapsing it.
 _REBUILD_COLUMNS = (
     "id, state, district, market, commodity, variety, grade, "
     "arrival_date, min_price, max_price, modal_price"
@@ -269,7 +276,6 @@ _REBUILD_PLAIN_INSERT = f"""
     FROM prices
     WHERE id > ? AND id <= ?
     ORDER BY id
-    ON CONFLICT DO NOTHING
 """
 _REBUILD_DEDUPE_INSERT = f"""
     INSERT INTO prices_rebuild ({_REBUILD_COLUMNS})
@@ -280,12 +286,47 @@ _REBUILD_DEDUPE_INSERT = f"""
             ORDER BY id
         ) AS _rn
         FROM prices
-        WHERE id > ? AND id <= ?
+        WHERE hash(market, commodity, variety, grade, arrival_date) % ? = ?
     )
     WHERE _rn = 1
     ORDER BY id
-    ON CONFLICT DO NOTHING
 """
+
+
+# ── Warehouse-wide maintenance ───────────────────────────────────────────────
+#
+# `/health` is the platform's liveness probe, and it samples warehouse counts.
+# A probe that has to queue behind a table copy is a probe the platform reads as
+# a dead container - which is how a repair in flight used to take the whole
+# service off the edge. Anything that holds the warehouse for more than a moment
+# marks itself here, and /health serves its last snapshot instead of sampling.
+_MAINTENANCE_THREADS: set = set()
+
+
+def maintenance_in_progress() -> bool:
+    """Is a warehouse-wide write in flight on this process?"""
+    return bool(_MAINTENANCE_THREADS)
+
+
+def _during_maintenance(fn):
+    """Mark a warehouse-wide write for as long as it runs.
+
+    Keyed by thread, so the flag cannot outlive the operation that set it - a
+    raise inside the operation still clears it - and two callers cannot clear
+    each other's mark.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        thread_id = threading.get_ident()
+        _MAINTENANCE_THREADS.add(thread_id)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _MAINTENANCE_THREADS.discard(thread_id)
+
+    return wrapper
+
 
 # DuckDB sizes its default memory limit from the host's RAM, not the
 # container's cgroup limit. On a 512 MB instance that means it allocates until
@@ -336,6 +377,7 @@ def _configure_bulk_memory(conn) -> None:
             logger.warning(f"Could not apply {statement!r}: {exc}")
 
 
+@_during_maintenance
 def rebuild_prices_table(conn) -> dict:
     """Rebuild `prices`, and with it every ART index over it - atomically.
 
@@ -347,9 +389,39 @@ def rebuild_prices_table(conn) -> dict:
     This used to be destructive: the staging copy was inserted, committed, then
     `prices` was dropped while the rename happened afterwards. A copy that ran
     out of memory was therefore published as an empty table, because the DROP
-    had already committed by the time the failure surfaced. Everything now runs
-    in one transaction, the copy is verified before the swap, and any failure
-    rolls back to the original table.
+    had already committed by the time the failure surfaced. Nothing is copied
+    into `prices` itself now: the copy goes to a staging table and is verified
+    before the swap, and the swap - the drop and the rename - is the one
+    statement sequence that has to be atomic, so it is the one that runs in a
+    transaction. A copy that dies half-way leaves the original table exactly as
+    it is.
+
+    How long the copy takes is a recovery feature, not a detail, and so is what
+    it does to memory. Measured on 2026-10-01 against a 2,000,001-row
+    warehouse, under the memory cap and the single thread this sets:
+
+      * a 200k-row window copied in 0.9s, and the next one in 0.9s;
+      * the same two windows with `ON CONFLICT DO NOTHING` took 0.9s and then
+        132s, growing with the table (the conflict check probes the unique
+        index once per row, ~0.65ms/row);
+      * a copy into a constraint-free table in 0.4s per window;
+      * and copying every window inside ONE transaction - which is what this
+        function did - ran out of memory at the eighth window: `could not
+        allocate block of size 256.0 KiB (183.0 MiB/183.1 MiB used)` against
+        this function's own 192MB cap;
+      * one statement over the whole table does not fit either, which is why the
+        dedupe copy walks key buckets instead of the whole table at once.
+
+    So a 2M-row rebuild was tens of minutes of one-thread index probing that
+    also ran the warehouse into its memory cap, and that is the repair the
+    operator reaches for while the index is already broken: it kept being
+    killed mid-copy, the fault marker stayed put, and `/health` was starved long
+    enough for the platform to de-route the container. The copy clauses are now
+    plain INSERTs, committed one window at a time. The plain copy is safe
+    because a healthy-looking index is checked for duplicates first (and    the constraint would only ever see the rows it already holds); the dedupe copy
+    collapses each key inside its own bucket before it is inserted, so the
+    constraint has nothing to reject either way. On 2026-10-01 the whole repair
+    then took 12.7s against a 2,000,001-row warehouse, keeping every row.
     """
     before = int(conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] or 0)
     _configure_bulk_memory(conn)
@@ -362,26 +434,40 @@ def rebuild_prices_table(conn) -> dict:
     except Exception as exc:
         logger.warning(f"Could not count duplicate price keys before rebuilding: {exc}")
         duplicates = 0
-    insert_sql = _REBUILD_DEDUPE_INSERT if duplicates else _REBUILD_PLAIN_INSERT
     logger.warning(
-        "Rebuilding the prices table (%d rows, %d duplicate business keys); "
-        "%s",
+        "Rebuilding the prices table (%d rows, %d duplicate business keys); %s",
         before, duplicates,
-        "deduping as it copies" if duplicates else "streaming copy, no dedupe needed",
+        "collapsing duplicates by key bucket" if duplicates else "streaming copy, no dedupe needed",
     )
 
     conn.execute("DROP TABLE IF EXISTS prices_rebuild")
     conn.execute(_PRICES_DDL.format(table="prices_rebuild"))
-    conn.execute("BEGIN TRANSACTION")
-    try:
-        # Copy in batches so the working set stays bounded. The dedupe variant
-        # keeps the lowest id for each business key, so duplicates that the
-        # broken index was failing to prevent collapse instead of aborting the
-        # rebuild with a constraint error.
+
+    # One window per transaction, deliberately. A single transaction around the
+    # whole copy accumulates every change in the transaction's local storage and
+    # runs into the memory cap (see the measurements above), and the copy does
+    # not need the transaction: it writes to a staging table nobody reads, and a
+    # copy that dies half-way leaves the live warehouse exactly as it was.
+    if duplicates:
+        # Dedupe by business-key bucket, one bucket per statement: a key has to
+        # sit entirely inside one pass for the collapse to be global, and one
+        # statement over the whole table does not fit in the cap either -
+        # measured on 2026-10-01, 1,000,200 rows with 200 duplicate keys failed
+        # with `Failed to commit: failed to pin block of size 256.0 KiB
+        # (183.0 MiB/183.1 MiB used)`. The bucket count keeps a pass around a
+        # quarter of a copy batch. `hash()` is defined for NULL, so a row with
+        # an unknown variety or grade still lands in exactly one bucket.
+        buckets = max(8, min(128, (before // _REBUILD_BATCH_ROWS) * 4))
+        logger.debug(
+            "Prices rebuild: collapsing duplicates across %d key buckets", buckets
+        )
+        for bucket in range(buckets):
+            conn.execute(_REBUILD_DEDUPE_INSERT, [buckets, bucket])
+    else:
         # Window boundaries come from the source table, so the copy advances
-        # through the whole id space even when a window's rows are all deduped
-        # away. A window shorter than one batch on its own is still a complete
-        # window, which is what stops the loop from ending early.
+        # through the whole id space. A window shorter than one batch on its own
+        # is still a complete window, which is what stops the loop from ending
+        # early.
         bounds = [
             int(r[0])
             for r in conn.execute(
@@ -392,22 +478,26 @@ def rebuild_prices_table(conn) -> dict:
         ]
         last_id = 0
         for upper in bounds:
-            cursor = conn.execute(insert_sql, [last_id, upper])
+            cursor = conn.execute(_REBUILD_PLAIN_INSERT, [last_id, upper])
             copied = int(cursor.fetchone()[0] or 0)
             last_id = upper
             logger.debug("Prices rebuild: window ending at %s copied %s rows", upper, copied)
 
-        after = int(conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0] or 0)
+    after = int(conn.execute("SELECT COUNT(*) FROM prices_rebuild").fetchone()[0] or 0)
 
-        # Refuse to publish a short copy. A real dedupe removes a few rows; a
-        # copy killed by memory pressure can lose most of the table, and that
-        # must roll back to the original rather than become the warehouse.
-        if before and after < int(before * _REBUILD_MIN_COPY_RATIO):
-            raise RuntimeError(
-                f"refusing to publish a rebuild that copied {after} of {before} "
-                f"rows (below {_REBUILD_MIN_COPY_RATIO:.0%} of the original)"
-            )
+    # Refuse to publish a short copy. A real dedupe removes a few rows; a copy
+    # killed by memory pressure can lose most of the table, and that must be
+    # rejected rather than become the warehouse.
+    if before and after < int(before * _REBUILD_MIN_COPY_RATIO):
+        raise RuntimeError(
+            f"refusing to publish a rebuild that copied {after} of {before} "
+            f"rows (below {_REBUILD_MIN_COPY_RATIO:.0%} of the original)"
+        )
 
+    # The publish is the one step that has to be all-or-nothing: after it, the
+    # staging copy is the warehouse.
+    conn.execute("BEGIN TRANSACTION")
+    try:
         conn.execute("DROP TABLE prices")
         conn.execute("ALTER TABLE prices_rebuild RENAME TO prices")
         conn.execute("COMMIT")
