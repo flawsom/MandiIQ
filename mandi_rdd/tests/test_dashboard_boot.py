@@ -58,13 +58,27 @@ def test_one_run_paints_the_whole_cockpit_and_one_banner(monkeypatch):
     before the rerun. One settled run must therefore paint the page hero, the
     navigation, and exactly one banner.
 
-    A dead loopback API keeps this deterministic (and offline): /health fails at
-    once, the snapshot reports "empty", and the banner is guaranteed to render.
+    The warehouse behind this run is made to answer nothing at all: a dead
+    loopback API for the real reads, and a stubbed data layer for the freshness
+    snapshot. That second part matters - a sandbox or a CI runner with a local
+    DuckDB file would answer the /data-quality fallback with a row count from
+    the machine running the test, which is not the state under test.
     """
+    import streamlit as st
     from streamlit.testing.v1 import AppTest
+
+    from mandi_rdd.dashboard import data_access
 
     monkeypatch.setenv("MANDIIQ_UI_REFRESH_SECONDS", "60")
     monkeypatch.setenv("MANDIQ_API_URL", "http://127.0.0.1:9")
+    # What Streamlit Cloud gets from a restarting API: data_access returns {} for
+    # /health and an error for the /data-quality fallback, because Cloud ships
+    # no local warehouse. The app has to read that as "unreachable".
+    monkeypatch.setattr(data_access, "get_health", lambda: {})
+    monkeypatch.setattr(
+        data_access, "get_data_quality", lambda: {"error": "Unreachable: no healthy upstream"}
+    )
+    st.cache_data.clear()  # the snapshot is cached for 15s across runs
     app = AppTest.from_file(str(DASHBOARD_DIR / "app.py"), default_timeout=60)
     app.run()
 
@@ -75,6 +89,20 @@ def test_one_run_paints_the_whole_cockpit_and_one_banner(monkeypatch):
     bodies = [str(getattr(el, "body", "")) for el in app.get("html")]
     banners = [b for b in bodies if "mandiq-live-banner" in b]
     assert len(banners) == 1, f"expected one freshness banner, got {len(banners)}"
+
+    # The deployed cockpit reported a restarting API as a warehouse that had
+    # lost every row: "Live data: empty / The warehouse has no price rows at
+    # all. data through unknown". Nothing was asked of the warehouse, so the
+    # strip must say so instead of making a claim it cannot support.
+    assert "Live data: unreachable" in banners[0], (
+        "an API that did not answer must be reported as unreachable: " + banners[0][:400]
+    )
+    assert "no price rows at all" not in banners[0], (
+        "an unreachable API is not evidence of an empty warehouse"
+    )
+    assert "no answer from" in banners[0], (
+        "the strip must name the address that did not answer"
+    )
 
     sidebar_blocks = [b for b in bodies if ">Live data</div>" in b]
     assert len(sidebar_blocks) == 1, (
@@ -168,6 +196,29 @@ def test_the_freshness_surfaces_repaint_themselves_and_never_rerun_the_app():
             assert forbidden not in body, (
                 f"{painter} must paint the snapshot it is handed, not fetch one"
             )
+
+
+def test_an_unreachable_api_is_never_reported_as_an_empty_warehouse():
+    """A missing answer is not a missing row.
+
+    ``data_access.get_health`` returns ``{}`` whenever the request fails, and
+    the dashboard derived "empty" from that sentinel - so a deploy-time blip
+    (Northflank answers a restarting service with 503 "no healthy upstream")
+    was published to the user as a warehouse whose price table had been wiped.
+    """
+    source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
+
+    assert '"unreachable": "Nothing answered at the production API' in source
+
+    ladder = _function_block(source, "_live_snapshot")
+    assert "health_answered = bool(live)" in ladder
+    assert 'status = "unreachable"' in ladder, "the failure sentinel needs its own status"
+    assert 'elif n_prices == 0:' in ladder, (
+        "only a count of zero - never a missing count - may be called empty"
+    )
+    assert 'if not live.get("n_prices"):' not in ladder, (
+        "this is the line that turned a failed request into an empty warehouse"
+    )
 
 
 def test_a_build_that_cannot_date_its_data_is_never_called_healthy():

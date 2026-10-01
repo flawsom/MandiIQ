@@ -1383,13 +1383,29 @@ def _live_snapshot() -> dict:
     behind = quality.get("days_behind")
     if behind is None:
         behind = live.get("days_behind")
+    # An empty dict is ``get_health``'s failure sentinel: it means nobody
+    # answered, not that the warehouse lost its rows. Deriving "empty" from it
+    # is what made a restarting API - Northflank answers a restarting service
+    # with "no healthy upstream" - read as a warehouse with no price rows at
+    # all, dated "unknown". The cockpit has to report the outage it actually
+    # saw, and name the address that did not answer.
+    health_answered = bool(live)
+    quality_answered = bool(quality) and not quality.get("error")
+    n_prices = live.get("n_prices")
+    if n_prices is None:
+        n_prices = quality.get("n_prices")
     status = live.get("status")
     if not status:
         # An older build does not report a status, so derive it the same way the
         # API does instead of assuming everything is fine.
-        if not live.get("n_prices"):
+        if not (health_answered or quality_answered):
+            status = "unreachable"
+        elif n_prices == 0:
+            # Only a source that answered and counted zero rows can say this.
             status = "empty"
-        elif behind is None:
+        elif not n_prices or behind is None:
+            # Answered, but published neither a row count nor a date: that is a
+            # missing fact, not an empty warehouse.
             status = "unknown"
         elif int(behind) < 0:
             status = "degraded"
@@ -1408,7 +1424,7 @@ def _live_snapshot() -> dict:
         "min_date": quality.get("min_date") or live.get("data_min_date"),
         "behind": behind,
         "future": quality.get("n_future_dates", live.get("n_future_dates")) or 0,
-        "n_prices": live.get("n_prices"),
+        "n_prices": n_prices,
         "n_commodities": live.get("n_commodities"),
         "last_run": live.get("last_run_utc"),
         "last_outcome": live.get("last_outcome"),
@@ -1423,6 +1439,10 @@ def _live_snapshot() -> dict:
         # why, which is the difference between a blocker and a known outage.
         "last_price_source": live.get("last_price_source"),
         "mirror_configured": bool(live.get("mirror_configured")),
+        # The address behind those figures, so the strip can name it when
+        # nothing answers. A cockpit pointed at a retired service is a
+        # one-line fix - once the address is on screen.
+        "api_base": _da._get_api_base(),
     }
 
 
@@ -1449,9 +1469,15 @@ def _paint_live_strip(live: dict) -> None:
         "degraded": "The warehouse holds arrival dates that cannot be true, so affected commodities are unreliable.",
         "empty": "The warehouse has no price rows at all.",
         "unknown": "The API did not report how old its data is.",
+        "unreachable": "Nothing answered at the production API, so the cockpit cannot see the warehouse at all.",
     }.get(live["status"], "Data freshness is not what it should be.")
-    _facts = ["data through <b>%s</b>" % (live["max_date"] or "unknown"),
-              _behind_wording(live["behind"])]
+    if live["status"] == "unreachable":
+        # "data through unknown" is still a claim about the warehouse. The only
+        # fact here is that the request went nowhere, so report that, and where.
+        _facts = ["no answer from <b>%s</b>" % (live["api_base"] or "the production API")]
+    else:
+        _facts = ["data through <b>%s</b>" % (live["max_date"] or "unknown"),
+                  _behind_wording(live["behind"])]
     if live["n_prices"]:
         _facts.append("{:,} rows".format(int(live["n_prices"])))
     if live["future"]:
@@ -1547,6 +1573,8 @@ def _paint_sidebar_live(live: dict) -> None:
         _lines.append("error: " + str(live["last_refresh_error"])[:140])
     if live["version"]:
         _lines.append("build " + str(live["version"]))
+    if live["status"] == "unreachable" and live["api_base"]:
+        _lines.append("no answer from " + str(live["api_base"]))
     # A repaint that finds the same /health payload looks like no repaint at
     # all, so the block dates itself. That is the difference between "the
     # cockpit stopped refreshing" and "the warehouse has nothing new to say".
