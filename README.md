@@ -22,7 +22,7 @@
 [![Version](https://img.shields.io/badge/version-2.4.1-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-230%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-235%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -119,7 +119,7 @@ Measured from the deployment serving traffic on **2026-10-01** (trimmed from `GE
 | RDD estimates computed | **33** | `$.n_rdd_results` |
 | NDVI coverage | **605 districts** | `$.n_ndvi_districts` |
 | FastAPI routes | **45** | `app.routes` |
-| Automated tests | **230 items** (212 test functions) | `python -m pytest mandi_rdd/tests -q` |
+| Automated tests | **235 items** (217 test functions) | `python -m pytest mandi_rdd/tests -q` |
 | Self-refresh cadence | **every 30 minutes** | `MANDIIQ_REFRESH_INTERVAL_MINUTES` |
 | Refresh scope | **light** (integrity, prices, rainfall) | `MANDIIQ_REFRESH_SCOPE=full` adds the analysis recompute |
 | External verification | **every 15 minutes**, at most one run per 20 | `refresh-live-data.yml` |
@@ -595,7 +595,7 @@ All public. No personal data is ingested, stored or inferred — see [Security](
 </td></tr>
 <tr><td><b>Testing &amp; tooling</b></td><td>
 
-![pytest](https://img.shields.io/badge/pytest-230%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-235%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
 ![Ruff](https://img.shields.io/badge/Ruff-lint%20%2B%20format-261230?style=flat-square&labelColor=0a0a0a)
 ![Mermaid](https://img.shields.io/badge/Mermaid-diagrams-FF3670?style=flat-square&labelColor=0a0a0a&logo=mermaid&logoColor=white)
 
@@ -735,7 +735,7 @@ MandiIQ/
 │   │   └── orchestrator.py       # tool selection + grounded answering
 │   ├── dashboard/                # Streamlit cockpit (20 modules · 15 pages)
 │   ├── scripts/                  # consumer_check · check_production_freshness · verify_live_data
-│   ├── tests/                    # 230 items (212 test functions)
+│   ├── tests/                    # 235 items (217 test functions)
 │   ├── data/                     # local warehouse + district coordinates
 │   └── sql/                      # analytical SQL kept beside the code that runs it
 ├── docs/                         # the whole public site; served at the domain root, no build step
@@ -847,6 +847,7 @@ Everything the running system reads. Only the first group is required for the do
 | `GET` | `/health` | Warehouse counts, newest arrival date, days behind, index state, self-refresh bookkeeping, price source |
 | `GET` | `/data-quality` | Date integrity: newest/oldest arrival, future-dated rows, provenance |
 | `GET` | `/freshness` | Per-commodity latest date, row count, district and state coverage |
+| `GET` | `/rainfall` | Rainfall departures by subdivision and month (`?sub_division=`, `?limit=`), inside the physically possible −100…200 % band |
 | `GET` | `/metrics` | Prometheus exposition format |
 | `GET` | `/fdr` | Benjamini–Hochberg summary across commodity fits |
 | `GET` | `/admin/dashboard-status` | Grafana dashboard cache state, `md5_hash`, file mtime |
@@ -1122,7 +1123,7 @@ MandiIQ has no client-side application framework to audit: the public telemetry 
 ## 🧪 Testing
 
 ```bash
-# the full suite: 230 items, 212 test functions, no network and no database required
+# the full suite: 235 items, 217 test functions, no network and no database required
 python3 -m pytest mandi_rdd/tests -q
 
 # one module, verbose
@@ -1336,7 +1337,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 
 **Pull requests** — a PR is reviewable when it:
 
-1. Keeps the suite green (`230 passed, 1 skipped` before your change, and the same plus your tests after).
+1. Keeps the suite green (`235 passed, 1 skipped` before your change, and the same plus your tests after).
 2. States which endpoint, page or step it changes, and how you verified it — a copy-pasteable `curl`/`pytest` line beats a paragraph.
 3. Does not add a number to the README that no endpoint returns. If it is a measurement, say where it came from and when.
 4. Adds a test with the fix. The suite has a `test_no_mock_data.py` guard for a reason: fixtures have a way of reaching production paths here.

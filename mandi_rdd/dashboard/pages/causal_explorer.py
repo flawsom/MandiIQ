@@ -91,7 +91,7 @@ def render(**kwargs):
     if "error" not in plot_data:
         fig = make_discontinuity_plot(plot_data, selected_commodity)
         st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown(

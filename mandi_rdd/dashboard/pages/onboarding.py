@@ -80,18 +80,18 @@ def render():
     col1, col2, col3 = st.columns([2, 1, 2])
 
     with col1:
-        if st.button("← Previous", disabled=(step == 0), use_container_width=True):
+        if st.button("← Previous", disabled=(step == 0), width="stretch"):
             st.session_state.onboarding_step = max(0, step - 1)
             st.rerun()
 
     with col2:
-        if st.button("Skip", use_container_width=True):
+        if st.button("Skip", width="stretch"):
             st.session_state.onboarding_complete = True
             st.rerun()
 
     with col3:
         button_text = "Next →" if step < 2 else "Get Started →"
-        if st.button(button_text, type="primary", use_container_width=True):
+        if st.button(button_text, type="primary", width="stretch"):
             if step < 2:
                 st.session_state.onboarding_step = step + 1
                 st.rerun()

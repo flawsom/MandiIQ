@@ -185,7 +185,7 @@ Checks that observable pre-treatment characteristics (prior-year average price, 
 pytest mandi_rdd/tests/ -v
 ```
 
-**230 test items passing** (212 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
+**235 test items passing** (217 `def test_` functions, the number `/health` reports; 1 skipped = warehouse-dependent check):
 
 | Test suite | Coverage |
 |---|---|
@@ -202,6 +202,7 @@ pytest mandi_rdd/tests/ -v
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
 | `test_consumer_check.py` (11 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, plus an unrepaired index fault as a blocker |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
+| `test_rainfall_contract.py` (5 tests) | `GET /rainfall` against a real temp warehouse: the series shape the pages query, the impossible-departure band, NaN normals crossing the wire as null, the case-insensitive subdivision filter, an empty warehouse returning `[]` |
 | `test_dashboard_data.py` (4 tests) | The dashboard's API-first data access: prices arrive as a usable DataFrame from the API, a silent API yields an empty frame rather than a crash, commodity pickers come from the API before the local warehouse |
 | `test_dashboard_boot.py` (9 tests) | Headless Streamlit run at the production refresh interval (a rerun loop shows up as a run that never settles), one settled run paints the chrome + sidebar + page body with exactly one banner, the shell cannot fix-position its header or hide every button, the live tick throttles its own rerun, a build that cannot date its data is never called healthy, every page imports, route table intact |
 
@@ -226,6 +227,7 @@ pytest mandi_rdd/tests/ -v
 | `GET /fdr` | Benjamini-Hochberg false-discovery control across the catalog |
 | `GET /data-quality` | Warehouse truth: row counts, future-date count, days behind, per-commodity freshness |
 | `GET /freshness` | Per-commodity latest date, row counts, district coverage |
+| `GET /rainfall?sub_division=&limit=` | Rainfall departures by subdivision and month - what the Discontinuity and Risk Map pages read instead of a warehouse they do not have |
 | `GET /conformal/{commodity}` | Distribution-free prediction intervals around the forecast |
 | `GET /drift/{commodity}` | PSI / KS / Page-Hinkley / EWMA drift + data-quality score |
 | `GET /tail-risk/{commodity}` | Historical VaR/CVaR, EVT tail fit, max drawdown |
@@ -433,7 +435,7 @@ If you prefer to deploy the dashboard separately on Streamlit Cloud:
 
 > **Note - where the cockpit's data actually comes from.** The DuckDB file is gitignored (`mandi_rdd/data/*.duckdb`), so a Streamlit Cloud deploy has **no local warehouse**: a page that queries DuckDB directly renders an empty state there, no matter how healthy the pipeline is. Price, freshness, RDD, forecast, risk, recommendation and analytics reads therefore go through `dashboard/data_access.py`, which asks the **API** first and only falls back to a local warehouse (the hosted instances hold the real data).
 >
-> Three pages are genuinely warehouse-only and say so in their empty state rather than telling you to run a pipeline you cannot run on the hosted layer: **Discontinuity** and **Risk Map** need the rainfall/district join, and **Deep Dive** runs the pipeline's SQL. Serving those on the hosted dashboard needs the API to publish a rainfall/NDVI series (and a query surface for Deep Dive) - until then, run the dashboard locally against a populated warehouse for that trio.
+> **Rainfall** is published by the API (`GET /rainfall`), so **Discontinuity** and **Risk Map** read their series the same way - together with the shipped district→subdivision lookup, which is code, not warehouse data. **Deep Dive** remains warehouse-only: it runs the pipeline's own SQL, which needs a query surface rather than a series, and it says so rather than telling a hosted visitor to run a pipeline.
 
 ---
 

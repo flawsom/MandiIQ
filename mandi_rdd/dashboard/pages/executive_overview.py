@@ -283,7 +283,7 @@ def render(**kwargs):
             fig.add_trace(go.Scatter(x=df["arrival_date"], y=df["min_price"], mode="lines", name="Min", line=dict(color="#7e7e7e", width=1, dash="dash"), opacity=0.5))
             fig.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=350)
             st.markdown('<div class="glass" style="padding:1.2rem;">', unsafe_allow_html=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.markdown(
@@ -624,9 +624,9 @@ def _render_ask_panel(default_commodity: str):
 
     col_q1, col_q2, _ = st.columns([1, 1, 6])
     with col_q1:
-        asked = st.button("🔍 Ask MandiIQ", type="primary", use_container_width=True)
+        asked = st.button("🔍 Ask MandiIQ", type="primary", width="stretch")
     with col_q2:
-        clear = st.button("Clear", use_container_width=True)
+        clear = st.button("Clear", width="stretch")
 
     if clear:
         st.session_state.ask_history = []
@@ -813,7 +813,7 @@ def _render_national_monsoon_strip():
                           line_width=1, annotation_text="−19%", annotation_position="top left")
             fig.update_layout(margin=dict(l=0, r=0, t=4, b=0), height=90,
                               xaxis=dict(visible=False), yaxis=dict(visible=False))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         st.markdown('</div>', unsafe_allow_html=True)
     except Exception:
         return

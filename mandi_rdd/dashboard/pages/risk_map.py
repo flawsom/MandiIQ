@@ -74,26 +74,38 @@ def render():
             label_visibility="collapsed",
         )
 
-    # ── Try to load real data ──
+    # ── Build the ledger ──
+    # Prices and rainfall come from the API and the district -> subdivision map
+    # from the shipped lookup, because the hosted dashboard has no warehouse to
+    # join against: this page used to come up empty there.
     df = None
     try:
-        conn = get_connection()
-        price_count = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
-        if price_count > 0:
-            df = conn.execute("""
-                SELECT
-                    p.district,
-                    p.commodity,
-                    AVG(p.modal_price) as avg_price,
-                    AVG(r.departure_pct) as rainfall_deficit,
-                    NULL as price_change
-                FROM prices p
-                LEFT JOIN district_map dm ON p.district = dm.district
-                LEFT JOIN rainfall r ON dm.sub_division = r.sub_division
-                GROUP BY p.district, p.commodity
-                ORDER BY rainfall_deficit DESC NULLS LAST
-            """).fetchdf()
-        conn.close()
+        from mandi_rdd.dashboard import data_access as _da
+        from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map
+
+        prices = _da.get_prices_frame(limit=5000)
+        rain = _da.get_rainfall_frame()
+        if not prices.empty and {"state", "district", "commodity", "modal_price"} <= set(prices.columns):
+            by_sub = None
+            if not rain.empty and {"sub_division", "departure_pct"} <= set(rain.columns):
+                by_sub = rain.groupby("sub_division")["departure_pct"].mean()
+            mapping = load_district_subdivision_map() or {}
+            prices = prices.assign(
+                sub_division=[
+                    mapping.get((str(s), str(d))) or mapping.get((str(s).title(), str(d).title()))
+                    for s, d in zip(prices["state"], prices["district"])
+                ]
+            )
+            if by_sub is not None:
+                prices["rainfall_deficit"] = pd.to_numeric(
+                    prices["sub_division"].map(by_sub), errors="coerce"
+                )
+            else:
+                prices["rainfall_deficit"] = float("nan")
+            df = (prices.groupby(["district", "commodity"], as_index=False)
+                        .agg(avg_price=("modal_price", "mean"),
+                             rainfall_deficit=("rainfall_deficit", "mean")))
+            df["price_change"] = None
     except Exception:
         df = None
 

@@ -80,7 +80,7 @@ def _conformal_section(payload: dict, color: str) -> None:
     fig.add_trace(go.Scatter(x=x, y=mid, mode="lines+markers",
                              line=dict(color=color, width=2), name="Forecast"))
     fig.update_layout(xaxis_title="Forecast month", yaxis_title="Modal price (₹/quintal)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _drift_section(payload: dict) -> None:
@@ -109,7 +109,7 @@ def _drift_section(payload: dict) -> None:
             {"check": "KS p-value", "value": ks.get("p_value")},
         ]
     )
-    st.dataframe(detail, use_container_width=True, hide_index=True)
+    st.dataframe(detail, width="stretch", hide_index=True)
 
 
 def _tail_risk_section(payload: dict) -> None:
@@ -204,7 +204,7 @@ def _spec_curve_section(payload: dict, color: str) -> None:
         yaxis=dict(autorange="reversed"),
         hovermode="closest",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     pfig = make_themed_figure(height=200, show_legend=False)
     pfig.add_trace(go.Bar(
@@ -216,7 +216,7 @@ def _spec_curve_section(payload: dict, color: str) -> None:
     if summary.get("alpha"):
         pfig.add_vline(x=summary["alpha"], line=dict(color="#ff5c39", width=1, dash="dash"))
     pfig.update_layout(xaxis_title="two-sided p-value", yaxis=dict(autorange="reversed"))
-    st.plotly_chart(pfig, use_container_width=True)
+    st.plotly_chart(pfig, width="stretch")
 
 
 def _nowcast_section(payload: dict) -> None:

@@ -162,7 +162,7 @@ def render():
         height=560, showlegend=False, margin=dict(l=0, r=0, t=10, b=0),
     )
     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Forward price range (volatility band) ──
@@ -222,7 +222,7 @@ def render():
         margin=dict(l=0, r=0, t=10, b=0),
     )
     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-    st.plotly_chart(fc_fig, use_container_width=True)
+    st.plotly_chart(fc_fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown(
@@ -267,7 +267,7 @@ def render():
             </div>
         """, unsafe_allow_html=True)
         st.dataframe(cheapest.rename(columns={"modal_price": "₹/qtl"}).reset_index(drop=True),
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
     with colR:
         st.markdown("""
             <div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:#bababa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">
@@ -275,7 +275,7 @@ def render():
             </div>
         """, unsafe_allow_html=True)
         st.dataframe(priciest.rename(columns={"modal_price": "₹/qtl"}).reset_index(drop=True),
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
 
     st.markdown(
         '<div class="interpretation-box insig-box" style="margin-top:0.8rem;">'

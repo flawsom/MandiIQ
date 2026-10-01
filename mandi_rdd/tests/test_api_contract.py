@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore")
 EXPECTED_ROUTES = {
     ("/health", "GET"),
     ("/freshness", "GET"),
+    ("/rainfall", "GET"),
     ("/prices", "GET"),
     ("/rdd-result/{commodity}", "GET"),
     ("/rdd-plot/{commodity}", "GET"),

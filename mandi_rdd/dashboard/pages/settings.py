@@ -273,7 +273,7 @@ def render():
             st.session_state.pipeline_running = False
             st.session_state.pipeline_result = None
 
-        run_clicked = st.button("▶ Run Pipeline Now", type="primary", use_container_width=True)
+        run_clicked = st.button("▶ Run Pipeline Now", type="primary", width="stretch")
 
         if run_clicked or st.session_state.pipeline_running:
             if not st.session_state.pipeline_running:
@@ -345,7 +345,7 @@ def render():
         on_click=lambda: st.session_state.update(
             surface_mode=not st.session_state.get("surface_mode", False)
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     st.markdown("""

@@ -102,8 +102,8 @@ def render():
             label_visibility="collapsed",
         )
     with col2:
-        ask = st.button("Ask", type="primary", use_container_width=True)
-        clear = st.button("Clear", use_container_width=True)
+        ask = st.button("Ask", type="primary", width="stretch")
+        clear = st.button("Clear", width="stretch")
 
     if clear:
         st.session_state.chat_history = []

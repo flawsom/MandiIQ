@@ -78,6 +78,57 @@ def get_prices_frame(commodity=None, state=None, district=None, limit=5000):
     return df
 
 
+def get_rainfall_frame(sub_division=None, limit=5000):
+    """Rainfall departures as a DataFrame: the API first, local warehouse second.
+
+    Same reasoning as get_prices_frame - the hosted dashboard has no warehouse,
+    so a rainfall page that queries DuckDB directly has nothing to draw. The
+    API's /rainfall endpoint carries the series.
+    """
+    import pandas as pd
+
+    api_base = _get_api_base()
+    params = {"limit": limit}
+    if sub_division:
+        params["sub_division"] = sub_division
+    rows = []
+    try:
+        import requests
+        resp = requests.get(f"{api_base}/rainfall", params=params, timeout=8)
+        resp.raise_for_status()
+        payload = resp.json()
+        if isinstance(payload, list):
+            rows = payload
+    except Exception as e:
+        _warn_stale_fallback("/rainfall", str(e))
+
+    if not rows:
+        try:
+            from mandi_rdd.storage.duckdb_store import get_connection
+            conn = get_connection(read_only=True)
+            df = conn.execute(
+                """
+                SELECT sub_division, year, month, rainfall_mm, normal_mm, departure_pct
+                FROM rainfall
+                WHERE departure_pct BETWEEN -100 AND 200
+                LIMIT ?
+                """,
+                [limit],
+            ).fetchdf()
+            conn.close()
+            rows = df.to_dict("records") if hasattr(df, "to_dict") else []
+        except Exception:
+            rows = []
+
+    df = pd.DataFrame(rows or [])
+    if df.empty:
+        return df
+    for col in ("rainfall_mm", "normal_mm", "departure_pct"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
 def get_commodities(limit: int = 300) -> list:
     """Commodity names that have data: the API first, local tables as fallback.
 

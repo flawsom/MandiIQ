@@ -297,6 +297,6 @@ def _render_shap_chart(shap_values: dict):
     )
 
     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 

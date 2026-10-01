@@ -218,7 +218,7 @@ def render():
         height=300,
     )
     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Side-by-side: NDVI vs Rainfall ──
@@ -251,7 +251,7 @@ def render():
                 height=250,
                 showlegend=False,
             )
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col2:
@@ -269,7 +269,7 @@ def render():
                 height=250,
                 showlegend=False,
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
 
         # Interpretation

@@ -88,7 +88,7 @@ def render(**kwargs):
                         </div>
                     """, unsafe_allow_html=True)
                     df = pd.DataFrame(top)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width="stretch", hide_index=True)
             else:
                 st.markdown(
                     f'<div class="interpretation-box insig-box">Risk score unavailable: {risk["error"]}</div>',
@@ -217,7 +217,7 @@ def render(**kwargs):
                         legend=dict(orientation="h", y=1.12, x=0, font=dict(size=10)),
                     )
                     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     st.caption(
@@ -264,7 +264,7 @@ def render(**kwargs):
                     fig.update_layout(hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0), height=300)
 
                     st.markdown('<div class="crosshair-panel glass" style="padding:1rem;">', unsafe_allow_html=True)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     if fc.get("metrics"):

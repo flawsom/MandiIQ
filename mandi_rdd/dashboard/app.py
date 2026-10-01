@@ -1633,7 +1633,7 @@ with st.sidebar:
         + "<br>".join(_lines) + '</div>'
     )
 
-    if st.button("Refresh data now", key="_sidebar_ingest", use_container_width=True):
+    if st.button("Refresh data now", key="_sidebar_ingest", width="stretch"):
         if _request_ingest():
             _live_snapshot.clear()
             st.toast("Ingestion started on the server")

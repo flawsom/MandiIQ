@@ -28,16 +28,25 @@ API_BASE = get_api_base()
 CUTOFF = -19.0  # IMD deficient-rainfall threshold (% departure from normal)
 
 
-def commodity_list(conn) -> list:
-    """Data-driven commodity list (no hardcoded fallbacks)."""
-    from mandi_rdd.storage.duckdb_store import get_curated_commodities
-    result = get_curated_commodities()
-    if result:
-        return [r.title() for r in result]
-    rows = conn.execute(
-        "SELECT DISTINCT commodity FROM prices ORDER BY commodity LIMIT 20"
-    ).fetchall()
-    return [r[0].title() for r in rows] or ["Onion"]
+def commodity_list(conn=None) -> list:
+    """Data-driven commodity list (no hardcoded fallbacks).
+
+    API first: the hosted dashboard carries no local warehouse, so the
+    warehouse query below cannot be the first source or the picker is empty.
+    """
+    from mandi_rdd.dashboard import data_access as _da
+    names = _da.get_commodities()
+    if names:
+        return names
+    if conn is not None:
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT commodity FROM prices ORDER BY commodity LIMIT 20"
+            ).fetchall()
+            return [r[0].title() for r in rows] or ["Onion"]
+        except Exception:
+            pass
+    return ["Onion"]
 
 
 def load_rainfall(conn) -> pd.DataFrame:
@@ -78,10 +87,10 @@ def render():
     )
 
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection
-        conn = get_connection()
-        df = load_rainfall(conn)
-        conn.close()
+        # API first (GET /rainfall): a direct DuckDB read draws nothing on the
+        # hosted dashboard, which ships without a warehouse.
+        from mandi_rdd.dashboard import data_access as _da
+        df = _da.get_rainfall_frame()
     except Exception as e:
         st.markdown(
             f'<div class="interpretation-box insig-box">Could not load rainfall series: {e}</div>',
@@ -165,7 +174,7 @@ def render():
         height=380,
     )
     st.markdown('<div class="glass" style="padding:1rem;">', unsafe_allow_html=True)
-    st.plotly_chart(dens_fig, use_container_width=True)
+    st.plotly_chart(dens_fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 
     jump = res.get("density_jump")
@@ -239,7 +248,7 @@ def render():
         )
         yr_fig.update_yaxes(tickformat=".0%")
         st.markdown('<div class="glass" style="padding:1rem;">', unsafe_allow_html=True)
-        st.plotly_chart(yr_fig, use_container_width=True)
+        st.plotly_chart(yr_fig, width="stretch")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Price sensitivity to deficit exposure ──
@@ -261,36 +270,35 @@ def render():
         unsafe_allow_html=True,
     )
 
-    commodity = st.selectbox("Commodity", commodity_list(conn), index=0)
+    commodity = st.selectbox("Commodity", commodity_list(), index=0)
 
+    # An empty frame keeps the branch below honest instead of raising len(None).
+    prices = pd.DataFrame(columns=["state", "district", "price", "sub_division", "deficit_freq"])
     try:
-        from mandi_rdd.storage.duckdb_store import get_connection
         from mandi_rdd.ingestion.fetch_rainfall import load_district_subdivision_map
-        c2 = get_connection()
-        prices = c2.execute(
-            """
-            SELECT state, district, AVG(modal_price) AS price
-            FROM prices
-            WHERE LOWER(commodity) = LOWER(?)
-            GROUP BY state, district
-            """,
-            [commodity],
-        ).fetchdf()
-        deficit_freq = (
-            df.assign(deficit=(df["departure_pct"] < CUTOFF).astype(int))
-            .groupby("sub_division")["deficit"]
-            .mean()
-            .rename("deficit_freq")
-            .reset_index()
-        )
-        mp = load_district_subdivision_map()
-        prices["sub_division"] = prices.apply(
-            lambda r: mp.get((r["state"], r["district"])), axis=1
-        )
-        prices = prices.merge(deficit_freq, on="sub_division", how="left").dropna(
-            subset=["price", "deficit_freq"]
-        )
-        c2.close()
+        from mandi_rdd.dashboard import data_access as _da
+
+        _prices = _da.get_prices_frame(commodity=commodity, limit=5000)
+        if not _prices.empty and {"state", "district", "modal_price"} <= set(_prices.columns):
+            prices = (
+                _prices.groupby(["state", "district"], as_index=False)["modal_price"]
+                .mean()
+                .rename(columns={"modal_price": "price"})
+            )
+            deficit_freq = (
+                df.assign(deficit=(df["departure_pct"] < CUTOFF).astype(int))
+                .groupby("sub_division")["deficit"]
+                .mean()
+                .rename("deficit_freq")
+                .reset_index()
+            )
+            mp = load_district_subdivision_map()
+            prices["sub_division"] = prices.apply(
+                lambda r: mp.get((r["state"], r["district"])), axis=1
+            )
+            prices = prices.merge(deficit_freq, on="sub_division", how="left").dropna(
+                subset=["price", "deficit_freq"]
+            )
 
         if len(prices) >= 8:
             corr = prices["deficit_freq"].corr(prices["price"])
@@ -310,7 +318,7 @@ def render():
             )
             sc_fig.update_xaxes(tickformat=".0%")
             st.markdown('<div class="glass" style="padding:1rem;">', unsafe_allow_html=True)
-            st.plotly_chart(sc_fig, use_container_width=True)
+            st.plotly_chart(sc_fig, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(
                 f"""
@@ -408,7 +416,7 @@ def render():
                 yaxis_title="Jun-Sep rainfall (mm)",
                 height=420,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
             st.caption(
                 "Source: IMD / data.gov.in - Rainfall in all India and its departure from normal "

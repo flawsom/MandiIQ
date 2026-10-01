@@ -1580,6 +1580,56 @@ async def freshness(commodity: Optional[str] = None):
         conn.close()
 
 
+@app.get("/rainfall", tags=["Data"])
+async def rainfall(
+    sub_division: Optional[str] = None,
+    limit: int = Query(5000, le=20000),
+):
+    """Rainfall departures by subdivision and month - the RDD pages' input.
+
+    The dashboard's rainfall pages read this from a local DuckDB file. That file
+    is gitignored, so on any deployment without a warehouse they rendered an
+    empty state however healthy the pipeline was. Publishing the series here is
+    what lets the Discontinuity and Risk Map pages work from the hosted
+    dashboard, exactly as /prices already does for the price pages.
+
+    ``departure_pct`` is filtered to the physically possible band (-100..200),
+    the same guard the pages applied to their own query.
+    """
+    conn = get_connection()
+    init_schema(conn)
+    try:
+        where = "WHERE departure_pct BETWEEN -100 AND 200"
+        params: list = []
+        if sub_division:
+            where += " AND LOWER(sub_division) = LOWER(?)"
+            params.append(sub_division)
+        params.append(limit)
+        rows = conn.execute(f"""
+            SELECT sub_division, year, month, rainfall_mm, normal_mm, departure_pct
+            FROM rainfall
+            {where}
+            ORDER BY year, month
+            LIMIT ?
+        """, params).fetchall()
+
+        cols = ["sub_division", "year", "month", "rainfall_mm", "normal_mm", "departure_pct"]
+        records = []
+        for row in rows:
+            rec = {}
+            for col, val in zip(cols, row):
+                # JSON has no NaN: an unmeasured normal must arrive as null.
+                if isinstance(val, float) and val != val:
+                    val = None
+                rec[col] = val
+            records.append(rec)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
 @app.get("/prices", response_model=list[PriceRecord], tags=["Data"])
 async def prices(
     state: Optional[str] = Query(None),
