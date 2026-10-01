@@ -108,7 +108,7 @@ def test_recovery_is_only_claimed_by_builds_that_can_survive_it(app_module):
     every build, so on 2026-10-01 the workflow handed a non-atomic 2.3.0
     container a rebuild it could not survive (OOM, then `503 no healthy
     upstream` on every route). It has to come from the running build."""
-    assert app_module._recovery_is_safe() is True  # master advertises 2.4.0
+    assert app_module._recovery_is_safe() is True  # master advertises 2.4.1
     floor = app_module.SAFE_RECOVERY_VERSION
     assert floor == (2, 4, 0)
     assert app_module._version_tuple("2.3.0") < floor

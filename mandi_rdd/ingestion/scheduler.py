@@ -13,6 +13,7 @@ Use cases:
 - Cron: 0 6 * * * cd /app && python -m mandi_rdd.ingestion.scheduler
 """
 
+import datetime
 import json
 import os
 import sys
@@ -20,6 +21,7 @@ import time
 import logging
 import threading
 from pathlib import Path
+from typing import Optional
 
 # Defensive: ensure stdout/stderr never crash on Unicode (e.g. cp1252 consoles)
 try:
@@ -75,6 +77,157 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+# ── Run scope ───────────────────────────────────────────────────────────────
+#
+# The in-container scheduler and an external workflow trigger the same
+# pipeline, but they do not have the same budget. The analysis half of a run
+# (RDD over every commodity, then Prophet and XGBoost training per commodity)
+# is a recompute over data the price and rainfall steps have already stored,
+# and it needs far more memory than a free-tier container has: on 2026-10-01
+# the primary instance restarted in a loop while its own tick ran it, and the
+# platform edge answered `503 no healthy upstream` between restarts.
+#
+# So a run declares a scope. `light` keeps the warehouse current - storage
+# integrity, arrival dates, prices, rainfall, state backfill - and deliberately
+# leaves the analysis, the satellite fetch and the index rebuild to a run that
+# asked for them. `full` is the whole pipeline, for a caller with the memory
+# for it: a larger instance, CI, or a laptop.
+SCOPE_LIGHT = "light"
+SCOPE_FULL = "full"
+
+# Steps a light run leaves out, by their names in the summary.
+LIGHT_SKIPPED_STEPS = (
+    "fetch_ndvi", "rdd_analysis", "forecast_training",
+    "classifier_training", "nightly_narratives",
+)
+
+
+def resolve_scope(value: object = None) -> str:
+    """Read a run scope from a caller, `MANDIIQ_REFRESH_SCOPE`, or the default.
+
+    Unknown values fall back to light rather than guessing: the cost of being
+    wrong is a container that restarts, and the cost of being light is an
+    analysis that a full run recomputes later.
+    """
+    raw = value if value is not None else os.environ.get("MANDIIQ_REFRESH_SCOPE")
+    text = str(raw or "").strip().lower()
+    if text in ("full", "all", "heavy", "complete"):
+        return SCOPE_FULL
+    if text in ("", "light", "core", "safe"):
+        return SCOPE_LIGHT
+    logger.warning("Unknown refresh scope %r; running %s", raw, SCOPE_LIGHT)
+    return SCOPE_LIGHT
+
+
+# ── Bookkeeping that survives the restart it describes ──────────────────────
+#
+# A run leaves a marker beside the database while it is in flight and clears it
+# when it returns. A marker still there at boot means the previous process died
+# mid-run - an OOM kill, or the platform killing a container whose health probe
+# stopped answering - which is the only honest evidence that the work itself is
+# what killed it. /health reports it, and the next boot waits longer before
+# trying again, so a fatal run cannot repeat every 90 seconds forever.
+
+REFRESH_STATE_NAME = "refresh_state.json"
+
+
+def refresh_state_path() -> Optional[Path]:
+    """On the volume, beside the warehouse: that directory survives a restart."""
+    try:
+        from mandi_rdd.storage.duckdb_store import DB_PATH
+        return Path(DB_PATH).parent / REFRESH_STATE_NAME
+    except Exception:
+        return None
+
+
+def _read_refresh_state(path=None) -> dict:
+    target = Path(path) if path is not None else refresh_state_path()
+    if target is None:
+        return {}
+    try:
+        if target.exists():
+            record = json.loads(target.read_text(encoding="utf-8"))
+            if isinstance(record, dict):
+                return record
+    except Exception as exc:
+        logger.debug("Refresh state unreadable: %s", exc)
+    return {}
+
+
+def _write_refresh_state(record: dict, path=None) -> None:
+    target = Path(path) if path is not None else refresh_state_path()
+    if target is None:
+        return
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Could not write the refresh state: %s", exc)
+
+
+def begin_refresh(scope: str, step: str = "starting", path=None) -> None:
+    """Mark a run as in flight. Left behind if this process dies during it."""
+    record = _read_refresh_state(path)
+    record["inflight"] = {
+        "scope": scope,
+        "step": step,
+        "pid": os.getpid(),
+        "started_utc": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+    _write_refresh_state(record, path)
+
+
+def note_refresh_step(step: str, path=None) -> None:
+    """Name the step the run is inside, so a death during it is attributable."""
+    record = _read_refresh_state(path)
+    inflight = record.get("inflight")
+    if not isinstance(inflight, dict):
+        return
+    inflight["step"] = step
+    record["inflight"] = inflight
+    _write_refresh_state(record, path)
+
+
+def end_refresh(path=None) -> None:
+    """Clear the marker: this run returned, so the next boot is a clean one."""
+    record = _read_refresh_state(path)
+    if "inflight" not in record:
+        return
+    record["inflight"] = None
+    _write_refresh_state(record, path)
+
+
+def claim_refresh_state(path=None) -> dict:
+    """Read the volume's refresh state at boot, booking an unclean run if due.
+
+    Returns ``{"unclean_runs": n, "last_unclean": {...}|None, "inflight": bool}``.
+    Called once per process, because the question it answers - "did the process
+    before me die in the middle of a run?" - is about the boot, not the tick.
+    """
+    record = _read_refresh_state(path)
+    inflight = record.get("inflight")
+    left_behind = isinstance(inflight, dict) and bool(inflight)
+    if left_behind:
+        last_unclean = dict(inflight)
+        last_unclean["detected_utc"] = (
+            datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        )
+        record["unclean_runs"] = int(record.get("unclean_runs") or 0) + 1
+        record["last_unclean"] = last_unclean
+        record["inflight"] = None
+        _write_refresh_state(record, path)
+        logger.error(
+            "The previous run died during %r (scope=%s) and did not come back; "
+            "unclean runs recorded: %d",
+            last_unclean.get("step"), last_unclean.get("scope"), record["unclean_runs"],
+        )
+    return {
+        "unclean_runs": int(record.get("unclean_runs") or 0),
+        "last_unclean": record.get("last_unclean"),
+        "inflight": bool(left_behind),
+    }
+
+
 def run_ingestion(
 
     filters: dict = None,
@@ -83,6 +236,8 @@ def run_ingestion(
 
     skip_rainfall: bool = False,
 
+    scope: object = None,
+
 ) -> dict:
     """Serialise pipeline runs, then execute one.
 
@@ -90,7 +245,11 @@ def run_ingestion(
     trigger the same pipeline. Overlapping runs fight over the DuckDB write
     lock and can corrupt the ART indexes, so concurrent calls are refused
     instead of queued.
+
+    ``scope`` is "light" or "full" (see SCOPE_LIGHT/SCOPE_FULL); it defaults to
+    `MANDIIQ_REFRESH_SCOPE`, which defaults to light.
     """
+    scope_name = resolve_scope(scope)
     if not _RUN_LOCK.acquire(blocking=False):
         logger.warning("Ingestion already running; skipping this trigger")
         return {
@@ -98,8 +257,9 @@ def run_ingestion(
             "steps": {},
             "error": "ingestion already running",
         }
+    begin_refresh(scope_name)
     try:
-        return _run_ingestion_locked(filters, max_records, skip_rainfall)
+        return _run_ingestion_locked(filters, max_records, skip_rainfall, scope_name)
     except Exception as exc:
         logger.exception("Ingestion run failed: %s", exc)
         _write_ingest_status({"status": "failed", "error": str(exc), "steps": {}})
@@ -112,7 +272,61 @@ def run_ingestion(
             pass
         raise
     finally:
+        end_refresh()
         _RUN_LOCK.release()
+
+
+def _check_price_index(conn, light: bool) -> dict:
+    """Look at the prices index, and repair it only when this run may.
+
+    A rebuild copies the whole table, so it is the single heaviest thing the
+    pipeline does. ``heal_price_index()`` forces one whenever a fault is on
+    record, which is right for a run that has the memory for it and wrong for a
+    tick on a free-tier container that can be killed mid-copy: the copy is
+    atomic, so the warehouse survives, but the container restarts and the edge
+    reports `503 no healthy upstream` while it does. A light run therefore
+    reports the fault and defers it - the warehouse keeps serving stale rows,
+    which is recoverable, and the container keeps serving at all.
+    """
+    from mandi_rdd.storage.duckdb_store import (
+        clear_index_fault,
+        find_duplicate_price_keys,
+        heal_price_index,
+        index_fault_flagged,
+        rebuild_prices_table,
+    )
+
+    if light and index_fault_flagged():
+        logger.warning(
+            "A price-index repair is pending and this run is scope=light, so "
+            "the rebuild is deferred instead of started here"
+        )
+        return {
+            "duplicates": find_duplicate_price_keys(conn),
+            "rebuilt": False,
+            "trigger": None,
+            "deferred": "index_repair",
+            "hint": (
+                "POST /admin/rebuild-prices, or POST /refresh?scope=full on an "
+                "instance with the memory for it"
+            ),
+        }
+
+    report = heal_price_index(conn)
+    if not light and not report.get("rebuilt") and _last_run_had_index_fault():
+        # heal_price_index() forces the rebuild whenever the fault marker
+        # is present; this covers a marker that was lost, and the
+        # previous run's recorded error is the only remaining evidence.
+        logger.error(
+            "The previous ingestion run died on an inconsistent prices "
+            "index; rebuilding the table before touching it again"
+        )
+        report = rebuild_prices_table(conn)
+        report["rebuilt"] = True
+        report["trigger"] = "previous_run_index_fault"
+        if report.get("probed"):
+            clear_index_fault()
+    return report
 
 
 def _run_ingestion_locked(
@@ -120,13 +334,21 @@ def _run_ingestion_locked(
     filters: dict = None,
     max_records: int = None,
     skip_rainfall: bool = False,
+    scope: str = SCOPE_LIGHT,
 ) -> dict:
     """
-    Run the full nightly pipeline.
-    
+    Run the nightly pipeline at the requested scope.
+
+    A light run does everything that keeps the warehouse current and current-
+    looking: storage and index integrity, arrival dates, prices, rainfall and
+    the state backfill. It skips the satellite fetch, the index rebuild and the
+    analysis recompute, and records that it did so, so nothing about a light run
+    is presented as a full one.
+
     Returns summary dict with counts and timing.
     """
     start = time.time()
+    light = scope != SCOPE_FULL
     # 0. Consume any historical CSVs dropped into data/historical/ so the
     #    dashboard can build a real time-series (the live API is daily-only).
     with pipeline_metrics.step("historical_backfill"):
@@ -138,7 +360,8 @@ def _run_ingestion_locked(
         except Exception as e:
             logger.warning(f"Historical backfill skipped: {e}")
 
-    summary = {"status": "ok", "steps": {}}
+    summary = {"status": "ok", "steps": {}, "scope": scope}
+    logger.info("Pipeline run starting: scope=%s", scope)
 
     # 1. Initialize storage
     conn = get_connection()
@@ -150,32 +373,15 @@ def _run_ingestion_locked(
     #     write touching those keys fails and ingestion cannot make progress.
     with pipeline_metrics.step("index_health"):
         try:
-            from mandi_rdd.storage.duckdb_store import (
-                clear_index_fault,
-                heal_price_index,
-                index_fault_flagged,
-                rebuild_prices_table,
-            )
+            from mandi_rdd.storage.duckdb_store import index_fault_flagged
             # The duplicate check catches an index that is no longer enforcing.
             # A fault that leaves the index self-consistent is only visible by
             # writing to it, and probing with a write is itself how the process
             # dies - so the recorded fault is the trigger. That turns a crash
-            # loop into one bad run followed by a repair.
-            index_report = heal_price_index(conn)
-            if not index_report.get("rebuilt") and _last_run_had_index_fault():
-                # heal_price_index() forces the rebuild whenever the fault
-                # marker is present; this covers a marker that was lost, and
-                # the previous run's recorded error is the only remaining
-                # evidence.
-                logger.error(
-                    "The previous ingestion run died on an inconsistent prices "
-                    "index; rebuilding the table before touching it again"
-                )
-                index_report = rebuild_prices_table(conn)
-                index_report["rebuilt"] = True
-                index_report["trigger"] = "previous_run_index_fault"
-                if index_report.get("probed"):
-                    clear_index_fault()
+            # loop into one bad run followed by a repair, and a light run
+            # reports the fault instead of starting the repair.
+            note_refresh_step("index_health")
+            index_report = _check_price_index(conn, light=light)
             index_report["fault_flagged"] = index_fault_flagged()
             summary["steps"]["index_health"] = index_report
         except Exception as e:
@@ -211,6 +417,7 @@ def _run_ingestion_locked(
     page_size = int(_env_float("MANDIIQ_PRICE_PAGE_SIZE", 1000.0))
     with pipeline_metrics.step("fetch_prices"):
         _t0 = time.monotonic()
+        note_refresh_step("fetch_prices")
         try:
             from mandi_rdd.ingestion.fetch_prices import iter_price_pages
             # Resume where the last run stopped. Without this every run walked
@@ -535,9 +742,13 @@ def _run_ingestion_locked(
 
     # 4b. Ingest satellite NDVI (if Sentinel Hub credentials are set)
     import os as _os
-    if _os.environ.get("SENTINEL_CLIENT_ID") and _os.environ.get("SENTINEL_CLIENT_SECRET"):
+    if light:
+        logger.info("Light run: skipping the satellite NDVI fetch")
+        summary["steps"]["ndvi"] = {"status": "skipped", "reason": "light scope"}
+    elif _os.environ.get("SENTINEL_CLIENT_ID") and _os.environ.get("SENTINEL_CLIENT_SECRET"):
         with pipeline_metrics.step("fetch_ndvi"):
             logger.info("Fetching satellite NDVI data...")
+            note_refresh_step("fetch_ndvi")
             try:
                 _t0 = time.monotonic()
                 n_ndvi = fetch_and_store_all_ndvi()
@@ -576,11 +787,29 @@ def _run_ingestion_locked(
         if c in all_commodities and c not in target_commodities:
             target_commodities.append(c)
 
+    # The analysis half of the run is a recompute over data the steps above
+    # have already stored, and it is the part that does not fit a free-tier
+    # container. A light run leaves it to a run that asked for it, and records
+    # what it left out rather than reporting an empty analysis as a clean one.
+    analysis_targets = [] if light else target_commodities
+    if light:
+        logger.info(
+            "Light run: deferring RDD/forecast/classifier for %d commodities",
+            len(target_commodities),
+        )
+        summary["steps"]["analysis"] = {
+            "status": "skipped",
+            "reason": "light scope",
+            "would_cover": len(target_commodities),
+        }
+
     rdd_results = []
     fe_results = []
     classifier_results = []        # Wrap analysis loop in a step timer
     with pipeline_metrics.step("rdd_analysis"):
-        for commodity in target_commodities:
+        if analysis_targets:
+            note_refresh_step("rdd_analysis")
+        for commodity in analysis_targets:
             # RDD + Fixed-effects
             logger.info(f"Running RDD + FE for {commodity}...")
             try:
@@ -694,7 +923,7 @@ def _run_ingestion_locked(
                 logger.warning("AI orchestrator not available - install openai and pyyaml")
                 generate_nightly_narrative = None
 
-            for commodity in target_commodities:
+            for commodity in analysis_targets:
                 if not generate_nightly_narrative:
                     break
                 try:
@@ -721,7 +950,12 @@ def _run_ingestion_locked(
 
     summary["steps"]["narratives"] = {"generated": len(narrative_results), "commodities": narrative_results}
     summary["duration_seconds"] = round(time.time() - start, 1)
-    summary["commodities_analyzed"] = target_commodities
+    summary["commodities_analyzed"] = analysis_targets
+    summary["steps_skipped"] = (
+        [name for name in LIGHT_SKIPPED_STEPS] if light else []
+    )
+    if light:
+        summary["analysis_deferred_for"] = target_commodities
 
     # Record the full pipeline run in pipeline_metrics
     pipeline_metrics.record_pipeline_run(summary)
@@ -812,6 +1046,8 @@ def _write_ingest_status(summary: dict, status_path: Path = None) -> None:
         "last_run_utc": datetime.datetime.utcnow().isoformat() + "Z",
         "outcome": outcome,
         "status": status,
+        "scope": summary.get("scope"),
+        "steps_skipped": summary.get("steps_skipped") or [],
         "new_price_rows": n_new,
         "duration_s": summary.get("duration_seconds"),
         "error": None if status == "ok" else summary.get("error"),

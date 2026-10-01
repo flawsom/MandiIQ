@@ -19,10 +19,10 @@
 <br>
 
 <!-- release / licence / runtime -->
-[![Version](https://img.shields.io/badge/version-2.4.0-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
+[![Version](https://img.shields.io/badge/version-2.4.1-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-188%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-218%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -119,8 +119,9 @@ Measured from the deployment serving traffic on **2026-10-01** (trimmed from `GE
 | RDD estimates computed | **33** | `$.n_rdd_results` |
 | NDVI coverage | **605 districts** | `$.n_ndvi_districts` |
 | FastAPI routes | **45** | `app.routes` |
-| Automated tests | **188 items** (175 test functions) | `python -m pytest mandi_rdd/tests -q` |
+| Automated tests | **218 items** (200 test functions) | `python -m pytest mandi_rdd/tests -q` |
 | Self-refresh cadence | **every 30 minutes** | `MANDIIQ_REFRESH_INTERVAL_MINUTES` |
+| Refresh scope | **light** (integrity, prices, rainfall) | `MANDIIQ_REFRESH_SCOPE=full` adds the analysis recompute |
 | External verification | **every 15 minutes**, at most one run per 20 | `refresh-live-data.yml` |
 | Container footprint | 512 MB RAM / 1 vCPU free tier | `NORTHFLANK_DEPLOY.md` |
 
@@ -142,7 +143,7 @@ Every number below was returned by the **deployed API on 2026-10-01**, quoted wi
 | `GET /robustness/Onion` → `placebo_tests` | 5 fake cutoffs; first −₹167.57, p = 0.410 | ✅ placebos behave |
 | `GET /robustness/Onion` → `covariate_balance` | log(observations) p = 0.922, count p = 0.791 | ✅ balance passes on this build |
 | `GET /robustness/Onion` → `density_test` | `density_jump: null` | ⚪ McCrary not computed — reported as unavailable, never as a pass |
-| `GET /spec-curve/{commodity}` · `/fdr` · `/conformal` · `/drift` · `/tail-risk` · `/dml` · `/nowcast` | **404** | 🚧 these routes exist on `master` (2.4.0); the instance serving traffic is an older build |
+| `GET /spec-curve/Onion` · `/fdr` · `/analytics/Onion` · `/conformal/Onion` · `/drift/Onion` · `/tail-risk/Onion` · `/dml/Onion` · `/nowcast/Onion` · `/forecast/Onion` · `/risk-score/Onion` | **200** | ✅ the ten routes 2.3.0 did not have, verified on the deployed 2.4.0 build on 2026-10-01. Eight of them are commodity paths: they 404 at the bare path, which is a probe missing its argument, not a missing route |
 
 **Read that table carefully, because it is the most useful thing in this repository:** two endpoints on the *same running build* disagree about the headline effect for onion — `+₹230.22` versus `+₹70.69` — and the bandwidth sweep says nothing is there at all. That is not a bug report, it is the finding. An effect that moves when you change the estimator or widen the window is not a cliff, and a project that reports only the first row of this table is reporting the specification it liked.
 
@@ -594,7 +595,7 @@ All public. No personal data is ingested, stored or inferred — see [Security](
 </td></tr>
 <tr><td><b>Testing &amp; tooling</b></td><td>
 
-![pytest](https://img.shields.io/badge/pytest-188%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-218%20items-0A9EDC?style=flat-square&labelColor=0a0a0a&logo=pytest&logoColor=white)
 ![Ruff](https://img.shields.io/badge/Ruff-lint%20%2B%20format-261230?style=flat-square&labelColor=0a0a0a)
 ![Mermaid](https://img.shields.io/badge/Mermaid-diagrams-FF3670?style=flat-square&labelColor=0a0a0a&logo=mermaid&logoColor=white)
 
@@ -686,9 +687,9 @@ docker build -f Dockerfile.fly -t mandiiq-api:fly .
 <br>
 
 1. Opens the DuckDB file (creating the schema if the volume is empty).
-2. Counts prices, rainfall and RDD results — if the warehouse is effectively empty it starts a full pipeline run in a background thread.
-3. Warms the in-memory Grafana dashboard cache so the heartbeat page reports fresh on first load.
-4. Starts the self-refresh loop: waits 90 s, runs the full pipeline, then repeats every 30 minutes.
+2. Counts prices, rainfall and RDD results in one pass — if the warehouse is effectively empty it only logs that, and leaves the repair to a run that happens while the container is already serving. It does not start one at boot: the heaviest work this service does, begun before the readiness probe can pass, is how a container crash-loops into `503 no healthy upstream` on every route.
+3. Warms the in-memory Grafana dashboard cache so the heartbeat page reports fresh on first load. The counts it just read become `/health`'s first snapshot, so the probe never has to touch the database to answer.
+4. Starts the self-refresh loop: waits 90 s (doubling per run that was killed mid-flight, up to `MANDIIQ_REFRESH_BACKOFF_MAX_S`), runs a **light** tick, then repeats every 30 minutes. A light tick does integrity, dates, prices, rainfall and the state backfill, and leaves the satellite fetch, the index rebuild and the RDD/forecast recompute to `POST /refresh?scope=full` on an instance with the memory for it.
 5. Verifies the prices index **once per process** — a bulk load cut short by memory pressure can leave DuckDB's unique index inconsistent, and every later write then fails with `Failed to delete all rows from index`. The probe runs before the first write, and a recorded fault is repaired with an atomic, memory-capped rebuild.
 
 Set `MANDIIQ_SELF_REFRESH=0` on a host that should never ingest (for example a laptop pointed at a production warehouse).
@@ -734,7 +735,7 @@ MandiIQ/
 │   │   └── orchestrator.py       # tool selection + grounded answering
 │   ├── dashboard/                # Streamlit cockpit (20 modules · 15 pages)
 │   ├── scripts/                  # consumer_check · check_production_freshness · verify_live_data
-│   ├── tests/                    # 188 items (175 test functions)
+│   ├── tests/                    # 218 items (200 test functions)
 │   ├── data/                     # local warehouse + district coordinates
 │   └── sql/                      # analytical SQL kept beside the code that runs it
 ├── docs/                         # the whole public site; served at the domain root, no build step
@@ -791,7 +792,11 @@ Everything the running system reads. Only the first group is required for the do
 |---|---|---|
 | `MANDIIQ_SELF_REFRESH` | `1` | `0` disables the in-process scheduler entirely |
 | `MANDIIQ_REFRESH_INTERVAL_MINUTES` | `30` | Loop cadence (minimum 5) |
-| `MANDIIQ_REFRESH_INITIAL_DELAY_S` | `90` | Warm-up before the first tick |
+| `MANDIIQ_REFRESH_INITIAL_DELAY_S` | `90` | Warm-up before the first tick; doubled per unclean run, capped below |
+| `MANDIIQ_REFRESH_SCOPE` | `light` | What an in-container tick may do. `full` adds NDVI, the index rebuild and the RDD/forecast recompute |
+| `MANDIIQ_REFRESH_BACKOFF_MAX_S` | `1800` | Ceiling on the wait after a run that was killed mid-flight |
+| `MANDIIQ_HEALTH_COUNT_TTL_S` | `60` | How long `/health`'s counts snapshot stays fresh; a run in flight always serves it |
+| `MANDIIQ_ALLOW_AUTO_REBUILD` | unset | `1` lets `refresh-live-data.yml` run the prices rebuild unattended; off by default because the rebuild restarts a small container |
 | `MANDIIQ_PRICE_FETCH_MAX_SECONDS` | – | Wall-clock budget for a price pass; the cursor is written when it expires |
 | `MANDIIQ_PRICE_PAGE_SIZE` | – | Records per upstream page |
 | `MANDIIQ_PRICE_SOURCES` | – | Extra `mirror` or `resource_id` hosts appended **after** api.data.gov.in |
@@ -915,7 +920,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 ```jsonc
 {
   "status": "healthy",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "n_prices": 1994318,
   "n_commodities": 423,
   "n_states": 36,
@@ -949,6 +954,10 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 | `safe_recovery` | Whether **this build** may repair the warehouse unattended | `false` → deploy a current build before automating recovery |
 | `last_price_source` | Host that produced the newest rows | `null` on builds older than 2.4.0 |
 | `refresh_failures` | Failed self-refresh ticks | Rising numbers with a flat `refresh_runs` means the loop is dying |
+| `refresh_scope` / `refresh_skipped_steps` | What the loop is allowed to do, and what the last run left out | `light` + a step list is a run that fit the box; it is never presented as a full one |
+| `unclean_refresh_runs` / `last_unclean_refresh` | Runs that were killed mid-flight, and the step each died in | Non-zero → the work is bigger than the instance; raise memory or the scope-aware waits |
+| `counts_age_s` | Age of the warehouse counts above | Above 0 means the probe answered from a snapshot rather than waiting on a run |
+| `auto_rebuild_allowed` | Whether the workflow may rebuild this instance's prices table | `false` → the rebuild waits for an operator, and the warehouse keeps serving |
 | `llm_fallback_count` | Times `/ask` fell through to another provider | Steady growth means one provider is down |
 
 </details>
@@ -1111,7 +1120,7 @@ MandiIQ has no client-side application framework to audit: the public telemetry 
 ## 🧪 Testing
 
 ```bash
-# the full suite: 188 items, 175 test functions, no network and no database required
+# the full suite: 218 items, 200 test functions, no network and no database required
 python3 -m pytest mandi_rdd/tests -q
 
 # one module, verbose
@@ -1224,12 +1233,12 @@ fly logs                        # confirm "Self-refresh scheduler started"
 <br>
 
 ```bash
-docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.0 .
+docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.1 .
 docker run -d --name mandiiq -p 8080:8080 \
   -v mandiiq_data:/data \
   -e MANDIIQ_DB_PATH=/data/mandi_iq.duckdb \
   -e DATA_GOV_IN_API_KEY="$DATA_GOV_IN_API_KEY" \
-  ghcr.io/<you>/mandiiq:2.4.0
+  ghcr.io/<you>/mandiiq:2.4.1
 ```
 
 | Target | Notes for this workload |
@@ -1325,7 +1334,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 
 **Pull requests** — a PR is reviewable when it:
 
-1. Keeps the suite green (`188 passed, 1 skipped` before your change, and the same plus your tests after).
+1. Keeps the suite green (`218 passed, 1 skipped` before your change, and the same plus your tests after).
 2. States which endpoint, page or step it changes, and how you verified it — a copy-pasteable `curl`/`pytest` line beats a paragraph.
 3. Does not add a number to the README that no endpoint returns. If it is a measurement, say where it came from and when.
 4. Adds a test with the fix. The suite has a `test_no_mock_data.py` guard for a reason: fixtures have a way of reaching production paths here.
@@ -1349,8 +1358,13 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [x] Static telemetry site with instance failover and provenance panels
 - [x] Self-refresh scheduler + external verification every 15 minutes
 - [x] Atomic, memory-capped index recovery with a version-gated leash
+- [x] Declared run scope, a backoff after a run is killed mid-flight, and /health that answers while the pipeline writes
 - [x] CEDA archive backfill that walks backwards from the oldest stored row
-- [ ] **Deploy 2.4.0 to the primary instance** and clear the recorded index fault
+- [ ] **Deploy 2.4.1 to the primary instance**, then arm or run the index rebuild
+      (`MANDIIQ_ALLOW_AUTO_REBUILD=1`, or `POST /admin/rebuild-prices`) on an
+      instance with the memory for it: a 2.4.0 build served the warehouse fine
+      but restarted repeatedly while its own refresh ran the analysis, and the
+      rebuild is still deferred by default
 - [ ] **Shared-secret gate for `/admin/*`** (env-driven, no-op when unset)
 - [ ] Warehouse freshness without a live upstream: evaluate additional Agmarknet mirrors
 - [ ] eNAM as an ingestion source — blocked: the dashboard answers 200, its data controller returns an empty 500 to every request shape from outside India
@@ -1358,7 +1372,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [ ] Per-commodity conformal coverage chart in the cockpit
 - [ ] WASM/parquet export so the analytical panel can be queried without the API
 
-> The first two items are the honest state of the deployment, not wishlist entries: the running build predates the recovery hardening, and `/admin/*` is unauthenticated until the gate lands.
+> The open items are the honest state of the deployment, not wishlist entries: the recorded index fault is still pending because clearing it means rebuilding the prices table, which is the work that restarts a container this size - so it waits for an operator or a bigger instance instead of firing on a schedule (`MANDIIQ_ALLOW_AUTO_REBUILD`), and `/admin/*` is unauthenticated until the gate lands.
 
 [↑ Back to top](#table-of-contents)
 

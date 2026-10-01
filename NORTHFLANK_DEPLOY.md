@@ -39,6 +39,12 @@
 # - MANDIIQ_CEDA_LOOKBACK_DAYS=7                   (optional)
 # - MANDIIQ_CEDA_MAX_CALLS=150                     (optional)
 # - MANDIIQ_DUCKDB_MEMORY_LIMIT=192MB              (optional; rebuild ceiling)
+# - MANDIIQ_REFRESH_SCOPE=light                     (optional; "full" runs the
+#     analysis recompute too - see the self-refresh section for why the default
+#     is light and what it leaves out)
+# - MANDIIQ_ALLOW_AUTO_REBUILD=1                    (optional; lets the workflow
+#     run the prices rebuild unattended. Off unless an operator sets it, because
+#     the rebuild is what restarts a small container)
 
 # Persistent Volume:
 # - Name: mandiiq-data
@@ -178,11 +184,61 @@
 # container at all, boot included - so an operator who sets it to stop the
 # in-container rebuilds is no longer surprised by one at startup.
 #
-# Each tick is a full pipeline run (prices + rainfall + NDVI + RDD + forecast).
-# On the 512 MB free tier that is the heaviest thing this service does; if the
-# container starts OOM-restarting, raise MANDIIQ_REFRESH_INTERVAL_MINUTES to
-# 360 rather than disabling the scheduler entirely - the GitHub workflow will
-# still nudge it from outside every 15 minutes.
+# Each tick runs at a declared SCOPE, and the scope is what makes it
+# survivable on a small tier:
+#
+#   MANDIIQ_REFRESH_SCOPE=light   (the default)
+#     read-only integrity check, date repair, prices, rainfall, state backfill.
+#     No satellite fetch, no index rebuild, no RDD/forecast/classifier
+#     recompute, no narratives.
+#   MANDIIQ_REFRESH_SCOPE=full
+#     the whole pipeline, for an instance with the memory for it.
+#
+# The analysis half is a recompute over data the price and rainfall steps have
+# already stored, so a light run costs the freshness of nothing but the
+# analysis - and a run that does not fit the box is not a run. What a run left
+# out is recorded, never implied: /health.refresh_skipped_steps, and the
+# "scope"/"steps_skipped" keys in last_ingest_status.json. Ask for the heavy
+# work explicitly when you want it, on an instance that can afford it:
+#
+#   curl -sS -X POST "https://.../refresh?scope=full"
+#
+# Why light is the default: on 2026-10-01 the primary - a 2.4.0 build whose
+# self-refresh tick finally ran the pipeline that the DuckDB probe bug had been
+# suppressing since July - restarted repeatedly while it worked, and the edge
+# answered 503 on every route between restarts.
+#
+# Two other protections landed with it:
+#
+#   * /health never waits on the pipeline. The warehouse counts and the date
+#     scan come from a snapshot while a run is in flight, and refresh when it
+#     is over (or sooner, if the warehouse file changed underneath them - a
+#     restore or a rebuild swaps it). counts_age_s reports how old the numbers
+#     are. A liveness probe that queues behind the work it is checking is read
+#     by the platform as a dead container, and a dead container is restarted.
+#   * a run writes data/refresh_state.json on the volume while it is in flight,
+#     naming the step it is inside. A marker still there at boot means the
+#     previous process was killed mid-run; /health then reports
+#     unclean_refresh_runs and last_unclean_refresh, and the next boot waits
+#     initial_delay * 2^deaths (capped by MANDIIQ_REFRESH_BACKOFF_MAX_S,
+#     default 1800) before repeating the work that killed it. One fatal run
+#     cannot become a loop that fires every 90 seconds.
+#
+# The prices rebuild - the other thing that can kill a small container - is an
+# operator decision now, not an automatic one:
+#
+#   MANDIIQ_ALLOW_AUTO_REBUILD=1   arm the workflow's rebuild for this service
+#
+# Without it, refresh-live-data.yml notices index_fault_pending, says why it is
+# not acting, and leaves the warehouse stale and serving. With it (on a service
+# with the memory for the rebuild) the automated recovery resumes; the version
+# gate still applies on top of the flag.
+#
+# Tunables added by all of this (all optional):
+#   MANDIIQ_REFRESH_SCOPE=light|full          what an in-container tick may do
+#   MANDIIQ_REFRESH_BACKOFF_MAX_S=1800        ceiling on the wait after a death
+#   MANDIIQ_HEALTH_COUNT_TTL_S=60             how long a counts snapshot is fresh
+#   MANDIIQ_ALLOW_AUTO_REBUILD=1              allow the workflow to rebuild
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data integrity operations
@@ -238,7 +294,9 @@
 #     recoverable; a crash loop is not.
 #
 # So: deploy 2.4.0 and the next scheduled run clears index_fault_pending by
-# itself. Until then the workflow skips the repair and says why.
+# itself - unless the instance has not been cleared to rebuild (2.4.1's
+# MANDIIQ_ALLOW_AUTO_REBUILD), in which case the workflow skips the repair and
+# says why, and a light tick reports the fault rather than starting it.
 #
 # That deploy landed on 2026-10-01. The primary answers /health 200 with
 # version 2.4.0 and safe_recovery true, and every 2.4.0 route answers 200 -
@@ -247,8 +305,17 @@
 # they answer at /analytics/Onion and 404 at /analytics, so a probe that omits
 # the commodity reports a 404 that is not a missing route.
 #
-# The refresh-live-data.yml workflow now runs both of these
-# automatically when /health says index_fault_pending, or when n_prices is 0.
+# 2.4.1 is the build that made the tick itself survivable: scope, the backoff
+# after a run is killed mid-flight, and a /health that answers from a snapshot
+# while the pipeline writes. `version` is how you tell it from the 2.4.0 build
+# that crash-looped on 2026-10-01.
+#
+# The refresh-live-data.yml workflow runs both of the recovery operations above
+# when /health says index_fault_pending, or when n_prices is 0 - but the
+# rebuild is now behind MANDIIQ_ALLOW_AUTO_REBUILD (see the self-refresh
+# section), so with the flag unset the workflow reports the pending fault and
+# leaves the warehouse stale-but-serving instead of restarting a small
+# container to clear it.
 # If the upstream feed (api.data.gov.in) is unreachable, /health reports a
 # degraded run and the warehouse keeps serving what it has - the pipeline
 # skips the price fetch and still refreshes rainfall, RDD and the forecast.

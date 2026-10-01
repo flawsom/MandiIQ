@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.4.0"
+    version: str = "2.4.1"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -115,6 +115,32 @@ class HealthResponse(BaseModel):
     refresh_runs: int = 0
     refresh_failures: int = 0
     refresh_interval_s: int = 0
+    # What the in-container scheduler is allowed to do. "light" keeps the
+    # warehouse current (integrity, dates, prices, rainfall) and leaves the
+    # analysis recompute, the satellite fetch and the index rebuild to a run
+    # that asked for them; "full" is the whole pipeline. `refresh_skipped_steps`
+    # names what the last run left out, so a light run is never read as a full
+    # one. The default is light because the alternative is a container that
+    # restarts while it works.
+    refresh_scope: str = "light"
+    refresh_skipped_steps: list[str] = []
+    # Whether an automated caller may run the prices rebuild on this instance.
+    # It copies the whole table, so on a tier small enough to be killed by that
+    # an unattended caller firing it on a schedule is how a stale-but-serving
+    # warehouse becomes a restart loop. Defaults to False; the flag is an
+    # operator decision, taken once the instance has the memory for it.
+    auto_rebuild_allowed: bool = False
+    # A run that leaves a marker on the volume and does not come back was killed
+    # mid-work (OOM, or the platform stopping a container whose health probe
+    # stopped answering). The count survives restarts, and the boot that finds
+    # it waits longer before trying the same thing again.
+    unclean_refresh_runs: int = 0
+    last_unclean_refresh: Optional[dict] = None
+    first_refresh_delay_s: Optional[int] = None
+    # How old the warehouse counts below are. They are served from a snapshot
+    # while a pipeline run is writing, because a health check that queues behind
+    # the work it is checking reports the work, not the service.
+    counts_age_s: Optional[float] = None
     commodities_analyzed: list[str] = []
 
 
@@ -218,11 +244,120 @@ class AppState:
 
 _QUALITY_CACHE: dict = {"at": 0.0, "data": None}
 
+# Warehouse counts for /health. Primed on boot and refreshed on a TTL, because
+# counting 2M price rows is real work on a 512 MB box and the probe has a 10
+# second budget. While a run is in flight DuckDB is writing - and a rebuild is
+# swapping a table underneath it - so the probe serves the last snapshot rather
+# than queueing behind the writer. See _warehouse_counts().
+_COUNT_CACHE: dict = {"at": 0.0, "data": None, "key": None}
+
+
+def _warehouse_signature() -> Optional[tuple]:
+    """Identify the warehouse file, so a different or changed one is re-read.
+
+    Without this the snapshot would outlive the event it should follow: a
+    rebuild swaps the prices table, /admin/restore-from-r2 replaces the whole
+    file, and either way a probe that kept answering from a 60 second old
+    snapshot would report the warehouse that used to be there.
+    """
+    try:
+        from mandi_rdd.storage.duckdb_store import DB_PATH
+        path = Path(DB_PATH)
+        stat = path.stat()
+        return (str(path), stat.st_size, int(stat.st_mtime))
+    except Exception:
+        return None
+
+
+def _health_count_ttl_s() -> float:
+    try:
+        return max(0.0, float(os.environ.get("MANDIIQ_HEALTH_COUNT_TTL_S", "60")))
+    except ValueError:
+        return 60.0
+
+
+def _count_warehouse(conn) -> dict:
+    """The counts /health publishes, in one pass over the warehouse."""
+    values = {
+        "n_prices": int(conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]),
+        "n_commodities": int(
+            conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
+        ),
+        "n_states": int(conn.execute("SELECT COUNT(DISTINCT state) FROM prices").fetchone()[0]),
+        "n_districts": int(
+            conn.execute("SELECT COUNT(DISTINCT district) FROM prices").fetchone()[0]
+        ),
+        "n_rainfall": int(conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]),
+        "n_rainfall_filtered": int(
+            conn.execute(
+                "SELECT COUNT(*) FROM rainfall WHERE departure_pct BETWEEN -100 AND 200"
+            ).fetchone()[0]
+        ),
+        "rainfall_below_threshold": int(
+            conn.execute("SELECT COUNT(*) FROM rainfall WHERE departure_pct < -19").fetchone()[0]
+        ),
+        "n_rdd_results": int(conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]),
+        "n_ndvi": None,
+        "n_ndvi_districts": None,
+    }
+    try:
+        values["n_ndvi"] = int(conn.execute("SELECT COUNT(*) FROM ndvi").fetchone()[0])
+        values["n_ndvi_districts"] = int(
+            conn.execute("SELECT COUNT(DISTINCT district) FROM ndvi").fetchone()[0]
+        )
+    except Exception:
+        pass
+    return values
+
+
+def _warehouse_counts(conn) -> tuple:
+    """Return ``(counts, age_seconds)`` without ever making /health wait.
+
+    A snapshot is refreshed only when no run is in flight and the TTL has
+    passed. When a run is in flight the previous snapshot is served instead:
+    the probe must not queue behind a DuckDB write or a table swap, because the
+    platform reads a slow probe as a dead container and restarts it - which
+    turns a busy instance into a crash loop.
+    """
+    now = time.time()
+    cached = _COUNT_CACHE.get("data")
+    age = round(now - float(_COUNT_CACHE.get("at") or 0.0), 1) if cached is not None else None
+    signature = _warehouse_signature()
+    if cached is not None:
+        # While a run is in flight the answer is always the snapshot: the writer
+        # changes the warehouse continuously, so the signature below would
+        # report "changed" on every page and send the probe back to the database
+        # it is supposed to stay out of.
+        if _ingestion_running():
+            return cached, age
+        if _COUNT_CACHE.get("key") == signature and age is not None and age < _health_count_ttl_s():
+            return cached, age
+    try:
+        data = _count_warehouse(conn)
+    except Exception as exc:
+        if cached is None:
+            raise
+        logger.warning("Warehouse counts unavailable (%s); serving the last snapshot", exc)
+        return cached, age
+    _COUNT_CACHE["at"] = now
+    _COUNT_CACHE["data"] = data
+    _COUNT_CACHE["key"] = signature
+    return data, 0.0
+
 
 def _cached_date_quality(conn, ttl_seconds: float = 60.0) -> dict:
-    """Date-integrity snapshot, memoised so /health stays cheap to poll."""
+    """Date-integrity snapshot, memoised so /health stays cheap to poll.
+
+    Held for the duration of a pipeline run as well as for the TTL: this is
+    several aggregates over the prices table, and while a run is writing (or
+    swapping the table during a rebuild) a reader can be made to wait behind
+    it. The liveness probe must never be the reader that waits - the platform
+    reads a slow probe as a dead container and restarts it.
+    """
     now = time.time()
     cached = _QUALITY_CACHE.get("data")
+    if cached is not None and _ingestion_running():
+        return cached
     if cached is not None and now - float(_QUALITY_CACHE.get("at") or 0.0) < ttl_seconds:
         return cached
     try:
@@ -272,6 +407,13 @@ _REFRESH_STATE: dict = {
     "runs": 0,
     "failures": 0,
     "interval_s": 0,
+    "scope": None,
+    "skipped_steps": [],
+    # Filled in by lifespan: how long the loop waited before its first run, and
+    # what the volume said about runs that did not survive.
+    "first_delay_s": None,
+    "unclean_runs": 0,
+    "last_unclean": None,
 }
 
 
@@ -301,6 +443,55 @@ def _self_refresh_initial_delay_s() -> int:
     except ValueError:
         seconds = 90
     return max(5, seconds)
+
+
+def _self_refresh_backoff_s(unclean_runs: int) -> int:
+    """How long to wait after a boot that followed a run which died.
+
+    A run that leaves its marker behind was killed while working, so repeating
+    it on the same schedule is how a single failure becomes a restart loop:
+    every boot retries within 90 seconds and dies in the same place. Each such
+    death doubles the wait, up to MANDIIQ_REFRESH_BACKOFF_MAX_S (default 1800),
+    which bounds the loop without disabling the scheduler - the run still gets
+    retried, just not before the platform has had time to settle.
+    """
+    if unclean_runs <= 0:
+        return _self_refresh_initial_delay_s()
+    try:
+        ceiling = max(5, int(os.environ.get("MANDIIQ_REFRESH_BACKOFF_MAX_S", "1800")))
+    except ValueError:
+        ceiling = 1800
+    return min(_self_refresh_initial_delay_s() * (2 ** min(unclean_runs, 5)), ceiling)
+
+
+def _auto_rebuild_allowed() -> bool:
+    """Whether an external caller may run the prices rebuild unattended.
+
+    ``refresh-live-data.yml`` already refuses to run recovery on a build older
+    than 2.4.0. This is the second half of that decision: the version gate says
+    the build *can* do it safely, and this says *this instance* has the memory
+    for it. A rebuild copies the whole prices table, and a container that is
+    killed mid-copy restarts into `503 no healthy upstream` - which is why the
+    default is off and the operator arms it (MANDIIQ_ALLOW_AUTO_REBUILD=1) on a
+    service that can afford the work.
+    """
+    return os.environ.get("MANDIIQ_ALLOW_AUTO_REBUILD", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _refresh_scope() -> str:
+    """The scope the in-container scheduler runs with.
+
+    Light by default: this container's job is to keep the warehouse current,
+    and the analysis recompute is what does not fit a free-tier box. Set
+    MANDIIQ_REFRESH_SCOPE=full on an instance with the memory for it.
+    """
+    try:
+        from mandi_rdd.ingestion.scheduler import resolve_scope
+        return resolve_scope()
+    except Exception:
+        return "light"
 
 
 def _utcnow_iso() -> str:
@@ -391,10 +582,13 @@ def _refresh_once() -> dict:
         logger.info("Self-refresh skipped: an ingestion is already running")
         return {"status": "busy"}
 
+    scope = _refresh_scope()
+    _REFRESH_STATE["scope"] = scope
+
     _verify_price_index_once()
 
     try:
-        summary = run_ingestion()
+        summary = run_ingestion(scope=scope)
     except Exception as e:
         _REFRESH_STATE["failures"] += 1
         _REFRESH_STATE["last_error"] = f"{type(e).__name__}: {e}"
@@ -420,6 +614,9 @@ def _refresh_once() -> dict:
     # this process never had to repair anything itself.
     steps = summary.get("steps") or {}
     _note_index_health(steps.get("index_health"), source="pipeline")
+    # What this run deliberately left out, so /health can say "light run, analysis
+    # deferred" rather than leaving a smaller number unexplained.
+    _REFRESH_STATE["skipped_steps"] = list(summary.get("steps_skipped") or [])
     return summary
 
 
@@ -568,10 +765,18 @@ async def lifespan(app: FastAPI):
     try:
         df = conn.execute("SELECT DISTINCT commodity FROM prices ORDER BY commodity").fetchdf()
         state.commodities = df["commodity"].tolist() if len(df) > 0 else []
-        n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
-        n_rainfall = conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]
-        n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
-        
+        # One pass over the warehouse, which /health then serves from this
+        # snapshot. Counting 2M rows here costs nothing extra - the counts were
+        # being read anyway - and it means the first probe after a boot never
+        # has to wait on the database to answer.
+        counts = _count_warehouse(conn)
+        _COUNT_CACHE["at"] = time.time()
+        _COUNT_CACHE["data"] = counts
+        _COUNT_CACHE["key"] = _warehouse_signature()
+        n_prices = counts["n_prices"]
+        n_rainfall = counts["n_rainfall"]
+        n_rdd = counts["n_rdd_results"]
+
         logger.info(f"Startup data check: {n_prices} prices, {n_rainfall} rainfall, {n_rdd} RDD results")
         should_trigger_pipeline = (n_prices < 100 or n_rainfall < 10 or n_rdd < 1)
     except Exception:
@@ -624,10 +829,30 @@ async def lifespan(app: FastAPI):
     interval_s = _self_refresh_interval_s()
     _REFRESH_STATE["interval_s"] = interval_s
 
+    # Did the process before this one die in the middle of a run? The marker it
+    # left on the volume is the only evidence, and it decides how long this boot
+    # waits before repeating the work that killed it.
+    try:
+        from mandi_rdd.ingestion.scheduler import claim_refresh_state
+        refresh_state = claim_refresh_state()
+    except Exception as exc:
+        logger.warning(f"Could not read the refresh state: {exc}")
+        refresh_state = {"unclean_runs": 0, "last_unclean": None, "inflight": False}
+    _REFRESH_STATE["unclean_runs"] = refresh_state.get("unclean_runs") or 0
+    _REFRESH_STATE["last_unclean"] = refresh_state.get("last_unclean")
+    first_delay_s = _self_refresh_backoff_s(int(_REFRESH_STATE["unclean_runs"] or 0))
+    _REFRESH_STATE["first_delay_s"] = first_delay_s
+    if _REFRESH_STATE["unclean_runs"]:
+        logger.warning(
+            "%d refresh run(s) have been killed mid-flight; waiting %ss before "
+            "the next one instead of %ss",
+            _REFRESH_STATE["unclean_runs"], first_delay_s, _self_refresh_initial_delay_s(),
+        )
+
     if _self_refresh_enabled():
         def _self_refresh_loop():
             import time as _t
-            _t.sleep(_self_refresh_initial_delay_s())
+            _t.sleep(first_delay_s)
             while True:
                 try:
                     summary = _refresh_once()
@@ -639,8 +864,8 @@ async def lifespan(app: FastAPI):
 
         threading.Thread(target=_self_refresh_loop, daemon=True).start()
         logger.info(
-            f"Self-refresh scheduler started: first run in "
-            f"{_self_refresh_initial_delay_s()}s, then every {interval_s}s"
+            f"Self-refresh scheduler started: scope={_refresh_scope()}, first run "
+            f"in {first_delay_s}s, then every {interval_s}s"
         )
     else:
         logger.info("Self-refresh scheduler disabled (MANDIIQ_SELF_REFRESH=0)")
@@ -666,10 +891,10 @@ app = FastAPI(
     * `/forecast/{commodity}` - Prophet forecast with optional LSTM comparison
     * `/risk-score/{commodity}` - XGBoost price-spike risk probability
     * `/recommendation/{commodity}` - Procurement recommendation
-    * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)
-    * `/refresh` - Manual re-run of the full pipeline
+    * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)        * `/refresh` - Manual re-run of the pipeline (scope=light is the default,
+          scope=full runs the analysis recompute too)
     """,
-    version="2.4.0",
+    version="2.4.1",
     lifespan=lifespan,
 )
 
@@ -695,6 +920,10 @@ app.add_middleware(
 # 2026-10-01 that container crash-looped and the platform edge answered
 # `503 no healthy upstream` on /health, / and /docs. A capability that gates a
 # destructive repair has to be derived from the build that is actually running.
+# 2.4.1 is the build that made its own refresh survivable (declared run scope,
+# a backoff after a run is killed mid-flight, /health answering from a snapshot
+# while the pipeline writes). /health.version is how an operator tells that
+# build from the one that crashed in a loop on 2026-10-01.
 SAFE_RECOVERY_VERSION = (2, 4, 0)
 
 
@@ -724,29 +953,23 @@ async def health():
     try:
         conn = get_connection()
         init_schema(conn)
-        
-        n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
-        n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
-        n_states = conn.execute("SELECT COUNT(DISTINCT state) FROM prices").fetchone()[0]
-        n_districts = conn.execute("SELECT COUNT(DISTINCT district) FROM prices").fetchone()[0]
-        n_rainfall = conn.execute("SELECT COUNT(*) FROM rainfall").fetchone()[0]
-        n_rainfall_filtered = conn.execute(
-            "SELECT COUNT(*) FROM rainfall WHERE departure_pct BETWEEN -100 AND 200"
-        ).fetchone()[0]
-        rainfall_below = conn.execute(
-            "SELECT COUNT(*) FROM rainfall WHERE departure_pct < -19"
-        ).fetchone()[0]
-        n_rdd = conn.execute("SELECT COUNT(*) FROM rdd_results").fetchone()[0]
 
-        n_ndvi = None
-        n_ndvi_districts = None
-        try:
-            n_ndvi = conn.execute("SELECT COUNT(*) FROM ndvi").fetchone()[0]
-            n_ndvi_districts = conn.execute(
-                "SELECT COUNT(DISTINCT district) FROM ndvi"
-            ).fetchone()[0]
-        except Exception:
-            pass
+        # From a snapshot, not from a query: this endpoint is the liveness probe,
+        # and it must answer while the pipeline is writing (or swapping tables
+        # during a rebuild) rather than queueing behind it. `counts_age_s` says
+        # how old the snapshot is, so a stale reading is never presented as a
+        # current one.
+        counts, counts_age_s = _warehouse_counts(conn)
+        n_prices = counts["n_prices"]
+        n_commodities = counts["n_commodities"]
+        n_states = counts["n_states"]
+        n_districts = counts["n_districts"]
+        n_rainfall = counts["n_rainfall"]
+        n_rainfall_filtered = counts["n_rainfall_filtered"]
+        rainfall_below = counts["rainfall_below_threshold"]
+        n_rdd = counts["n_rdd_results"]
+        n_ndvi = counts["n_ndvi"]
+        n_ndvi_districts = counts["n_ndvi_districts"]
 
         # Read last ingest status
         last_run_utc = None
@@ -810,6 +1033,13 @@ async def health():
             refresh_runs=int(_REFRESH_STATE["runs"]),
             refresh_failures=int(_REFRESH_STATE["failures"]),
             refresh_interval_s=int(_REFRESH_STATE["interval_s"]),
+            refresh_scope=_REFRESH_STATE.get("scope") or _refresh_scope(),
+            auto_rebuild_allowed=_auto_rebuild_allowed(),
+            refresh_skipped_steps=list(_REFRESH_STATE.get("skipped_steps") or []),
+            unclean_refresh_runs=int(_REFRESH_STATE.get("unclean_runs") or 0),
+            last_unclean_refresh=_REFRESH_STATE.get("last_unclean"),
+            first_refresh_delay_s=_REFRESH_STATE.get("first_delay_s"),
+            counts_age_s=counts_age_s,
             commodities_analyzed=state.commodities[:20],
         )
     except Exception:
@@ -1733,8 +1963,8 @@ async def ask_question(request: AskRequest):
 
 
 @app.post("/refresh", response_model=RefreshResponse, tags=["System"])
-async def refresh(commodity: Optional[str] = None):
-    """Kick off a full pipeline re-run in the background.
+async def refresh(commodity: Optional[str] = None, scope: Optional[str] = None):
+    """Kick off a pipeline re-run in the background.
 
     Because the pipeline (fetching prices, rainfall, RDD, forecast) can take
     several minutes, the task runs as a background job and this endpoint
@@ -1743,9 +1973,15 @@ async def refresh(commodity: Optional[str] = None):
 
     Args:
         commodity: Optional commodity filter to limit the pipeline run.
+        scope: "light" (default, from MANDIIQ_REFRESH_SCOPE) keeps the warehouse
+            current and leaves the analysis recompute alone; "full" runs
+            everything. A caller with the memory for it - a bigger instance, a
+            workflow on a fat runner - asks for full explicitly.
     """
     try:
-        from mandi_rdd.ingestion.scheduler import run_ingestion
+        from mandi_rdd.ingestion.scheduler import run_ingestion, resolve_scope
+
+        run_scope = resolve_scope(scope if scope is not None else _refresh_scope())
 
         def _run_pipeline(commodity_filter: str | None = None):
             import time as _t
@@ -1753,8 +1989,12 @@ async def refresh(commodity: Optional[str] = None):
             filters = {}
             if commodity_filter:
                 filters["commodity"] = commodity_filter
-            logger.info(f"Background pipeline starting (commodity={commodity_filter or 'all'})...")
-            summary = run_ingestion(filters=filters if commodity_filter else None)
+            logger.info(
+                f"Background pipeline starting (commodity={commodity_filter or 'all'}, "
+                f"scope={run_scope})...")
+            summary = run_ingestion(
+                filters=filters if commodity_filter else None, scope=run_scope
+            )
 
             # Generate nightly narrative if AI is configured
             from mandi_rdd.ai.router import get_api_key as _get_llm_key
@@ -1776,7 +2016,10 @@ async def refresh(commodity: Optional[str] = None):
         threading.Thread(target=_run_pipeline, args=(commodity,), daemon=True).start()
         return RefreshResponse(
             status="ok",
-            message=f"Pipeline started in background (commodity={commodity or 'all'}). Check /health or /metrics for progress.",
+            message=(
+                f"Pipeline started in background (commodity={commodity or 'all'}, "
+                f"scope={run_scope}). Check /health or /metrics for progress."
+            ),
             duration_seconds=None,
         )
     except Exception as e:

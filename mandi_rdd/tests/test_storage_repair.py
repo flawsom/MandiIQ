@@ -280,7 +280,7 @@ def test_the_api_verifies_the_index_before_it_ingests():
     source = (repo_root / "mandi_rdd" / "api" / "main.py").read_text(encoding="utf-8")
     assert "_verify_price_index_once()" in source
     assert source.index("_verify_price_index_once()") < source.index(
-        "summary = run_ingestion()"
+        "summary = run_ingestion(scope=scope)"
     )
 
 

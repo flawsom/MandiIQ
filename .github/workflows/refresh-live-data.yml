@@ -153,7 +153,22 @@ jobs:
 
           problems = []
 
-          if health.get("index_fault_pending"):
+          # A rebuild copies the whole prices table. On a container small enough
+          # to be killed by that, an automated caller firing it on a schedule is
+          # how a stale-but-serving warehouse becomes a restart loop - the
+          # container that answered 503 on every route on 2026-10-01 was sent
+          # exactly this. The version gate above says the build can do it
+          # safely; this says the instance has the memory for it, and only the
+          # operator can arm it (MANDIIQ_ALLOW_AUTO_REBUILD=1 on the service).
+          if health.get("index_fault_pending") and not health.get("auto_rebuild_allowed"):
+              print("::notice::index_fault_pending is set, but this instance has not been "
+                    "cleared to rebuild its own prices table. Set "
+                    "MANDIIQ_ALLOW_AUTO_REBUILD=1 on a service with the memory for the "
+                    "rebuild to let this run automatically, or POST "
+                    "/admin/rebuild-prices from an operator when ready. The warehouse "
+                    "keeps serving what it has in the meantime.")
+
+          if health.get("index_fault_pending") and health.get("auto_rebuild_allowed"):
               print("index_fault_pending is set - asking the API to rebuild the prices index")
               try:
                   report = post("/admin/rebuild-prices")

@@ -353,6 +353,11 @@
       ["last refresh attempt", h.last_refresh_attempt_utc],
       ["last refresh success", ("last_refresh_success_utc" in h) ? (h.last_refresh_success_utc || "never since this container started") : null],
       ["last refresh error", ("last_refresh_error" in h) ? (h.last_refresh_error || "none") : null],
+      ["self-refresh scope", ("refresh_scope" in h) ? (h.refresh_scope + (h.refresh_skipped_steps && h.refresh_skipped_steps.length ? " (skips " + h.refresh_skipped_steps.length + " steps)" : "")) : null],
+      ["runs killed mid-flight", ("unclean_refresh_runs" in h) ? String(h.unclean_refresh_runs) : null],
+      ["last run killed during", ("last_unclean_refresh" in h) ? (h.last_unclean_refresh ? String(h.last_unclean_refresh.step || "unknown step") : "none") : null],
+      ["warehouse counts age", ("counts_age_s" in h) ? (h.counts_age_s == null ? "unknown" : h.counts_age_s + " s") : null],
+      ["automated rebuild armed", tri(h, "auto_rebuild_allowed")],
       ["last price source", ("last_price_source" in h) ? (h.last_price_source || "none reported") : null],
       ["price index fault pending", tri(h, "index_fault_pending")],
       ["mirror configured", tri(h, "mirror_configured")]
@@ -436,8 +441,35 @@
         detail: "The warehouse recorded an index fault, and the repair only runs on a build that can perform it: " +
           "<code>version &gt;= 2.4.0</code> with <code>safe_recovery: true</code>. This instance reports version " +
           "<code>" + esc(h.version || "unknown") + "</code> and safe_recovery <code>" + esc(String(h.safe_recovery)) + "</code>. " +
-          "Recovery is refused rather than attempted on a build that would OOM part-way through - refusing leaves the warehouse " +
-          "stale but serving, and a crash loop is worse than stale."
+          "A second gate sits on top: the instance must also have been cleared for it " +
+          "(<code>auto_rebuild_allowed</code> <code>" + esc(String(h.auto_rebuild_allowed)) + "</code>), because the rebuild copies " +
+          "the whole table and is what restarts a container too small to finish it. " +
+          "Recovery is refused rather than attempted on an instance that would die part-way through - refusing leaves the " +
+          "warehouse stale but serving, and a crash loop is worse than stale."
+      });
+    }
+    if (h.unclean_refresh_runs) {
+      var died = h.last_unclean_refresh || {};
+      out.push({
+        level: "warn",
+        title: h.unclean_refresh_runs + " refresh run(s) were killed while working",
+        detail: "A run writes a marker on the volume while it is in flight and clears it when it returns, " +
+          "so a marker left behind is a process that died mid-work - usually the platform stopping a container " +
+          "whose health probe stopped answering, or memory pressure during the run itself" +
+          (died.step ? ", here during <code>" + esc(died.step) + "</code>" : "") + ". " +
+          "The next boot waits longer before repeating it (the delay doubles per death, up to a ceiling), " +
+          "so this cannot become a loop that fires every 90 seconds."
+      });
+    }
+    if (h.refresh_scope === "light") {
+      out.push({
+        level: "info",
+        title: "This instance refreshes at light scope",
+        detail: "A light tick keeps the warehouse current - integrity check, dates, prices, rainfall, state " +
+          "backfill - and deliberately leaves the analysis recompute, the satellite fetch and the index rebuild " +
+          "alone, because they do not fit the instance. What a run left out is reported, never implied: see " +
+          "<code>refresh_skipped_steps</code>. A full run is available on request " +
+          "(<code>POST /refresh?scope=full</code>) or with <code>MANDIIQ_REFRESH_SCOPE=full</code> on a bigger instance."
       });
     }
     if (h.mirror_configured) {
