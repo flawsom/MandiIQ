@@ -386,10 +386,22 @@
 # writes its reason to `last_index_check` (source `admin_rebuild_failed`)
 # instead of answering a 500 and keeping nothing.
 #
-# To clear a pending fault: deploy 2.4.3, POST /admin/rebuild-prices, then check
+# 2.4.4 is the build that stops wedging itself on a fault it may not repair.
+# The light tick logged the pending fault in index_health as designed and then
+# wrote anyway; the first write against the broken index invalidated the DuckDB
+# instance, the state backfill raised with it, and the run reported `failure`
+# with the warehouse frozen - so one fault read as two problems. A run that may
+# not rebuild now may not write either, and reports `degraded` with the repair
+# in its error. Measured after the repair below: `last_outcome: degraded`,
+# `error: price source unavailable: <urlopen error [Errno 111] Connection
+# refused>` - the run's real reason, with no index error in it.
+#
+# To clear a pending fault: deploy 2.4.4, POST /admin/rebuild-prices, then check
 # /health - `index_repair_in_progress` is true while the copy runs, and
 # `index_fault_pending` must be false with a `last_index_repair` record once it
-# finishes.
+# finishes. Measured on 2026-10-02 against the live 1,994,318-row warehouse:
+# HTTP 200 in 87s, `rows_before` == `rows_after`, `probed: true`, and /health
+# answered throughout - so the fault below is cleared and the marker is gone.
 #
 # POST /refresh?scope=full is NOT a substitute for /admin/rebuild-prices. It
 # does heal the index - index_health is the second step of the run - but it then

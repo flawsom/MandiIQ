@@ -19,10 +19,10 @@
 <br>
 
 <!-- release / licence / runtime -->
-[![Version](https://img.shields.io/badge/version-2.4.3-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
+[![Version](https://img.shields.io/badge/version-2.4.4-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-245%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-252%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -923,13 +923,13 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 ```jsonc
 {
   "status": "healthy",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "n_prices": 1994318,
   "n_commodities": 423,
   "n_states": 36,
   "n_districts": 667,
   "data_max_date": "2026-09-25",
-  "days_behind": 6,
+  "days_behind": 7,
   "n_future_dates": 0,
   "last_outcome": "degraded",
   "index_fault_pending": false,
@@ -1238,12 +1238,12 @@ fly logs                        # confirm "Self-refresh scheduler started"
 <br>
 
 ```bash
-docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.3 .
+docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.4 .
 docker run -d --name mandiiq -p 8080:8080 \
   -v mandiiq_data:/data \
   -e MANDIIQ_DB_PATH=/data/mandi_iq.duckdb \
   -e DATA_GOV_IN_API_KEY="$DATA_GOV_IN_API_KEY" \
-  ghcr.io/<you>/mandiiq:2.4.3
+  ghcr.io/<you>/mandiiq:2.4.4
 ```
 
 | Target | Notes for this workload |
@@ -1365,16 +1365,21 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [x] Atomic, memory-capped index recovery with a version-gated leash
 - [x] Declared run scope, a backoff after a run is killed mid-flight, and /health that answers while the pipeline writes
 - [x] CEDA archive backfill that walks backwards from the oldest stored row
-- [ ] **Deploy 2.4.3 to the primary instance**, then run the index rebuild
-      (`POST /admin/rebuild-prices`) and watch `index_fault_pending` clear.
-      2.4.2 made the endpoint run off the event loop and that was necessary but
-      not sufficient: measured against the live warehouse on 2026-10-01, the
-      copy's `ON CONFLICT DO NOTHING` cost 0.9s for the first 200k-row window
-      and 132s for the second, so a 2.0M-row repair was tens of minutes and
-      never reached its own swap. 2.4.3 copies with plain INSERTs (0.9s per
-      window, flat), marks the warehouse busy so `/health` answers from its
-      snapshot instead of sampling while the copy runs, and records a failed
-      rebuild in `last_index_check` instead of only returning a 500
+- [x] **2.4.4 deployed to the primary, and the index rebuild run**:
+      `POST /admin/rebuild-prices` answered HTTP 200 in 87s on 2026-10-02,
+      `rows_before` == `rows_after` == 1,994,318 with `probed: true` and
+      `index_fault_pending: false` after it, and the next run reported
+      `degraded` with `price source unavailable` as its reason instead of
+      `failure` with an index error. 2.4.2 made the endpoint run off the event
+      loop and that was necessary but not sufficient: measured against the live
+      warehouse on 2026-10-01, the copy's `ON CONFLICT DO NOTHING` cost 0.9s for
+      the first 200k-row window and 132s for the second, so a 2.0M-row repair
+      was tens of minutes and never reached its own swap. 2.4.3 copies with
+      plain INSERTs (0.9s per window, flat), marks the warehouse busy so
+      `/health` answers from its snapshot instead of sampling while the copy
+      runs, and records a failed rebuild in `last_index_check` instead of only
+      returning a 500. 2.4.4 stops the tick that may not repair from writing
+      into the fault and reporting it as a second, separate failure
 - [ ] **Shared-secret gate for `/admin/*`** (env-driven, no-op when unset)
 - [ ] Warehouse freshness without a live upstream: evaluate additional Agmarknet mirrors
 - [ ] eNAM as an ingestion source — blocked: the dashboard answers 200, its data controller returns an empty 500 to every request shape from outside India
@@ -1382,7 +1387,7 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
 - [ ] Per-commodity conformal coverage chart in the cockpit
 - [ ] WASM/parquet export so the analytical panel can be queried without the API
 
-> The open items are the honest state of the deployment, not wishlist entries: the recorded index fault is still pending because every rebuild attempt so far died mid-copy - the repair is tens of minutes of single-threaded index probing on the deployed build, and the run that was in flight when the container was de-routed left the marker it was meant to clear. On 2.4.3 the copy is a flat 0.9s per 200k-row window, so the repair runs on an operator's command; it stays behind `MANDIIQ_ALLOW_AUTO_REBUILD` rather than firing on a schedule, and `/admin/*` is unauthenticated until the gate lands.
+> The open items are the honest state of the deployment, not wishlist entries. The recorded index fault is cleared: the 2.4.3 copy is a flat 0.9s per 200k-row window, so the repair finished in 87s on an operator's command and lost no rows. It stays behind `MANDIIQ_ALLOW_AUTO_REBUILD` rather than firing on a schedule, because the rebuild is still the heaviest thing this container does. What is *not* cleared is freshness, and no code change closes it: from a cloud network the documented feed refuses connections, the CEDA mirror answers (the token is accepted) but its daily coverage ends around 2025-10, and eNAM's data controller returns an empty 500 to every request shape from outside India. A run therefore reports `degraded` with `price source unavailable` and the warehouse keeps serving what it has. `/admin/*` is unauthenticated until the gate lands.
 
 [↑ Back to top](#table-of-contents)
 

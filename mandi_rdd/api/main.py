@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.4.3"
+    version: str = "2.4.4"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -936,7 +936,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)        * `/refresh` - Manual re-run of the pipeline (scope=light is the default,
           scope=full runs the analysis recompute too)
     """,
-    version="2.4.3",
+    version="2.4.4",
     lifespan=lifespan,
 )
 
@@ -981,6 +981,15 @@ app.add_middleware(
 # the first - tens of minutes per repair, which is why two rebuilds on the 2.4.2
 # build answered /health the whole time and still recorded nothing. The copy is
 # a plain INSERT now, and `index_repair_in_progress` says when one is running.
+#
+# 2.4.4 is the build that does not wedge itself on a fault it may not repair.
+# A light run logged the pending fault in index_health as designed, then wrote
+# anyway: the first write against the broken index invalidated the DuckDB
+# instance, the state backfill raised with it, and the run reported `failure`
+# with the warehouse frozen - so the recorded fault and the recorded failure
+# were the same fault, counted twice. The price write phase is skipped now and
+# the run reports `degraded` with the repair in its error message, which is what
+# `/health.last_outcome` is for. The rebuild itself is unchanged.
 SAFE_RECOVERY_VERSION = (2, 4, 0)
 
 
