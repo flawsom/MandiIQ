@@ -1777,14 +1777,17 @@ with st.sidebar:
 
 
 def _paint_current_page() -> None:
+    """Run the routed page body - once, at the top level of the script run.
 
-    """Run the routed page body.
-
-    Wrapped in a timer fragment like the two freshness surfaces, so the page's
-    tables and figures re-read their data on the same clock as the banner above
-    them instead of going stale under a repaint. Everything painted outside this
-    function - the strip, the top bar, the sidebar - is another fragment or a
-    one-shot, so a page repaint can only ever clear and redraw the page body.
+    The page body cannot be a ticking fragment the way the two freshness
+    surfaces are. ``pg`` is the page object ``st.navigation`` returned, and
+    Streamlit lets it be run exactly once per script run: a
+    ``st.fragment(run_every=...)`` tick re-enters only the fragment, so the
+    second call raises "This page cannot be called directly. Only the page
+    returned from st.navigation can be called once." and every route renders as
+    a traceback. The page body therefore repaints on navigation and on any
+    widget interaction; the strip and the sidebar are the surfaces that carry
+    the clock.
     """
 
     try:
@@ -1810,21 +1813,13 @@ def _paint_current_page() -> None:
         st.exception(_exc)
 
 
-# The page body ticks on the same timer as the freshness surfaces, under the
-# same toggle. Re-running the routed page is safe from a fragment: the
-# entrypoint re-executes on a fragment rerun, and that is what re-ordains the
-# page. The shell still asks for no rerun of its own - see
-# _paint_live_strip_tick.
+# The page body is run once, plainly, and deliberately NOT wrapped in a
+# st.fragment(run_every=...) tick. "Live updates" ticks the freshness strip and
+# its sidebar copy; the routed page itself is re-run by the entrypoint on
+# navigation and on widget interaction. See _paint_current_page for the
+# exception a ticked page fragment raises.
 
-if LIVE_REFRESH_SECONDS and st.session_state.get("live_auto_refresh", True):
-
-    _page_tick = st.fragment(run_every=LIVE_REFRESH_SECONDS)(_paint_current_page)
-
-    _page_tick()
-
-else:
-
-    _paint_current_page()
+_paint_current_page()
 
 
 

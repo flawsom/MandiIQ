@@ -361,10 +361,31 @@ def _render_freshness_widget():
 
     # KPI micro-row
     c1, c2, c3, c4 = st.columns(4)
+    # These two are sums over the freshness rows on this page, not over the
+    # warehouse: a commodity with no freshness record contributes nothing here
+    # while every one of its price rows is still counted in the strip's
+    # /health.n_prices. Left unlabelled the two numbers read as one warehouse
+    # disagreeing with itself - "1,994,318 rows" above "1,373,866" - which is
+    # how a coverage limit gets mistaken for lost data.
     with c1:
-        st.metric("Commodities tracked", f"{total_commodities}")
+        st.metric(
+            "Commodities tracked",
+            f"{total_commodities}",
+            help=(
+                "Commodities with a freshness record. The strip counts every "
+                "commodity in the warehouse via /health.n_commodities."
+            ),
+        )
     with c2:
-        st.metric("Total price rows", f"{total_rows:,}")
+        st.metric(
+            "Rows (tracked commodities)",
+            f"{total_rows:,}",
+            help=(
+                "Price rows belonging to the commodities on this page. It is "
+                "smaller than the warehouse total in the strip because that "
+                "count - /health.n_prices - is every row in `prices`."
+            ),
+        )
     with c3:
         st.metric("Updated last 7d", f"{recent_count}")
     with c4:
