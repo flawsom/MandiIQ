@@ -40,6 +40,8 @@ See mandi_rdd/styles/design.css and mandi_rdd/dashboard/theme.py
 
 
 
+import html
+
 import os
 
 import sys
@@ -1486,7 +1488,14 @@ def _paint_live_strip(live: dict) -> None:
     if live["future"]:
         _facts.append("<b>%s impossible date(s)</b>" % live["future"])
     if live["last_refresh_error"]:
-        _facts.append("last refresh error: %s" % str(live["last_refresh_error"])[:180])
+        # These errors carry transport text like ``<urlopen error ...>``, and
+        # this surface is raw HTML: left unescaped, the parser reads the reason
+        # as a tag and the banner shows a dangling "unavailable:" instead. The
+        # reason is what makes the failure actionable, so it is escaped.
+        _facts.append(
+            "last refresh error: %s"
+            % html.escape(str(live["last_refresh_error"])[:180])
+        )
     if live["last_price_source"]:
         _facts.append("prices last served by %s" % str(live["last_price_source"])[:120])
     elif live["status"] in ("stale", "degraded"):
@@ -1495,7 +1504,7 @@ def _paint_live_strip(live: dict) -> None:
     if live["status"] in ("stale", "degraded"):
         ceda = live.get("last_ceda") or {}
         if ceda.get("error"):
-            _facts.append(f"CEDA mirror: {str(ceda['error'])[:120]}")
+            _facts.append(f"CEDA mirror: {html.escape(str(ceda['error'])[:120])}")
         if not live["mirror_configured"]:
             # This used to be offered as the one action that restores the daily
             # update. It is not: CEDA is an archive, and its recorded daily
@@ -1591,7 +1600,11 @@ def _paint_sidebar_live(live: dict) -> None:
             int(live["refresh_runs"]),
         ))
     if live["last_refresh_error"]:
-        _lines.append("error: " + str(live["last_refresh_error"])[:140])
+        # Escaped for the same reason as the strip: `<urlopen error ...>`
+        # inserted raw is parsed as a tag, hiding the reason that was fetched.
+        _lines.append(
+            "error: " + html.escape(str(live["last_refresh_error"])[:140])
+        )
     if live["version"]:
         _lines.append("build " + str(live["version"]))
     if live["status"] == "unreachable" and live["api_base"]:

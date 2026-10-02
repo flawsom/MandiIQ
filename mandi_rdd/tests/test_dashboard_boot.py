@@ -115,6 +115,90 @@ def test_one_run_paints_the_whole_cockpit_and_one_banner(monkeypatch):
     assert len(app.get("page_link")) >= 10, "the sidebar navigation never rendered"
 
 
+def test_the_refresh_error_reaches_the_screen_instead_of_being_eaten_by_html(monkeypatch):
+    """The reason a refresh failed must survive the HTML surfaces.
+
+    /health reports a transport failure as ``price source unavailable:
+    <urlopen error [Errno 111] Connection refused>``. The strip and the
+    sidebar are drawn with ``st.html``, so the angle brackets were parsed as a
+    tag and the cause vanished: the deployed cockpit showed "error: price
+    source unavailable:" - the failure named, its reason eaten - on the one
+    surface built to explain a frozen warehouse. The text is escaped now, so
+    the reason that was fetched is the reason on screen.
+    """
+    import html
+
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+
+    from mandi_rdd.dashboard import data_access
+
+    reason = (
+        "price source unavailable: <urlopen error [Errno 111] Connection refused>"
+    )
+    escaped = html.escape(reason)
+
+    monkeypatch.setenv("MANDIIQ_UI_REFRESH_SECONDS", "60")
+    monkeypatch.setenv("MANDIQ_API_URL", "http://127.0.0.1:9")
+    monkeypatch.setattr(
+        data_access,
+        "get_health",
+        lambda: {
+            "status": "stale",
+            "n_prices": 1994318,
+            "n_commodities": 423,
+            "data_max_date": "2026-09-25",
+            "days_behind": 7,
+            "last_run_utc": "2026-10-02T15:27:21Z",
+            "last_outcome": "degraded",
+            "last_refresh_error": reason,
+            "mirror_configured": True,
+            "last_ceda": {"fetched": 0, "new": 0},
+        },
+    )
+    monkeypatch.setattr(
+        data_access, "get_data_quality", lambda: {"error": "Unreachable: no healthy upstream"}
+    )
+
+    st.cache_data.clear()  # the snapshot is cached for 15s across runs
+    app = AppTest.from_file(str(DASHBOARD_DIR / "app.py"), default_timeout=60)
+    app.run()
+
+    assert not app.exception, "Dashboard raised: " + "; ".join(
+        str(exc.value) for exc in app.exception
+    )
+
+    bodies = [str(getattr(el, "body", "")) for el in app.get("html")]
+    banners = [b for b in bodies if "mandiq-live-banner" in b]
+    assert len(banners) == 1, f"expected one freshness banner, got {len(banners)}"
+    assert escaped in banners[0], (
+        "the refresh reason must reach the banner escaped, not parsed away: "
+        + banners[0][:500]
+    )
+    assert reason not in banners[0], (
+        "raw angle brackets are parsed as a tag and the reason disappears"
+    )
+
+    sidebar_blocks = [b for b in bodies if ">Live data</div>" in b]
+    assert len(sidebar_blocks) == 1, (
+        f"expected one sidebar freshness block, got {len(sidebar_blocks)}"
+    )
+    # The sidebar body is its own st.html element, painted under the header.
+    sidebar_bodies = [
+        b for b in bodies if "padding:0 1rem 0.4rem;font-family:IBM Plex Mono" in b
+    ]
+    assert len(sidebar_bodies) == 1, (
+        f"expected one sidebar freshness body, got {len(sidebar_bodies)}"
+    )
+    assert escaped in sidebar_bodies[0], (
+        "the sidebar copy of the reason must reach the screen too: "
+        + sidebar_bodies[0][:500]
+    )
+    assert reason not in sidebar_bodies[0], (
+        "the sidebar escapes the reason for the same reason as the banner"
+    )
+
+
 def test_the_shell_cannot_double_its_header_or_hide_its_controls():
     """The cockpit's own chrome must not fight Streamlit's.
 
