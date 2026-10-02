@@ -19,10 +19,10 @@
 <br>
 
 <!-- release / licence / runtime -->
-[![Version](https://img.shields.io/badge/version-2.4.4-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
+[![Version](https://img.shields.io/badge/version-2.4.5-d7ff00?style=flat-square&labelColor=0a0a0a)](https://github.com/flawsom/MandiIQ/releases)
 [![License](https://img.shields.io/badge/license-MIT-2ecc71?style=flat-square&labelColor=0a0a0a)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&labelColor=0a0a0a&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-252%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
+[![Tests](https://img.shields.io/badge/tests-263%20passing-2ecc71?style=flat-square&labelColor=0a0a0a)](mandi_rdd/tests)
 [![Ruff](https://img.shields.io/badge/style-ruff-261230?style=flat-square&labelColor=0a0a0a)](https://github.com/astral-sh/ruff)
 
 <!-- live counters: read from the canonical deployment's /health at render time -->
@@ -923,7 +923,7 @@ curl -s "https://p01--mandiiq--x4n8x4gkmzht.code.run/health" | python3 -m json.t
 ```jsonc
 {
   "status": "healthy",
-  "version": "2.4.4",
+  "version": "2.4.5",
   "n_prices": 1994318,
   "n_commodities": 423,
   "n_states": 36,
@@ -1238,12 +1238,12 @@ fly logs                        # confirm "Self-refresh scheduler started"
 <br>
 
 ```bash
-docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.4 .
+docker build -f Dockerfile.northflank -t ghcr.io/<you>/mandiiq:2.4.5 .
 docker run -d --name mandiiq -p 8080:8080 \
   -v mandiiq_data:/data \
   -e MANDIIQ_DB_PATH=/data/mandi_iq.duckdb \
   -e DATA_GOV_IN_API_KEY="$DATA_GOV_IN_API_KEY" \
-  ghcr.io/<you>/mandiiq:2.4.4
+  ghcr.io/<you>/mandiiq:2.4.5
 ```
 
 | Target | Notes for this workload |
@@ -1380,6 +1380,24 @@ docs:       document why api.data.gov.in is unreachable from cloud networks
       runs, and records a failed rebuild in `last_index_check` instead of only
       returning a 500. 2.4.4 stops the tick that may not repair from writing
       into the fault and reporting it as a second, separate failure
+- [x] **2.4.5: the historical ingest writes through the anti-join, and the daily
+      update stops pretending the container can fetch**: all four CSV shapes
+      `/admin/ingest-historical` accepts are projected onto one canonical column
+      set and written by `upsert_prices` (`NOT EXISTS` on
+      market/commodity/variety/grade/arrival_date) instead of three separate
+      `INSERT OR IGNORE` statements - the index conflict path that failed with
+      `Failed to delete all rows from index`, and the same path the daily upload
+      would have used. The endpoint now also answers `rows_read`, `rows_new`,
+      `newest_in_file`, `data_max_date` and `days_behind`, so one push can be
+      verified from the caller's side, and `scripts/push_live_prices.py` is the
+      push: it fetches the snapshot with the pipeline's own fetcher (or takes a
+      CSV) and hands it over from a network that can read the source, printing
+      the newest arrival date before and after. No cloud network this project
+      runs on can reach that source - api.data.gov.in resets TLS from Northflank
+      *and* from a plain cloud sandbox, agmarknet.gov.in answers 403 from every
+      path, and CEDA's daily coverage ends around 2025-10 - so the push is the
+      path, and `.github/workflows/nightly-ingest.yml` attempts it daily on a
+      best-effort basis for the days a runner can read it
 - [ ] **Shared-secret gate for `/admin/*`** (env-driven, no-op when unset)
 - [ ] Warehouse freshness without a live upstream: evaluate additional Agmarknet mirrors
 - [ ] eNAM as an ingestion source — blocked: the dashboard answers 200, its data controller returns an empty 500 to every request shape from outside India

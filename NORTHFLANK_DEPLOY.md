@@ -155,6 +155,49 @@
 # from the same 60-second poll.
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Redeploying the mirror (the failover, not an equal)
+# ─────────────────────────────────────────────────────────────────────────────
+# A push to master does NOT redeploy either Northflank service. Primary and
+# mirror are separate services on the same image, each with its own Build &
+# deploy button, and the mirror is the one that gets forgotten: on 2026-10-02 it
+# was still serving a July build - no `version` field at all, last_run_utc
+# 2026-07-29, /data-quality and /admin/source-probe both 404 - while answering
+# `status: "healthy"` with no date in it.
+#
+# Why that matters: the mirror IS the failover. When the primary's edge answers
+# `503 no healthy upstream`, docs/assets/site.js (nav links, footer links, the
+# nav LED), refresh-live-data.yml and every consumer that follows
+# window.MandiiqShell.resolveApi() fall through to this host. A failover running
+# an old build serves old numbers, and a build that publishes no dates cannot be
+# caught by comparing dates - which is exactly how it stayed invisible.
+#
+# To redeploy it: Northflank -> the mirror service -> "Build & deploy", the same
+# button the primary uses. Nothing in this repository can trigger it.
+#
+# Then verify, in this order. The first line is what shows the deploy landed:
+#
+#   for h in x4n8x4gkmzht zbvjrztgjqgw; do
+#     curl -s --max-time 20 "https://p01--mandiiq--$h.code.run/health" | python3 -c "
+#   import json, sys
+#   d = json.load(sys.stdin)
+#   print('$h', d.get('version'), d.get('status'), d.get('data_max_date'),
+#         'safe_recovery=', d.get('safe_recovery'))"
+#   done
+#   # both lines must carry the SAME version, a real date, and safe_recovery=True
+#
+#   curl -s -o /dev/null -w "data-quality %{http_code}\n" \
+#     https://p01--mandiiq--zbvjrztgjqgw.code.run/data-quality      # want 200
+#
+# Until that passes, treat the mirror as a read-only second opinion.
+# refresh-live-data.yml already refuses to run *recovery* on a build that does
+# not advertise safe_recovery (an older build rebuilds the prices table
+# non-atomically and decompresses the R2 backup in RAM - the two ways the
+# warehouse was lost before), and `python -m mandi_rdd.scripts.consumer_check`
+# now warns outright when the mirror publishes no version, or claims to be
+# healthy while publishing no date.
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Keeping the service awake
 # ─────────────────────────────────────────────────────────────────────────────
 # Free-tier hosts suspend idle services, which is why the first visitor used to
@@ -395,6 +438,26 @@
 # in its error. Measured after the repair below: `last_outcome: degraded`,
 # `error: price source unavailable: <urlopen error [Errno 111] Connection
 # refused>` - the run's real reason, with no index error in it.
+#
+#
+# 2.4.5 is the build whose historical ingest cannot damage the index, and whose
+# daily update does not depend on a network the container is not on. Every shape
+# /admin/ingest-historical accepts - canonical columns, a data.gov.in export, an
+# Agmarknet archive export, the WFP export - is projected onto one set of
+# canonical columns and written by upsert_prices (the NOT EXISTS anti-join)
+# instead of three separate `INSERT OR IGNORE` statements, which used the UNIQUE
+# index's conflict path: the same machinery that failed with "Failed to delete
+# all rows from index". It answers with rows_read / rows_new / newest_in_file /
+# data_max_date / days_behind, so a push is verifiable from the caller's side.
+# That endpoint is the daily path now, because no cloud network this project
+# runs on can reach the source: api.data.gov.in resets TLS, agmarknet.gov.in
+# answers 403 from every path, and the CEDA archive's daily coverage ends around
+# 2025-10. `python -m mandi_rdd.scripts.push_live_prices` (see
+# mandi_rdd/README.md) hands the day's snapshot over from wherever the operator
+# can read it, and .github/workflows/nightly-ingest.yml attempts the same push
+# best-effort on the days a runner can. A 2.4.4 instance still writes that
+# endpoint with the old statement, so redeploy (Build & deploy - a push to
+# master does not) before treating it as the safe path.
 #
 # To clear a pending fault: deploy 2.4.4, POST /admin/rebuild-prices, then check
 # /health - `index_repair_in_progress` is true while the copy runs, and

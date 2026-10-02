@@ -7,6 +7,7 @@ backwards compatible. No database or network access is required.
 
 from __future__ import annotations
 
+import inspect
 import json
 import warnings
 from pathlib import Path
@@ -474,3 +475,115 @@ def test_a_fatal_probe_is_recorded_and_healed_in_the_same_tick(
         )
     finally:
         _restore_refresh_state(app_module, saved)
+
+
+def test_every_historical_csv_shape_ends_on_the_same_canonical_columns(app_module):
+    """Four upload shapes, one write path - the anti-join, not the index.
+
+    ``/admin/ingest-historical`` used to run ``INSERT OR IGNORE`` against the
+    UNIQUE index, in three separate copies of the same statement. That is the
+    conflict path that failed with ``Failed to delete all rows from index``,
+    and it skipped the batch dedupe, the impossible/future-date rejection and
+    the rebuild-and-retry that ``upsert_prices`` performs for every other write
+    in the project. The shapes are detected by name and projected onto one set
+    of canonical columns now, so a fifth shape cannot reintroduce the old path.
+    """
+    detect = app_module._detect_historical_format
+
+    shapes = {
+        "arrival_date,state,district,market,commodity,variety,grade,"
+        "min_price,max_price,modal_price\n": "canonical",
+        "Arrival_Date,State,District,Market,Commodity,Variety,Grade,"
+        "Min_x0020_Price,Max_x0020_Price,Modal_x0020_Price\n": "data_gov_in_snapshot",
+        "Price Date,State,District Name,Market Name,Commodity,Variety,Grade,"
+        "Min Price (Rs./Quintal),Max Price (Rs./Quintal),"
+        "Modal Price (Rs./Quintal)\n": "agmarknet_historical",
+        "date,admin1,admin2,market,commodity,price\n": "wfp_food_prices",
+    }
+    for header, expected in shapes.items():
+        assert detect(header) == expected, (
+            f"{header.split(',')[0]!r} was read as {detect(header)!r}"
+        )
+    assert detect("something,else\n") is None, "an unknown shape must be refused, not guessed"
+
+    columns = (
+        "arrival_date", "state", "district", "market", "commodity",
+        "variety", "grade", "min_price", "max_price", "modal_price",
+    )
+    for fmt in shapes.values():
+        sql = app_module._historical_projection_sql(fmt, "/tmp/upload.csv")
+        for column in columns:
+            assert f"AS {column}" in sql, f"the {fmt} projection does not name {column}"
+        assert "/tmp/upload.csv" in sql
+        # The reader must not guess column types. It guessed the one that
+        # matters: a canonical upload with ISO dates came back as a DATE column
+        # and TRIM(arrival_date) died with 'trim(DATE)' - the daily path
+        # refusing the very shape it is built for. Explicit casts only.
+        assert "all_varchar=true" in sql, f"the {fmt} projection lets the sniffer type it"
+
+    # And the write itself: no shape may be inserted against the index again.
+    # The statement, not the phrase: the endpoint's own comment names the old
+    # form, and a check that bans the words would only teach it new ones.
+    source = inspect.getsource(app_module.admin_ingest_historical)
+    assert "INSERT OR IGNORE INTO prices" not in source, (
+        "the index conflict path is back in the historical ingest"
+    )
+    assert "upsert_prices(" in source, "every shape must be written by the anti-join"
+
+
+def test_a_canonical_upload_lands_once_and_never_twice(app_module, tmp_path, monkeypatch):
+    """The daily push, end to end: the same file twice must add nothing twice.
+
+    The shape check above proves the projections name the right columns; this
+    one proves the write, against a real warehouse. The endpoint used to
+    ``INSERT OR IGNORE`` against the UNIQUE index, and it writes through the
+    anti-join now, so the property the daily path depends on is that a re-run -
+    or a push that overlaps the nightly run - cannot duplicate a price. The
+    upload also carries an impossible date, which must be rejected rather than
+    stored: that is the same guard that keeps a year-2099 typo out of the
+    freshness reading.
+    """
+    import io
+
+    from starlette.datastructures import UploadFile
+
+    from mandi_rdd.storage import duckdb_store
+
+    db = tmp_path / "push.duckdb"
+    monkeypatch.setattr(duckdb_store, "DB_PATH", db)
+    app_module._QUALITY_CACHE.clear()
+    conn = duckdb_store.get_connection(db_path=db, read_only=False)
+    duckdb_store.init_schema(conn)
+    conn.close()
+
+    header = (
+        "arrival_date,state,district,market,commodity,variety,grade,"
+        "min_price,max_price,modal_price\n"
+    )
+    body = header + (
+        "2026-10-01,Maharashtra,Pune,Pune,Onion,FAQ,FAQ,1200,1800,1500\n"
+        "2026-10-02,Maharashtra,Pune,Pune,Onion,FAQ,FAQ,1250,1850,1520\n"
+        "2099-01-01,Maharashtra,Pune,Pune,Onion,FAQ,FAQ,1,2,3\n"
+    )
+
+    def upload() -> dict:
+        return app_module.admin_ingest_historical(
+            UploadFile(filename="snapshot.csv", file=io.BytesIO(body.encode("utf-8")))
+        )
+
+    first = upload()
+    assert first["status"] == "ok", first
+    assert first["format"] == "canonical"
+    assert first["rows_read"] == 3
+    assert first["rows_new"] == 2, "the 2099 row must be rejected; the real two kept"
+    assert first["newest_in_file"] == "2026-10-02", (
+        "the newest date the file *kept* - a rejected 2099 typo is not what it said"
+    )
+    assert first["dates_rejected"] == 1
+    assert first["data_max_date"] == "2026-10-02"
+    assert first["total_prices"] == 2
+
+    second = upload()
+    assert second["rows_new"] == 0, "a re-upload must not duplicate a price"
+    assert second["total_prices"] == 2
+    assert second["data_max_date"] == "2026-10-02"

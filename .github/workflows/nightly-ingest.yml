@@ -78,6 +78,22 @@ jobs:
         run: |
           python -m mandi_rdd.ingestion.scheduler
 
+      # The runner's DuckDB is throwaway (gitignored, and the commit step only
+      # stages the two JSON metadata files), so rows fetched here never reach
+      # production on their own - production owns the warehouse on its volume.
+      # This hands the day's snapshot over HTTP instead, through the same upsert
+      # the pipeline uses. Deliberately best-effort: a GitHub runner usually
+      # cannot read api.data.gov.in either (it times out), so the guaranteed
+      # path remains an operator running push_live_prices.py from a network that
+      # can - see mandi_rdd/README.md, "Keeping the newest date current".
+      - name: Push the day's snapshot to production (best effort)
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+        run: |
+          python -m mandi_rdd.scripts.push_live_prices --api "${API_BASE}"
+
       - name: Enrich district->state mappings via Ashoka API
         # Best-effort enrichment, and the Ashoka API answers in anywhere from a
         # second to never - it sat on one read for ten minutes during a run.

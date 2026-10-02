@@ -385,7 +385,18 @@ def check_provenance(health: dict, data_quality: dict, freshness=None) -> list[d
 
 
 def check_cross_surface(api_health: dict, mirror_health: dict) -> list[dict]:
-    """Two instances serving different worlds is a consumer-visible bug."""
+    """Two instances serving different worlds is a consumer-visible bug.
+
+    The mirror is the failover, not a second opinion: when the primary's edge
+    answers `503 no healthy upstream`, the docs site, the landing page and
+    refresh-live-data.yml all fall through to this host. So a mirror that
+    cannot be identified or dated is the *failover path* serving something
+    else. On 2026-10-02 the mirror answered ``status: "healthy"`` while
+    publishing no ``data_max_date`` and no ``version`` at all - and every check
+    here stayed silent, because the disagreement loop skips a key either side
+    omits and an omitted date is not a date that conflicts. Both halves of that
+    are findings now.
+    """
     findings = []
     if not api_health or not mirror_health:
         return findings
@@ -397,6 +408,22 @@ def check_cross_surface(api_health: dict, mirror_health: dict) -> list[dict]:
                 "level": "warning",
                 "message": f"primary and mirror disagree on {key}: {primary} vs {mirror}",
             })
+    if not mirror_health.get("version"):
+        findings.append({
+            "level": "warning",
+            "message": (
+                "the mirror publishes no version - the failover is running a build "
+                "that cannot be identified; redeploy it before trusting it"
+            ),
+        })
+    if mirror_health.get("status") == "healthy" and not mirror_health.get("data_max_date"):
+        findings.append({
+            "level": "warning",
+            "message": (
+                "the mirror reports status=healthy while publishing no newest arrival "
+                "date - a build that cannot date its data is not a healthy one"
+            ),
+        })
     return findings
 
 

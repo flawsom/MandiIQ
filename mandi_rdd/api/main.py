@@ -47,6 +47,7 @@ from mandi_rdd.storage.duckdb_store import (
     get_prices,
     get_latest_rdd,
     get_monthly_avg_prices,
+    upsert_prices,
 )
 from mandi_rdd.ai.router import (
     clear_cool_down,
@@ -63,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "2.4.4"
+    version: str = "2.4.5"
     llm_fallback_count: int = 0
     n_prices: int
     n_commodities: int
@@ -936,7 +937,7 @@ app = FastAPI(
     * `/ask` - AI orchestrator (OpenRouter multi-model routing, circuit-breaker fallback)        * `/refresh` - Manual re-run of the pipeline (scope=light is the default,
           scope=full runs the analysis recompute too)
     """,
-    version="2.4.4",
+    version="2.4.5",
     lifespan=lifespan,
 )
 
@@ -990,6 +991,22 @@ app.add_middleware(
 # were the same fault, counted twice. The price write phase is skipped now and
 # the run reports `degraded` with the repair in its error message, which is what
 # `/health.last_outcome` is for. The rebuild itself is unchanged.
+#
+# 2.4.5 is the build whose historical ingest cannot damage the index, and whose
+# daily update does not depend on a network the container is not on. Every shape
+# `/admin/ingest-historical` accepts - canonical columns, a data.gov.in export,
+# an Agmarknet archive export, the WFP export - is projected onto one set of
+# canonical columns and written by ``upsert_prices`` (the ``NOT EXISTS``
+# anti-join) instead of three separate ``INSERT OR IGNORE`` statements, which
+# used the UNIQUE index's conflict path: the same machinery that failed with
+# "Failed to delete all rows from index". It answers with ``rows_read``,
+# ``rows_new``, ``newest_in_file``, ``data_max_date`` and ``days_behind``, so a
+# push is verifiable from the caller's side. That endpoint is the daily path
+# because no cloud network this project runs on can reach the source -
+# api.data.gov.in resets TLS, agmarknet.gov.in answers 403 from every path, and
+# the CEDA archive's daily coverage ends around 2025-10 - so
+# ``scripts/push_live_prices.py`` hands the day's snapshot over from wherever
+# the operator can read it.
 SAFE_RECOVERY_VERSION = (2, 4, 0)
 
 
@@ -2697,6 +2714,126 @@ def admin_restore_from_r2():
     }
 
 
+# ── Historical CSV ingest ────────────────────────────────────────────────────
+# Four export shapes land on this endpoint: the Agmarknet archive export, a
+# data.gov.in snapshot, the WFP/FAO food-price export, and this repository's own
+# canonical columns - the shape scripts/push_live_prices.py sends, because it is
+# the only one that carries a day-first date straight through to the same
+# parser the pipeline uses. Every one of them is projected onto the same ten
+# canonical columns, so every one of them is written by the same upsert.
+_HISTORICAL_BATCH = 5000
+
+
+def _detect_historical_format(
+    header: str, filename: str | None = None
+) -> str | None:
+    """Name the CSV shape from its header line, or None when it is unknown.
+
+    Case separates the two data.gov.in shapes: the snapshot export spells the
+    column ``Arrival_Date`` and the prices ``Modal_x0020_Price``, while this
+    repository's canonical columns are lower-case throughout.
+    """
+    header = header or ""
+    if "Price Date" in header or "District Name" in header:
+        return "agmarknet_historical"
+    if "Arrival_Date" in header or "Modal_x0020_Price" in header:
+        return "data_gov_in_snapshot"
+    if "arrival_date" in header.lower():
+        return "canonical"
+    if "date,admin1" in header or (
+        "admin1" in header and filename and "wfp" in filename.lower()
+    ):
+        return "wfp_food_prices"
+    return None
+
+
+# Every projection reads the upload with ``all_varchar=true`` and parses each
+# column explicitly. The sniffer guesses a type per column, and it guessed
+# wrong in the way that matters: a canonical upload whose dates happen to be
+# ISO (``2026-10-01``) came back as a DATE column, so ``TRIM(arrival_date)``
+# failed with "No function matches the given name and argument types
+# 'trim(DATE)'" - the daily path refusing the shape it is built for. Text in,
+# explicit casts out, and the date itself is left as text on purpose: that is
+# what lets ``upsert_prices`` parse it day-first and reject impossible or future
+# dates, which a blanket TRY_CAST would quietly turn into NULLs.
+_HISTORICAL_PROJECTIONS = {
+    # Agmarknet archive export - dates like "05 Apr 2025".
+    "agmarknet_historical": """
+        SELECT
+            CAST(COALESCE(TRY_CAST("Price Date" AS DATE),
+                          TRY_STRPTIME("Price Date", '%d %b %Y')) AS VARCHAR) AS arrival_date,
+            TRIM(State) AS state, TRIM("District Name") AS district,
+            TRIM("Market Name") AS market, TRIM(Commodity) AS commodity,
+            TRIM(Variety) AS variety, TRIM(Grade) AS grade,
+            TRY_CAST(REPLACE(CAST("Min Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE) AS min_price,
+            TRY_CAST(REPLACE(CAST("Max Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE) AS max_price,
+            TRY_CAST(REPLACE(CAST("Modal Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE) AS modal_price
+        FROM read_csv_auto('{path}', header=true, ignore_errors=true, all_varchar=true)
+        WHERE "Price Date" IS NOT NULL AND TRIM("Price Date") != '' AND Commodity IS NOT NULL
+    """,
+    # data.gov.in snapshot export - URL-encoded spaces in the price columns.
+    "data_gov_in_snapshot": """
+        SELECT
+            CAST(TRY_CAST(Arrival_Date AS DATE) AS VARCHAR) AS arrival_date,
+            TRIM(State) AS state, TRIM(District) AS district, TRIM(Market) AS market,
+            TRIM(Commodity) AS commodity, TRIM(Variety) AS variety, TRIM(Grade) AS grade,
+            TRY_CAST(REPLACE(CAST("Min_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE) AS min_price,
+            TRY_CAST(REPLACE(CAST("Max_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE) AS max_price,
+            TRY_CAST(REPLACE(CAST("Modal_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE) AS modal_price
+        FROM read_csv_auto('{path}', header=true, ignore_errors=true, all_varchar=true)
+        WHERE Arrival_Date IS NOT NULL AND Commodity IS NOT NULL
+    """,
+    # This repository's canonical columns, as sent by push_live_prices.py. The
+    # date is deliberately left as text: upsert_prices parses it day-first and
+    # rejects impossible or future dates, which a blanket TRY_CAST would turn
+    # into silent NULLs instead.
+    "canonical": """
+        SELECT
+            TRIM(arrival_date) AS arrival_date, TRIM(state) AS state,
+            TRIM(district) AS district, TRIM(market) AS market,
+            TRIM(commodity) AS commodity, TRIM(variety) AS variety,
+            TRIM(grade) AS grade,
+            TRY_CAST(REPLACE(CAST(min_price AS VARCHAR), ',', '') AS DOUBLE) AS min_price,
+            TRY_CAST(REPLACE(CAST(max_price AS VARCHAR), ',', '') AS DOUBLE) AS max_price,
+            TRY_CAST(REPLACE(CAST(modal_price AS VARCHAR), ',', '') AS DOUBLE) AS modal_price
+        FROM read_csv_auto('{path}', header=true, ignore_errors=true, all_varchar=true)
+        WHERE arrival_date IS NOT NULL AND TRIM(arrival_date) != '' AND commodity IS NOT NULL
+    """,
+    # WFP/FAO food prices - one modal price, no grade, no min/max.
+    "wfp_food_prices": """
+        SELECT
+            CAST(TRY_CAST(date AS DATE) AS VARCHAR) AS arrival_date,
+            TRIM(admin1) AS state, TRIM(admin2) AS district, TRIM(market) AS market,
+            TRIM(commodity) AS commodity, TRIM(commodity) AS variety, '' AS grade,
+            NULL AS min_price, NULL AS max_price,
+            TRY_CAST(price AS DOUBLE) AS modal_price
+        FROM read_csv_auto('{path}', header=true, ignore_errors=true, all_varchar=true)
+        WHERE date IS NOT NULL AND commodity IS NOT NULL AND price IS NOT NULL
+          AND admin1 IS NOT NULL AND TRIM(admin1) != ''
+    """,
+}
+
+
+def _historical_projection_sql(fmt: str, path: str) -> str:
+    """The SELECT that reads one upload and names the canonical columns.
+
+    Only the path is interpolated, and it is a path this process created a
+    moment earlier with ``tempfile.NamedTemporaryFile``.
+    """
+    return _HISTORICAL_PROJECTIONS[fmt].format(path=path)
+
+
+def _days_behind(iso_date: str | None) -> int | None:
+    """How many days behind today (UTC) the newest arrival date is, or None."""
+    if not iso_date:
+        return None
+    try:
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        return (today - datetime.date.fromisoformat(str(iso_date))).days
+    except ValueError:
+        return None
+
+
 @app.post("/admin/ingest-historical", tags=["Admin"])
 def admin_ingest_historical(file: UploadFile = File(...)):
     """Upload and ingest a historical CSV file into the prices table.
@@ -2745,65 +2882,64 @@ def admin_ingest_historical(file: UploadFile = File(...)):
             with open(tmp_path, "r", encoding="utf-8") as f:
                 header = f.readline()
 
-            if "Price Date" in header or "District Name" in header:
-                # Agmarknet historical format (date: "05 Apr 2025")
-                conn.execute(f"""
-                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
-                                       min_price, max_price, modal_price)
-                    SELECT
-                        COALESCE(TRY_CAST("Price Date" AS DATE), TRY_STRPTIME("Price Date", '%d %b %Y')),
-                        TRIM(State), TRIM("District Name"),
-                        TRIM("Market Name"), TRIM(Commodity), TRIM(Variety), TRIM(Grade),
-                        TRY_CAST(REPLACE(CAST("Min Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
-                        TRY_CAST(REPLACE(CAST("Max Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE),
-                        TRY_CAST(REPLACE(CAST("Modal Price (Rs./Quintal)" AS VARCHAR), ',', '') AS DOUBLE)
-                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
-                    WHERE "Price Date" IS NOT NULL AND TRIM("Price Date") != '' AND Commodity IS NOT NULL
-                """)
-                fmt = "agmarknet_historical"
-            elif "date,admin1" in header or ("admin1" in header and file.filename and "wfp" in file.filename.lower()):
-                # WFP food prices format
-                conn.execute(f"""
-                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
-                                       min_price, max_price, modal_price)
-                    SELECT
-                        TRY_CAST(date AS DATE), TRIM(admin1), TRIM(admin2), TRIM(market),
-                        TRIM(commodity), TRIM(commodity), '', NULL, NULL,
-                        TRY_CAST(price AS DOUBLE)
-                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
-                    WHERE date IS NOT NULL AND commodity IS NOT NULL AND price IS NOT NULL
-                      AND admin1 IS NOT NULL AND TRIM(admin1) != ''
-                """)
-                fmt = "wfp_food_prices"
-            elif "Arrival_Date" in header:
-                # data.gov.in snapshot format
-                conn.execute(f"""
-                    INSERT OR IGNORE INTO prices (arrival_date, state, district, market, commodity, variety, grade,
-                                       min_price, max_price, modal_price)
-                    SELECT
-                        TRY_CAST(Arrival_Date AS DATE), TRIM(State), TRIM(District), TRIM(Market),
-                        TRIM(Commodity), TRIM(Variety), TRIM(Grade),
-                        TRY_CAST(REPLACE(CAST("Min_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE),
-                        TRY_CAST(REPLACE(CAST("Max_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE),
-                        TRY_CAST(REPLACE(CAST("Modal_x0020_Price" AS VARCHAR), ',', '') AS DOUBLE)
-                    FROM read_csv_auto('{tmp_path}', header=true, ignore_errors=true)
-                    WHERE Arrival_Date IS NOT NULL AND Commodity IS NOT NULL
-                """)
-                fmt = "data_gov_in_snapshot"
-            else:
-                conn.close()
-                return {"status": "error", "message": f"Unrecognized CSV format. Header: {header[:100]}"}
+            fmt = _detect_historical_format(header, file.filename)
+            if fmt is None:
+                return {
+                    "status": "error",
+                    "message": f"Unrecognized CSV format. Header: {header[:100]}",
+                }
+
+            # Every shape is projected onto the same canonical columns and then
+            # written through upsert_prices - the anti-join the pipeline itself
+            # uses. This endpoint used to run INSERT OR IGNORE against the
+            # UNIQUE index, which is both the conflict path that failed with
+            # "Failed to delete all rows from index" and the reason an upload
+            # skipped the batch dedupe, the impossible/future-date rejection and
+            # the rebuild-and-retry that upsert_prices performs.
+            df = conn.execute(_historical_projection_sql(fmt, tmp_path)).fetchdf()
+            records = df.to_dict("records")
+            rows_new = 0
+            for start in range(0, len(records), _HISTORICAL_BATCH):
+                rows_new += upsert_prices(
+                    conn, records[start:start + _HISTORICAL_BATCH]
+                )
+            conn.commit()
 
             n_prices = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
             n_commodities = conn.execute("SELECT COUNT(DISTINCT commodity) FROM prices").fetchone()[0]
+            max_date = conn.execute(
+                "SELECT CAST(MAX(arrival_date) AS VARCHAR) FROM prices"
+            ).fetchone()[0]
             conn.close()
 
+            # The newest date the file carried *and kept*. A date the write
+            # rejected - a year-2099 typo, a future date - is not what the file
+            # said, it is what the validator threw out, and reporting it as the
+            # file's newest date would invite the operator to believe it landed.
+            # Same guard, same function upsert_prices uses, so the two cannot
+            # disagree about which rows survived.
+            from mandi_rdd.core.dates import parse_arrival_date as _parse_date
+
+            kept = [
+                iso for iso in (_parse_date(r.get("arrival_date")) for r in records) if iso
+            ]
             return {
                 "status": "ok",
                 "format": fmt,
                 "filename": file.filename,
+                # What the upload carried, versus what it changed: a file can be
+                # read in full and still add nothing (a re-upload, or a day the
+                # warehouse already had), and that is not a failure.
+                "rows_read": len(records),
+                "rows_new": rows_new,
+                "newest_in_file": max(kept) if kept else None,
+                "dates_rejected": len(records) - len(kept),
+                # The same figures /health reports, so the caller can see the
+                # newest arrival date move instead of taking "ok" on trust.
                 "total_prices": n_prices,
                 "total_commodities": n_commodities,
+                "data_max_date": max_date,
+                "days_behind": _days_behind(max_date),
             }
         finally:
             conn.close()

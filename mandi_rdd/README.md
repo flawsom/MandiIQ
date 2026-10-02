@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![CI](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/ci.yml)
 [![Ingest](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml/badge.svg)](https://github.com/flawsom/MandiIQ/actions/workflows/nightly-ingest.yml)
-[![Tests](https://img.shields.io/badge/tests-179%20passing-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-263%20passing-brightgreen?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi)](mandi_rdd/api/main.py)
 [![DuckDB](https://img.shields.io/badge/DB-DuckDB-FFF000?style=flat-square&logo=duckdb)](https://duckdb.org/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20(free)-FF6600?style=flat-square&logo=openai)](https://openrouter.ai/)
@@ -199,16 +199,17 @@ pytest mandi_rdd/tests/ -v
 | `test_scheduler_integrity.py` (26 tests) | Missing-key failure, placeholder keys, idempotent upserts, lazily streamed price pages, write/time budgets, host-fallback price sources, source diagnostics, operator source override, resumable backfill cursor, index-fault marker reading + persistence, a recorded fault deferring the price **writes** as well as the repair (and naming the remedy), the mirror step's own verdict persisted (a rejected token is not a backfill), workflow YAML/schedule/secret policy |
 | `test_ceda_mirror.py` (16 tests) | CEDA Agmarknet mirror: inert without a token, rows normalised into the `prices` shape, bounded resumable walk, a bad cell not killing a sweep, cached catalogue, probe reporting reachability, a token the host **rejects** reported as `token_rejected` (not as an unreachable host), the real `output` envelope unwrapped, rate-limit handling (long `Retry-After` surfaces instead of blocking the tick) |
 | `test_spec_curve.py` (20 tests) | Estimator equivalence, specification curve, Benjamini-Hochberg, collapsed fits kept out of the FDR family |
-| `test_api_contract.py` (20 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness (including `last_ceda`, the last mirror verdict), index-heal reporting, the source-probe remedy for an unarmed vs a rejected mirror key, `/ask` schemas stay stable |
+| `test_api_contract.py` (27 tests) | Documented routes exist, OpenAPI builds, `/fdr` + `/spec-curve/{commodity}` schema, `/health` truthfulness (including `last_ceda`, the last mirror verdict), index-heal reporting, the source-probe remedy for an unarmed vs a rejected mirror key, `/ask` schemas stay stable, every historical-CSV shape projected onto the one canonical column set that `upsert_prices` writes (no shape may go back to `INSERT OR IGNORE` against the index), and the daily push end to end against a real warehouse: the first upload lands, the same file again adds nothing, and an impossible date is rejected rather than reported as the file's newest |
 | `test_analytics.py` (14 tests) | Conformal coverage, PSI/KS/PH/EWMA drift, EVT tails, DML recovery, Kalman smoothing |
 | `test_date_integrity.py` (14 tests) | Day-first date parsing, future-date rejection, warehouse repair, multi-connection DuckDB guard |
 | `test_orchestrator.py` (13 tests) | `/ask` commodity-detection regressions, tool routing, structured fallbacks |
 | `test_freshness_contract.py` (7 tests) | Health payloads built from real DuckDB warehouses: stale, degraded, empty, fresh |
-| `test_consumer_check.py` (11 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, plus an unrepaired index fault as a blocker |
+| `test_consumer_check.py` (14 tests) | Staleness attribution: upstream publication lag vs pipeline ingest failure in the consumer check and the external gate, an unrepaired index fault as a blocker, and the mirror read as a failover - an unlabelled build, or one that claims `healthy` while publishing no date, is a warning rather than a silence |
+| `test_push_live_prices.py` (5 tests) | The daily push: the upload body is the canonical ten columns with no fetcher metadata and no `nan`, it is the exact shape the ingest endpoint detects, a source that cannot be read reports "nothing to push" instead of a green run, and `--dry-run` uploads nothing |
 | `test_analytics_db.py` (6 tests) | End-to-end analytics adapters on a synthetic in-memory DuckDB |
 | `test_rainfall_contract.py` (5 tests) | `GET /rainfall` against a real temp warehouse: the series shape the pages query, the impossible-departure band, NaN normals crossing the wire as null, the case-insensitive subdivision filter, an empty warehouse returning `[]` |
 | `test_dashboard_data.py` (4 tests) | The dashboard's API-first data access: prices arrive as a usable DataFrame from the API, a silent API yields an empty frame rather than a crash, commodity pickers come from the API before the local warehouse |
-| `test_dashboard_boot.py` (12 tests) | Headless Streamlit run at the production refresh interval (a rerun loop shows up as a run that never settles), one settled run paints the chrome + sidebar + page body with exactly one banner and one sidebar freshness block, a dead API reports `unreachable` rather than an empty warehouse, a refresh reason with `<urlopen ...>` in it reaches both HTML surfaces escaped instead of being parsed away, the shell cannot fix-position its header or hide every button, the strip and the sidebar repaint themselves in their own fragments, the shell never calls `st.rerun`, and the routed page body is run once and never wrapped in a timer fragment, a build that cannot date its data is never called healthy, every page imports, route table intact |
+| `test_dashboard_boot.py` (13 tests) | Headless Streamlit run at the production refresh interval (a rerun loop shows up as a run that never settles), one settled run paints the chrome + sidebar + page body with exactly one banner and one sidebar freshness block and prints the cockpit revision it is running, a dead API reports `unreachable` rather than an empty warehouse, a refresh reason with `<urlopen ...>` in it reaches both HTML surfaces escaped instead of being parsed away, the shell cannot fix-position its header or hide every button, the strip and the sidebar repaint themselves in their own fragments, the shell never calls `st.rerun`, and the routed page body is run once, never wrapped in a timer fragment, and degrades to a no-op if anything ever re-enters it, a build that cannot date its data is never called healthy, every page imports, route table intact |
 
 **Key:** The estimator tests use synthetic data with **known ground truth** (injected discontinuity, known DML coefficient, noisy trend) so CI needs no warehouse, API keys or GPU.
 
@@ -323,6 +324,29 @@ pytest mandi_rdd/tests/ -v
 | **IMD Rainfall** | data.gov.in sub-division rainfall catalog | [Catalog](https://www.data.gov.in/catalog/rainfall-india) + GitHub Datameet fallback |
 | **District→Sub-division mapping** | Built-in lookup table (500+ entries covering 9 states) | `ingestion/fetch_rainfall.py` |
 | **AI Orchestration (Phase 11)** | OpenRouter free-tier models (OpenAI-compatible API) | [openrouter.ai/keys](https://openrouter.ai/keys) (free, no card) |
+
+---
+
+### 🔄 Keeping the newest date current (the daily push)
+
+**No cloud network this project runs on can read the source.** Measured on 2026-10-02: `api.data.gov.in` resets TLS from Northflank *and* from a plain cloud sandbox (`SSL: UNEXPECTED_EOF_WHILE_READING`), `agmarknet.gov.in` answers every cloud address with 403, and the CEDA archive's daily coverage ends around 2025-10. The newest arrival date therefore cannot be advanced by the container, and a run that reports `price source unavailable` is reporting the network, not a bug in the pipeline.
+
+The daily update is a **push** from a network that *can* read the source - a laptop on an Indian connection, an office gateway, a VPN:
+
+```bash
+# fetch the current snapshot and hand it to production
+python -m mandi_rdd.scripts.push_live_prices
+
+# or upload a CSV you already have (any shape the endpoint detects)
+python -m mandi_rdd.scripts.push_live_prices --file ~/Downloads/agmarknet-today.csv
+
+# prove it afterwards: the newest date, not the HTTP status
+python -m mandi_rdd.scripts.check_production_freshness
+```
+
+It prints the warehouse's freshness before and after, so "it worked" is the newest arrival date moving - and an upload that carried nothing newer says so instead of reporting success. Re-running it is safe: `POST /admin/ingest-historical` upserts through the same anti-join as the pipeline (`NOT EXISTS` on market/commodity/variety/grade/arrival_date), so overlapping with a scheduled run, or re-sending the same file, cannot duplicate a row. A CSV dropped into `mandi_rdd/data/historical/` is consumed the same way at the start of every pipeline run, and deleted only once its rows have landed.
+
+The endpoint detects four shapes - this repository's canonical columns, a `data.gov.in` snapshot export (`Arrival_Date` / `Modal_x0020_Price`), an Agmarknet archive export (`Price Date`), and the WFP/FAO food-price export - and answers with `rows_read`, `rows_new`, `newest_in_file`, `data_max_date` and `days_behind`, which is what makes one push verifiable from the caller's side.
 
 ---
 

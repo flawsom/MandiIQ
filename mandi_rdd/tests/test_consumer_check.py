@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from mandi_rdd.scripts.check_production_freshness import evaluate
 from mandi_rdd.scripts.consumer_check import (
+    check_cross_surface,
     check_provenance,
     pipeline_failure_signals,
     upstream_lag_signature,
@@ -166,3 +167,46 @@ def test_freshness_gate_blocks_when_commodities_stop_on_different_dates():
     }
     problems = evaluate(report)
     assert any("ingest is behind upstream" in problem for problem in problems), problems
+
+
+def test_a_mirror_that_cannot_date_its_data_is_never_read_as_healthy():
+    """The failover was serving a build that could not say what day it was.
+
+    On 2026-10-02 the mirror answered ``status: "healthy"`` while publishing no
+    ``data_max_date`` and no ``version``, and this check stayed silent: the
+    disagreement loop skips a key either side omits, so an omitted date was not
+    a date that conflicts. A mirror that cannot be dated or identified is the
+    failover path serving something else, which is a finding - not a silence.
+    """
+    findings = check_cross_surface(
+        _health(),
+        {"status": "healthy", "n_prices": 1_900_000},
+    )
+    messages = " ".join(finding["message"] for finding in findings)
+
+    assert "no version" in messages, "an unlabelled failover build must be named"
+    assert "cannot date its data" in messages, "healthy without a date is not healthy"
+    assert all(level == "warning" for level in _levels(findings)), (
+        "the mirror is not our pipeline: it warns, it does not block our own release"
+    )
+
+
+def test_a_mirror_on_the_same_day_and_build_stays_quiet():
+    findings = check_cross_surface(
+        _health(),
+        {
+            "status": "stale",
+            "data_max_date": SHARED_DATE,
+            "n_prices": 1_994_318,
+            "version": "2.4.4",
+        },
+    )
+    assert findings == [], findings
+
+
+def test_a_mirror_serving_a_different_day_is_still_a_warning():
+    findings = check_cross_surface(
+        _health(),
+        {"status": "stale", "data_max_date": "2026-07-29", "version": "2.4.0"},
+    )
+    assert any("disagree on data_max_date" in finding["message"] for finding in findings)
