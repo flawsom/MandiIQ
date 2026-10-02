@@ -349,17 +349,6 @@ def _run_ingestion_locked(
     """
     start = time.time()
     light = scope != SCOPE_FULL
-    # 0. Consume any historical CSVs dropped into data/historical/ so the
-    #    dashboard can build a real time-series (the live API is daily-only).
-    with pipeline_metrics.step("historical_backfill"):
-        try:
-            n_hist = run_historical_backfill(folder="mandi_rdd/data/historical")
-            if n_hist:
-                pipeline_metrics.record_rows("historical_backfill", n_hist, n_hist)
-                logger.info(f"Historical backfill ingested {n_hist} rows.")
-        except Exception as e:
-            logger.warning(f"Historical backfill skipped: {e}")
-
     summary = {"status": "ok", "steps": {}, "scope": scope}
     logger.info("Pipeline run starting: scope=%s", scope)
 
@@ -371,6 +360,8 @@ def _run_ingestion_locked(
     # 1a. Make sure the UNIQUE index over prices is still enforcing. A bulk load
     #     that ran out of memory can leave it inconsistent, after which every
     #     write touching those keys fails and ingestion cannot make progress.
+    index_report: dict = {}
+    fault_flagged = False
     with pipeline_metrics.step("index_health"):
         try:
             from mandi_rdd.storage.duckdb_store import index_fault_flagged
@@ -382,10 +373,62 @@ def _run_ingestion_locked(
             # reports the fault instead of starting the repair.
             note_refresh_step("index_health")
             index_report = _check_price_index(conn, light=light)
-            index_report["fault_flagged"] = index_fault_flagged()
+            fault_flagged = index_fault_flagged()
+            index_report["fault_flagged"] = fault_flagged
             summary["steps"]["index_health"] = index_report
         except Exception as e:
             logger.warning(f"Price index check skipped: {e}")
+
+    # 1a-bis. A fault this run may not repair has to stop the *writes* too, not
+    #         only the repair. Deferring the rebuild is the light-scope policy;
+    #         deferring the write is what makes that policy survivable. The
+    #         first write against a broken prices index raises
+    #         "Failed to delete all rows from index", and DuckDB invalidates the
+    #         whole database instance when it does - so every statement after it
+    #         in the same run raises as well, and a run that meant to degrade
+    #         instead fails. Measured on 2026-10-02: the light tick logged the
+    #         fault in index_health, then died in the state backfill and
+    #         reported `last_outcome: failure` while the warehouse sat frozen.
+    #         Every step below that writes to `prices` is skipped instead, and
+    #         the run reports the remedy that would actually fix it.
+    price_writes_blocked = bool(fault_flagged) and not index_report.get("rebuilt")
+    if price_writes_blocked:
+        blocked_steps = [
+            "historical_backfill", "fetch_prices", "prices_ceda",
+            "prices_varietywise", "backfill_state",
+        ]
+        summary["steps_skipped"] = list(dict.fromkeys(
+            list(summary.get("steps_skipped") or []) + blocked_steps
+        ))
+        summary["status"] = "degraded"
+        summary["error"] = (
+            "price writes deferred: a prices-index fault is on record and this "
+            "run may not rebuild the table; a write on a broken index is fatal "
+            "and invalidates the DuckDB instance for the rest of the run. "
+            "POST /admin/rebuild-prices (or POST /refresh?scope=full) repairs it"
+        )
+        for _blocked in blocked_steps:
+            summary["steps"][_blocked] = {
+                "status": "skipped", "reason": "index_fault_pending",
+            }
+        logger.error(
+            "Price-index fault pending: skipping the price write phase this run "
+            "(historical backfill, live fetch, CEDA mirror, variety-wise feed, "
+            "state backfill). Repair with POST /admin/rebuild-prices."
+        )
+
+    # 0. Consume any historical CSVs dropped into data/historical/ so the
+    #    dashboard can build a real time-series (the live API is daily-only).
+    #    It writes to `prices`, so it runs after the index check, not before it.
+    if not price_writes_blocked:
+        with pipeline_metrics.step("historical_backfill"):
+            try:
+                n_hist = run_historical_backfill(folder="mandi_rdd/data/historical")
+                if n_hist:
+                    pipeline_metrics.record_rows("historical_backfill", n_hist, n_hist)
+                    logger.info(f"Historical backfill ingested {n_hist} rows.")
+            except Exception as e:
+                logger.warning(f"Historical backfill skipped: {e}")
 
     # 1b. Heal arrival dates before anything analytical runs. Future-dated
     #     rows are month-first mis-parses of a DD/MM/YYYY source, and they
@@ -433,7 +476,7 @@ def _run_ingestion_locked(
                 cursor_state = 0
             cursor_out: dict = {}
             logger.info("Price fetch resuming from cursor offset %s", cursor_state)
-            for page in iter_price_pages(
+            _price_pages = iter_price_pages(
                 filters=filters,
                 max_records=max_records,
                 page_size=page_size,
@@ -443,7 +486,12 @@ def _run_ingestion_locked(
                 progress_callback=lambda done, total: logger.info(
                     f"  Prices: {done}/{total} records"
                 ),
-            ):
+            )
+            if price_writes_blocked:
+                # iter_price_pages is a generator: nothing is fetched until it
+                # is walked, so this is a real skip and not a fetch we discard.
+                _price_pages = iter(())
+            for page in _price_pages:
                 for record in page:
                     source = record.pop("_source", None)
                     if source is not None and source_info is None:
@@ -465,7 +513,10 @@ def _run_ingestion_locked(
                     price_write_error = str(e)
                     break
                 pipeline_metrics.record_rows("fetch_prices", n_prices, n_new)
-            pipeline_metrics.record_api_call("data.gov.in", time.monotonic() - _t0, True)
+            if not price_writes_blocked:
+                pipeline_metrics.record_api_call(
+                    "data.gov.in", time.monotonic() - _t0, True
+                )
             # Persist the walk's position so the next run continues the pass.
             # The cursor only ever moves forward, except when a pass completes
             # and deliberately wraps back to 0 for the next sweep.
@@ -518,7 +569,7 @@ def _run_ingestion_locked(
     #     that does answer, and needs only a token; without the token this step
     #     is inert and the run stays degraded exactly as before.
     served_by = source_info.get("source_name") if source_info else None
-    if n_prices == 0:
+    if n_prices == 0 and not price_writes_blocked:
         with pipeline_metrics.step("prices_ceda"):
             n_ceda = 0
             n_ceda_new = 0
@@ -645,7 +696,7 @@ def _run_ingestion_locked(
             _t0 = time.monotonic()
             variety_records = fetch_varietywise_recent(days=60, max_records=20000)
             pipeline_metrics.record_api_call("varietywise_archive", time.monotonic() - _t0, True)
-            if variety_records:
+            if variety_records and not price_writes_blocked:
                 n_var_new = upsert_prices(conn, variety_records)
                 pipeline_metrics.record_rows("prices_varietywise", len(variety_records), n_var_new)
                 summary["steps"]["prices_varietywise"] = {
@@ -687,6 +738,11 @@ def _run_ingestion_locked(
         "new": n_new,
         "served_by": served_by,
     }
+    if price_writes_blocked:
+        summary["steps"]["prices"]["deferred"] = "index_fault_pending"
+        summary["steps"]["prices"]["hint"] = (
+            "POST /admin/rebuild-prices rebuilds the prices table and its index"
+        )
     if price_fetch_error:
         summary["steps"]["prices"]["error"] = price_fetch_error
         summary["status"] = "degraded"
@@ -719,14 +775,27 @@ def _run_ingestion_locked(
     logger.info(f"District-subdivision mappings: {len(district_map)}")
 
     # 3.5. Backfill state fields in prices using district map
-    with pipeline_metrics.step("backfill_state"):
-        logger.info("Backfilling state fields using district-to-state mapping...")
-        from mandi_rdd.ingestion.backfill_state import backfill, build_lookup
-        # backfill() takes a district->state lookup, not the connection it will
-        # open itself; passing the connection here used to abort every run.
-        n_updated = backfill(build_lookup())
-        summary["steps"]["backfill_state"] = {"updated": n_updated}
-        logger.info(f"State fields backfilled: {n_updated} records")
+    # The state backfill rewrites `state` on the price rows it matches, i.e. an
+    # UPDATE - which DuckDB runs as a delete-and-insert through the same index a
+    # recorded fault has broken. It is therefore part of the write phase, and it
+    # is also wrapped: a write fault here must degrade the run, not abort the
+    # rainfall and analysis work that can still run on the existing warehouse.
+    if not price_writes_blocked:
+        with pipeline_metrics.step("backfill_state"):
+            try:
+                logger.info("Backfilling state fields using district-to-state mapping...")
+                from mandi_rdd.ingestion.backfill_state import backfill, build_lookup
+                # backfill() takes a district->state lookup, not the connection
+                # it will open itself; passing the connection here used to
+                # abort every run.
+                n_updated = backfill(build_lookup())
+                summary["steps"]["backfill_state"] = {"updated": n_updated}
+                logger.info(f"State fields backfilled: {n_updated} records")
+            except Exception as e:
+                logger.warning(f"State backfill skipped: {e}")
+                summary["steps"]["backfill_state"] = {
+                    "status": "error", "error": str(e),
+                }
 
     # 4. Ingest rainfall
     if not skip_rainfall:
@@ -972,8 +1041,12 @@ def _run_ingestion_locked(
     summary["steps"]["narratives"] = {"generated": len(narrative_results), "commodities": narrative_results}
     summary["duration_seconds"] = round(time.time() - start, 1)
     summary["commodities_analyzed"] = analysis_targets
-    summary["steps_skipped"] = (
-        [name for name in LIGHT_SKIPPED_STEPS] if light else []
+    # Merge, do not overwrite: a run that deferred its price writes because of a
+    # recorded index fault named those steps in `steps_skipped` earlier, and a
+    # reader has to see both kinds of omission to know what this run did not do.
+    summary["steps_skipped"] = sorted(
+        set(summary.get("steps_skipped") or [])
+        | (set(LIGHT_SKIPPED_STEPS) if light else set())
     )
     if light:
         summary["analysis_deferred_for"] = target_commodities

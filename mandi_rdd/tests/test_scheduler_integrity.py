@@ -524,10 +524,46 @@ def test_pipeline_upserts_each_page_instead_of_buffering(monkeypatch):
     source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
         encoding="utf-8"
     )
-    assert "for page in iter_price_pages(" in source
+    # The walk is still lazy: `iter_price_pages(` builds a generator and the
+    # loop consumes it, so the only edit was naming it (the write phase may be
+    # deferred, and an un-walked generator fetches nothing).
+    assert "iter_price_pages(" in source
+    assert "for page in _price_pages:" in source
     assert "n_new += upsert_prices(conn, page)" in source
     assert "MANDIIQ_PRICE_FETCH_MAX_SECONDS" in source
     assert "price_records" not in source, "the buffered fetch path is still there"
+
+
+def test_a_recorded_index_fault_defers_the_writes_as_well_as_the_repair():
+    """Deferring the rebuild must not leave the run to die in the next write.
+
+    DuckDB invalidates the whole database instance on "Failed to delete all rows
+    from index", so the first write against a broken prices index takes every
+    later step of the run down with it - the state backfill included, because an
+    UPDATE is a delete-and-insert through that same index. A light run may not
+    rebuild, so it must not write either, and it has to say which remedy does
+    work instead of reporting `failure` while the warehouse sits frozen.
+    """
+    source = (REPO_ROOT / "mandi_rdd" / "ingestion" / "scheduler.py").read_text(
+        encoding="utf-8"
+    )
+    assert "price_writes_blocked = bool(fault_flagged) and not index_report.get(" in source
+    for step in (
+        "historical_backfill", "fetch_prices", "prices_ceda",
+        "prices_varietywise", "backfill_state",
+    ):
+        assert f'"{step}"' in source
+    assert "POST /admin/rebuild-prices" in source, (
+        "a deferred write must name the repair that resolves it"
+    )
+    # The backfill writes to `prices`, so it cannot run before the check that
+    # decides whether writing is safe.
+    assert source.index('step("index_health")') < source.index(
+        'step("historical_backfill")'
+    )
+    # And the deferral must survive to the status file alongside the light-run
+    # omissions rather than being overwritten by them.
+    assert "set(summary.get(\"steps_skipped\") or [])" in source
 
 
 def test_every_workflow_is_valid_yaml():

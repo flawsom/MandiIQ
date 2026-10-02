@@ -405,6 +405,22 @@
 # section), so with the flag unset the workflow reports the pending fault and
 # leaves the warehouse stale-but-serving instead of restarting a small
 # container to clear it.
+#
+# Deferring the rebuild defers the WRITES with it, and that half was missing
+# until 2026-10-02. The first write against a broken prices index raises
+# "Failed to delete all rows from index", and DuckDB invalidates the whole
+# database instance when it does - so every statement after it in the same run
+# raises too. The light tick logged the fault in index_health as designed, then
+# went on to write anyway, died in the state backfill (an UPDATE is a
+# delete-and-insert through that same index) and reported `failure` with the
+# warehouse frozen at 7 days behind. A run that may not rebuild now skips the
+# price write phase - historical CSV backfill, live fetch, the CEDA mirror, the
+# variety-wise feed and the state backfill - records them in `steps_skipped`
+# and `steps.prices.deferred`, reports `degraded` with the remedy in
+# `summary.error`, and still refreshes rainfall, RDD and the forecast on the
+# rows it already has. So `index_fault_pending: true` now means "ingestion is
+# writing nothing until you repair it" - repair it, do not wait for a tick to
+# find a way through.
 # If the upstream feed (api.data.gov.in) is unreachable, /health reports a
 # degraded run and the warehouse keeps serving what it has - the pipeline
 # skips the price fetch and still refreshes rainfall, RDD and the forecast.
