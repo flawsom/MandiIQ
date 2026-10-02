@@ -149,6 +149,22 @@ except ImportError:
     _HAS_COMPONENTS_PAGE = False
 
 
+# Which revision of this file the host is running.
+#
+# The sidebar's ``build`` is the *API's* ``/health.version`` - it names the
+# server that answered the freshness question, not the cockpit on screen. Those
+# are two different deployments, and Streamlit Community Cloud serves whatever
+# it last deployed, so a fix that is on ``master`` (and green in
+# tests/test_dashboard_boot.py) can stay invisible for as long as the host has
+# not redeployed. Until this string existed, the only way to tell which revision
+# was live was to read line numbers out of a traceback: the 2.4.3 page-run fix
+# (dbb4a28) was reported as still broken an hour after it was pushed because the
+# live traceback named the page run on line 1792 - the line the pre-fix file had
+# it on, while ``master`` had moved it to 1795. Bump this with every change to
+# this file; it is painted into the sidebar next to the build.
+COCKPIT_REV = "2026.10.02-2"
+
+
 
 # ═══════════════════════════════════════════════════════════
 
@@ -1607,6 +1623,11 @@ def _paint_sidebar_live(live: dict) -> None:
         )
     if live["version"]:
         _lines.append("build " + str(live["version"]))
+    # ``build`` above is the API's version - which server answered. This is
+    # which cockpit is on screen, which is what decides whether a fix is
+    # visible at all. When the host has not redeployed, this line is the whole
+    # reason the bug is still there.
+    _lines.append("cockpit " + COCKPIT_REV)
     if live["status"] == "unreachable" and live["api_base"]:
         _lines.append("no answer from " + str(live["api_base"]))
     # A repaint that finds the same /health payload looks like no repaint at
@@ -1795,6 +1816,17 @@ def _paint_current_page() -> None:
         pg.run()
 
     except Exception as _exc:  # surface real error instead of redacted box
+
+        # Re-entering this function from a fragment tick runs the page object a
+        # second time in the same script run, and Streamlit refuses it with
+        # "This page cannot be called directly. Only the page returned from
+        # st.navigation can be called once." The page is already painted by the
+        # run that owns it, so there is nothing left to do - and a traceback
+        # where the page belongs reads as a broken app, which is a worse lie
+        # than a page that simply did not repaint. Anything else still raises.
+        if "cannot be called" in str(_exc):
+
+            return
 
         import traceback as _tb
 

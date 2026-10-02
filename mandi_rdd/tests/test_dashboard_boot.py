@@ -109,6 +109,11 @@ def test_one_run_paints_the_whole_cockpit_and_one_banner(monkeypatch):
         f"expected one sidebar freshness block, got {len(sidebar_blocks)}"
     )
 
+    # The revision on screen has to be the cockpit's own, not the API's build.
+    assert any("cockpit " in b for b in bodies), (
+        "the sidebar must print the cockpit revision it is running"
+    )
+
     hero = [str(m.value) for m in app.markdown if "page-hero" in str(m.value)]
     assert hero, "the page body never rendered - only the shell did"
 
@@ -291,7 +296,9 @@ def test_the_routed_page_is_run_once_and_never_from_a_timer_fragment():
     answered every route with "This page cannot be called directly. Only the
     page returned from st.navigation can be called once." What the user saw was
     a traceback where the Risk Map belonged. The page body is run plainly, once;
-    only the strip and the sidebar carry the "Live updates" clock.
+    only the strip and the sidebar carry the "Live updates" clock. If a later
+    shell re-enters it anyway, the second call is swallowed as a no-op instead
+    of a traceback where the page belongs.
     """
     source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
 
@@ -313,6 +320,33 @@ def test_the_routed_page_is_run_once_and_never_from_a_timer_fragment():
     assert source.count('st.session_state.get("live_auto_refresh", True)') >= 2, (
         "one toggle must gate both ticking surfaces"
     )
+    # The re-entry is refused by Streamlit, not by us: the guard has to swallow
+    # exactly that refusal - the page is already painted - and nothing else.
+    assert '"cannot be called" in str(_exc)' in body, (
+        "a second call must degrade to a no-op, not a traceback where the page belongs"
+    )
+
+
+def test_the_cockpit_names_the_revision_it_is_running():
+    """Which revision the host serves must be readable off the app itself.
+
+    The sidebar's ``build`` is the API's ``/health.version``: it names the
+    server that answered the freshness question, not the cockpit on screen, and
+    the two are separate deployments. So a fix that is on ``master`` - and green
+    right here - stays invisible for as long as Streamlit Community Cloud has
+    not redeployed, and until this string existed the only way to tell was to
+    read line numbers out of a traceback: a live cockpit still named
+    ``pg.run()`` on line 1792, the line the pre-fix file had it on, while
+    ``master`` had moved it to 1795. ``COCKPIT_REV`` is painted beside the build
+    so the running revision is a fact on the page.
+    """
+    source = (DASHBOARD_DIR / "app.py").read_text(encoding="utf-8", errors="replace")
+
+    assert 'COCKPIT_REV = "' in source, "the cockpit must carry a revision string"
+    assert '"cockpit " + COCKPIT_REV' in source, (
+        "the sidebar has to paint the revision it is running"
+    )
+    assert "COCKPIT_REV" in _function_block(source, "_paint_sidebar_live")
 
 
 def test_an_unreachable_api_is_never_reported_as_an_empty_warehouse():
