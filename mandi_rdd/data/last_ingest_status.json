@@ -1,5 +1,5 @@
 {
-  "last_run_utc": "2026-10-22T10:24:14.629768Z",
+  "last_run_utc": "2026-10-23T10:21:13.879955Z",
   "outcome": "degraded",
   "status": "degraded",
   "scope": "light",
@@ -11,7 +11,7 @@
     "rdd_analysis"
   ],
   "new_price_rows": 0,
-  "duration_s": 91.0,
+  "duration_s": 109.0,
   "error": "price source unavailable: <urlopen error timed out>",
   "price_source": null,
   "data_max_date": null,
@@ -21,7 +21,7 @@
     "rebuilt": false,
     "duplicates": 0,
     "fault_flagged": false,
-    "checked_at": "2026-10-22T10:24:14.629760Z"
+    "checked_at": "2026-10-23T10:21:13.879948Z"
   },
   "ceda": {
     "status": "skipped"
