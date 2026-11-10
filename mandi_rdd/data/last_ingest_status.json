@@ -1,5 +1,5 @@
 {
-  "last_run_utc": "2026-11-09T14:09:25.938908Z",
+  "last_run_utc": "2026-11-10T13:40:41.410247Z",
   "outcome": "degraded",
   "status": "degraded",
   "scope": "light",
@@ -11,7 +11,7 @@
     "rdd_analysis"
   ],
   "new_price_rows": 0,
-  "duration_s": 45.4,
+  "duration_s": 42.8,
   "error": "price source unavailable: <urlopen error [Errno 111] Connection refused>",
   "price_source": null,
   "data_max_date": null,
@@ -21,7 +21,7 @@
     "rebuilt": false,
     "duplicates": 0,
     "fault_flagged": false,
-    "checked_at": "2026-11-09T14:09:25.938901Z"
+    "checked_at": "2026-11-10T13:40:41.410239Z"
   },
   "ceda": {
     "status": "skipped"
