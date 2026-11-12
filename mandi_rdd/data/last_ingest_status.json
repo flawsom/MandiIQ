@@ -1,5 +1,5 @@
 {
-  "last_run_utc": "2026-11-11T12:53:21.927681Z",
+  "last_run_utc": "2026-11-12T13:55:58.000673Z",
   "outcome": "degraded",
   "status": "degraded",
   "scope": "light",
@@ -11,8 +11,8 @@
     "rdd_analysis"
   ],
   "new_price_rows": 0,
-  "duration_s": 85.2,
-  "error": "price source unavailable: <urlopen error timed out>",
+  "duration_s": 60.2,
+  "error": "price source unavailable: <urlopen error [Errno 111] Connection refused>",
   "price_source": null,
   "data_max_date": null,
   "days_behind": null,
@@ -21,7 +21,7 @@
     "rebuilt": false,
     "duplicates": 0,
     "fault_flagged": false,
-    "checked_at": "2026-11-11T12:53:21.927674Z"
+    "checked_at": "2026-11-12T13:55:58.000666Z"
   },
   "ceda": {
     "status": "skipped"
